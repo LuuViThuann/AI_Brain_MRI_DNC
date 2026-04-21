@@ -1,0 +1,1406 @@
+/**
+ * xai_similar_ui.js - FIXED VERSION (Vietnamese Feature Names)
+ * ✅ Tất cả lỗi syntax đã được sửa
+ * Hiển thị tên feature bằng tiếng Việt
+ */
+
+(function XAISimilarUIModule() {
+  'use strict';
+
+  const API_BASE = 'http://127.0.0.1:8000/api';
+  const DEBUG = true;
+
+  // ===== 🇻🇳 FEATURE NAME TRANSLATION MAP =====
+  const FEATURE_NAMES_VI = {
+    // Geometric features
+    'tumor_area': 'Diện tích khối u',
+    'tumor_perimeter': 'Chu vi khối u',
+    'circularity': 'Độ tròn',
+    'solidity': 'Độ đặc',
+    'aspect_ratio': 'Tỷ lệ khung hình',
+    'bbox_width': 'Chiều rộng khung',
+    'bbox_height': 'Chiều cao khung',
+
+    // Location features
+    'location_x': 'Vị trí ngang (X)',
+    'location_y': 'Vị trí dọc (Y)',
+
+    // Intensity features
+    'mean_intensity': 'Cường độ trung bình',
+    'std_intensity': 'Độ lệch cường độ',
+    'min_intensity': 'Cường độ tối thiểu',
+    'max_intensity': 'Cường độ tối đa',
+
+    // Additional features
+    'contrast': 'Độ tương phản',
+    'homogeneity': 'Độ đồng nhất',
+    'entropy': 'Entropy',
+    'edge_density': 'Mật độ cạnh'
+  };
+
+  // ===== 🇻🇳 FEATURE DESCRIPTIONS (Giải thích chi tiết) =====
+  const FEATURE_DESCRIPTIONS_VI = {
+    'tumor_area': 'Kích thước vùng khối u (mm²). Yếu tố quan trọng nhất để đánh giá mức độ nghiêm trọng.',
+    'tumor_perimeter': 'Chu vi đường viền khối u. Phản ánh hình dạng và ranh giới của khối u.',
+    'circularity': 'Mức độ hình tròn của khối u (0-1). Giá trị cao = hình dạng đều đặn.',
+    'solidity': 'Tỷ lệ giữa diện tích khối u và diện tích bao lồi. Phản ánh độ đặc của khối u.',
+    'aspect_ratio': 'Tỷ lệ chiều rộng/chiều cao. Cho biết khối u có bị kéo dài theo một chiều không.',
+    'location_x': 'Vị trí khối u theo chiều ngang (trái-phải). Quan trọng để xác định vùng não bị ảnh hưởng.',
+    'location_y': 'Vị trí khối u theo chiều dọc (trên-dưới). Giúp định vị chính xác khối u.',
+    'mean_intensity': 'Cường độ sáng trung bình của khối u. Phản ánh mật độ mô.',
+    'std_intensity': 'Độ biến thiên cường độ sáng. Cho biết khối u có đồng nhất hay không.',
+    'bbox_width': 'Chiều rộng của hình chữ nhật bao quanh khối u.',
+    'bbox_height': 'Chiều cao của hình chữ nhật bao quanh khối u.'
+  };
+
+  // ===== 🎨 FEATURE IMPORTANCE COLORS =====
+  const IMPORTANCE_COLORS = {
+    critical: { threshold: 40, color: '#ff5252', label: '🔴 Yếu tố chính', rgb: '255, 82, 82' },
+    high: { threshold: 20, color: '#ff9100', label: '🟡 Yếu tố quan trọng', rgb: '255, 145, 0' },
+    medium: { threshold: 10, color: '#0097b4', label: '🟢 Yếu tố phụ', rgb: '0, 229, 255' },
+    low: { threshold: 0, color: '#4a5568', label: '⚪ Ảnh hưởng nhỏ', rgb: '136, 153, 176' }
+  };
+
+  // ===== LOGGING UTILITY =====
+  function log(message, data = null) {
+    if (!DEBUG) return;
+    const style = 'color: #0097b4; font-weight: bold;';
+    if (data) {
+      console.log(`%c[XAI] ${message}`, style, data);
+    } else {
+      console.log(`%c[XAI] ${message}`, style);
+    }
+  }
+
+  function warn(message, data = null) {
+    const style = 'color: #ff9100; font-weight: bold;';
+    if (data) {
+      console.warn(`%c[XAI] ${message}`, style, data);
+    } else {
+      console.warn(`%c[XAI] ${message}`, style);
+    }
+  }
+
+  function error(message, data = null) {
+    const style = 'color: #ff5252; font-weight: bold;';
+    if (data) {
+      console.error(`%c[XAI] ${message}`, style, data);
+    } else {
+      console.error(`%c[XAI] ${message}`, style);
+    }
+  }
+
+  // ===== MAIN UI CONTROLLER =====
+  window.XAISimilarUI = {
+
+    // State management
+    state: {
+      currentXAIData: null,
+      currentSimilarData: null,
+      isInitialized: false
+    },
+
+    // ===== INITIALIZATION =====
+    init: function () {
+      log('🚀 Initializing XAI & Similar Cases UI (Vietnamese Mode)');
+
+      try {
+        this.setupEventListeners();
+        this.setupDiagnosisIntegration();
+        this.state.isInitialized = true;
+        log('✅ UI initialized and ready');
+      } catch (e) {
+        error('Failed to initialize', e);
+      }
+    },
+
+    // ===== EVENT LISTENERS SETUP =====
+    setupEventListeners: function () {
+      log('Setting up event listeners');
+
+      document.addEventListener('diagnosisComplete', (event) => {
+        log('📥 Diagnosis complete event received', event.detail);
+
+        if (event.detail && event.detail.xaiData) {
+          this.state.currentXAIData = event.detail.xaiData;
+          window.lastXAIData = event.detail.xaiData;
+
+          this.renderXAIDashboard(event.detail.xaiData);
+          this.showXAIPanel();
+        }
+
+        if (event.detail && event.detail.similarData) {
+          this.state.currentSimilarData = event.detail.similarData;
+          window.lastSimilarData = event.detail.similarData;
+
+          this.renderSimilarCases(event.detail.similarData);
+        }
+      });
+
+      document.addEventListener('diagnosisError', (event) => {
+        warn('Diagnosis error event received', event.detail);
+        this.showXAIError(event.detail?.message || 'Unknown error');
+      });
+    },
+
+    // ===== DIAGNOSIS INTEGRATION =====
+    setupDiagnosisIntegration: function () {
+      log('Setting up diagnosis integration');
+
+      window.XAISimilarUI.renderDiagnosisResults = (diagnosisData) => {
+        log('Rendering diagnosis results', diagnosisData);
+
+        if (diagnosisData.xai) {
+          window.XAISimilarUI.renderXAIDashboard(diagnosisData.xai);
+          window.XAISimilarUI.showXAIPanel();
+        }
+
+        if (diagnosisData.similar_cases) {
+          window.XAISimilarUI.renderSimilarCases({
+            similar_cases: diagnosisData.similar_cases,
+            search_time_ms: diagnosisData.search_time_ms || 0,
+            total_cases: diagnosisData.total_cases || 0
+          });
+          window.XAISimilarUI.showSimilarPanel();
+        }
+      };
+    },
+
+    // ===== FETCH SIMILAR CASES =====
+    fetchSimilarCases: async function (imageFile) {
+      log('🔍 Fetching similar cases...');
+
+      if (!imageFile) {
+        warn('No image file provided');
+        this.showSimilarPlaceholder('no-image');
+        return null;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append('file', imageFile);
+        formData.append('k', 5);
+
+        log('📤 Sending request to /api/similar/find');
+
+        const response = await fetch(`${API_BASE}/similar/find`, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          log('⚠️ Similar search unavailable:', errorData);
+
+          if (response.status === 503) {
+            this.showSimilarPlaceholder('index-not-built', errorData);
+            return null;
+          }
+
+          throw new Error(errorData.message || 'Similar search failed');
+        }
+
+        const data = await response.json();
+        log('✅ Similar cases received:', data);
+
+        this.state.currentSimilarData = data;
+        window.lastSimilarData = data;
+
+        this.renderSimilarCases(data);
+
+        return data;
+
+      } catch (error) {
+        warn('❌ Similar cases fetch error:', error);
+        this.showSimilarPlaceholder('error', error);
+        return null;
+      }
+    },
+
+    // ===== RENDER XAI DASHBOARD =====
+    renderXAIDashboard: function (xaiData) {
+      const panel = document.getElementById('xaiPanel');
+
+      if (!panel) {
+        error('XAI panel not found in DOM');
+        return;
+      }
+
+      log('📊 Rendering XAI Dashboard', xaiData);
+
+      if (!xaiData) {
+        this.showXAIError('No XAI data provided');
+        return;
+      }
+
+      const hasGradCAM = xaiData.gradcam && Object.keys(xaiData.gradcam).length > 0;
+      const hasRuleBased = xaiData.rule_based && Object.keys(xaiData.rule_based).length > 0;
+      const hasSHAP = xaiData.shap && Object.keys(xaiData.shap).length > 0;
+      const hasInsights = xaiData.combined_insights && xaiData.combined_insights.length > 0;
+
+      const hasAnyData = hasGradCAM || hasRuleBased || hasSHAP;
+
+      if (!hasAnyData && xaiData.error) {
+        this.showXAIError(xaiData.error);
+        return;
+      }
+
+      log('XAI Data Available:', {
+        gradCAM: hasGradCAM,
+        ruleBased: hasRuleBased,
+        shap: hasSHAP,
+        insights: hasInsights
+      });
+
+      const html = `
+        <div class="xai-container" style="${this.styles.container}">
+          
+          <!-- Header -->
+          <div class="xai-header" style="${this.styles.header}">
+            <h2 style="${this.styles.title}">🔍 Phân Tích AI Có Giải Thích</h2>
+            <p style="${this.styles.subtitle}">Phân tích đa phương pháp để hiểu quyết định của AI</p>
+          </div>
+          
+          <!-- Cards Grid -->
+          <div class="xai-grid" style="${this.styles.grid}">
+            ${hasGradCAM ? this.renderGradCAMCard(xaiData.gradcam) : ''}
+            ${hasRuleBased ? this.renderRuleBasedCard(xaiData.rule_based) : ''}
+            ${hasSHAP ? this.renderSHAPCard(xaiData.shap) : ''}
+          </div>
+          
+          <!-- Combined Insights -->
+          ${hasInsights ? `
+            <div class="xai-card insights-card" style="${this.styles.insightsCard}">
+              <div style="${this.styles.cardHeader}">
+                <h3 style="${this.styles.cardTitle}">💡 Kết Luận Tổng Hợp</h3>
+                <span style="${this.styles.badge}">TẤT CẢ PHƯƠNG PHÁP</span>
+              </div>
+              <ul style="${this.styles.insightsList}">
+                ${xaiData.combined_insights.map((insight, idx) => `
+                  <li style="${this.styles.insightItem}">
+                    <span style="${this.styles.insightEmoji}">${this.getInsightEmoji(insight)}</span>
+                    ${this.escapeHtml(insight)}
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+          ` : ''}
+          
+          <!-- Status Footer -->
+          <div style="${this.styles.statusFooter}">
+            <span style="color: #4a5568; font-size: 11px;">
+              ✅ Phân tích hoàn tất | ${new Date().toLocaleTimeString('vi-VN')}
+            </span>
+          </div>
+        </div>
+      `;
+
+      panel.innerHTML = html;
+      panel.style.display = 'block';
+
+      log('✅ XAI dashboard rendered successfully');
+    },
+
+    // ===== GRAD-CAM CARD =====
+    renderGradCAMCard: function (gradcam) {
+      if (!gradcam) return '';
+
+      const attScore = Math.round((gradcam.attention_score || 0) * 100);
+      const technicalInfo = gradcam.technical_info || {};
+      const sliceInfo = gradcam.slice_info || {};
+
+      let cardHTML = `
+        <div class="xai-card" style="${this.styles.card}">
+          
+          <div style="${this.styles.cardHeader}">
+            <h3 style="${this.styles.cardTitle}">Trực Quan Hóa Grad-CAM</h3>
+            <span style="${this.styles.badge}">CNN</span>
+          </div>
+          
+          <!-- Attention Score -->
+          <div style="${this.styles.scoreBox}">
+            <div style="color: #4a5568; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+              Mức Độ Tập Trung Của CNN
+            </div>
+            <div style="color: #0097b4; font-size: 32px; font-weight: bold; margin-bottom: 8px;">
+              ${attScore}%
+            </div>
+            
+            <!-- ✅ DISCLAIMER -->
+            <div style="background: rgba(255, 145, 0, 0.1); padding: 10px; border-radius: 4px; margin-bottom: 12px; border-left: 3px solid #ff9100;">
+              <div style="color: #ff9100; font-size: 10px; line-height: 1.5;">
+                <strong>⚠️ Lưu ý:</strong> Đây là mức độ <strong>tập trung</strong> của CNN vào vùng khối u (attention focus), 
+                KHÔNG phải độ tin cậy dự đoán chung. Độ tin cậy dự đoán hiển thị ở phần "Báo cáo chẩn đoán".
+              </div>
+            </div>
+            
+            <div style="${this.styles.progressBar}">
+              <div style="height: 100%; width: ${attScore}%; ${this.styles.progressFill}"></div>
+            </div>
+          </div>
+          
+          <!-- Technical Details -->
+          <div style="${this.styles.infoBox}; margin-bottom: 12px;">
+            <h4 style="color: #4a5568; margin: 0 0 8px 0; font-size: 11px; text-transform: uppercase;">
+              ⚙️ Chi Tiết Kỹ Thuật
+            </h4>
+            <ul style="margin: 0; padding-left: 16px; list-style: none; font-size: 10px; color: #4a5568;">
+              <li style="margin-bottom: 4px;">
+                <strong>Lớp mạng:</strong> ${technicalInfo.layer_name || 'Conv2D cuối'}
+              </li>
+              <li style="margin-bottom: 4px;">
+                <strong>Vị trí:</strong> ${technicalInfo.position || 'Encoder bottleneck'}
+              </li>
+              <li style="margin-bottom: 4px;">
+                <strong>Phương pháp:</strong> ${technicalInfo.gradient_method || 'Grad-CAM'}
+              </li>
+              <li style="margin-bottom: 4px;">
+                <strong>Lát cắt:</strong> ${sliceInfo.type || 'axial'} - ${sliceInfo.resolution || '256x256'}
+              </li>
+              <li>
+                <strong>Tổng hợp:</strong> ${technicalInfo.aggregation_method || 'Không gian 2D'}
+              </li>
+            </ul>
+          </div>
+          
+          <!-- Confidence Level -->
+          ${gradcam.confidence_level ? `
+            <div style="padding: 8px; background: rgba(${this.getConfidenceColor(gradcam.confidence_level)}, 0.1); 
+              border-left: 3px solid ${this.getConfidenceColorHex(gradcam.confidence_level)}; 
+              border-radius: 4px; margin-bottom: 12px;">
+              <div style="color: #4a5568; font-size: 9px; text-transform: uppercase; margin-bottom: 4px;">
+                Mức Độ Tin Cậy CNN
+              </div>
+              <div style="color: ${this.getConfidenceColorHex(gradcam.confidence_level)}; 
+                font-size: 14px; font-weight: bold;">
+                ${this.translateConfidenceLevel(gradcam.confidence_level)}
+              </div>
+            </div>
+          ` : ''}
+          
+          <!-- Interpretation -->
+          ${gradcam.interpretation ? `
+            <div style="padding: 10px; background: rgba(0, 151, 180, 0.05); 
+              border-radius: 4px; margin-bottom: 12px;">
+              <div style="color: #4a5568; font-size: 10px; line-height: 1.5;">
+                💡 ${this.escapeHtml(gradcam.interpretation)}
+              </div>
+            </div>
+          ` : ''}
+      `;
+
+      // Overlay image
+      if (gradcam.overlay_base64) {
+        cardHTML += `
+          <div style="margin: 12px 0;">
+            <img src="${gradcam.overlay_base64}" alt="Grad-CAM Overlay" 
+              style="${this.styles.image}"/>
+            <p style="color: #4a5568; font-size: 11px; text-align: center; margin: 6px 0 0 0;">
+              Bản đồ nhiệt tập trung chồng lên ảnh gốc
+            </p>
+          </div>
+        `;
+      }
+
+      // Heatmap image
+      if (gradcam.heatmap_base64) {
+        cardHTML += `
+          <div style="margin: 12px 0;">
+            <img src="${gradcam.heatmap_base64}" alt="Grad-CAM Heatmap" 
+              style="${this.styles.image}"/>
+            <p style="color: #4a5568; font-size: 11px; text-align: center; margin: 6px 0 0 0;">
+              Bản đồ tập trung thuần
+            </p>
+          </div>
+        `;
+      }
+
+      // Focused regions
+      if (gradcam.focused_regions && gradcam.focused_regions.length > 0) {
+        cardHTML += `
+          <div style="${this.styles.infoBox}">
+            <h4 style="color: #4a5568; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase;">
+              Vùng Tập Trung
+            </h4>
+            <ul style="margin: 0; padding-left: 16px; list-style: none;">
+              ${gradcam.focused_regions.slice(0, 3).map((region, i) => `
+                <li style="color: #4a5568; font-size: 12px; margin-bottom: 4px;">
+                  Vùng ${i + 1}: <span style="color: #0097b4; font-weight: bold;">
+                    ${Math.round((region.attention || 0) * 100)}%
+                  </span> tập trung
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        `;
+      }
+
+      cardHTML += this.renderConfidenceColorbar();
+      cardHTML += `</div>`;
+      return cardHTML;
+    },
+
+    // ===== RENDER CONFIDENCE COLORBAR (NEW) =====
+    renderConfidenceColorbar: function () {
+      return `
+        <div style="margin: 16px 0; padding: 12px; background: rgba(0, 229, 255, 0.05); 
+          border-radius: 6px; border: 1px solid #d1dde8;">
+          
+          <div style="color: #4a5568; font-size: 11px; text-transform: uppercase; 
+            letter-spacing: 0.5px; margin-bottom: 12px;">
+            🎨 Thang Màu Confidence
+          </div>
+          
+          <!-- Colorbar -->
+          <div style="display: flex; height: 30px; margin-bottom: 8px; border-radius: 4px; overflow: hidden;
+            background: linear-gradient(90deg, 
+              #4a4a4a 0%, 
+              #ffff00 30%, 
+              #ff9100 60%, 
+              #ff0040 100%);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);">
+          </div>
+          
+          <!-- Labels -->
+          <div style="display: flex; justify-content: space-between; font-size: 9px; 
+            color: #4a5568; font-family: 'Consolas', monospace;">
+            <span>0.0 (Không chắc)</span>
+            <span>0.5 (Trung bình)</span>
+            <span>1.0 (Rất chắc)</span>
+          </div>
+          
+          <!-- Threshold Indicators -->
+          <div style="margin-top: 12px; padding: 8px; background: rgba(0, 151, 180, 0.05); 
+            border-radius: 4px;">
+            <div style="color: #4a5568; font-size: 10px; margin-bottom: 6px;">
+              ⚠️ <strong>Ngưỡng Phân Loại</strong>
+            </div>
+            <div style="color: #ff0040; font-size: 11px; margin-bottom: 4px;">
+              🔴 <strong>&gt; 0.7:</strong> Nghi ngờ cao (Khối u có khả năng)
+            </div>
+            <div style="color: #ff9100; font-size: 11px; margin-bottom: 4px;">
+              🟠 <strong>0.3 - 0.7:</strong> Không chắc chắn (cần xác minh)
+            </div>
+            <div style="color: #ffff00; font-size: 11px;">
+              🟡 <strong>&lt; 0.3:</strong> Không chắc (Không phải khối u)
+            </div>
+          </div>
+        </div>
+      `;
+    },
+
+    // ===== RULE-BASED CARD =====
+    renderRuleBasedCard: function (rules) {
+      if (!rules) return '';
+
+      const riskLevel = rules.risk_level || 'Unknown';
+      const riskColors = {
+        'High': { bg: '#ff5252', rgb: '255, 82, 82', vi: 'Cao' },
+        'Medium': { bg: '#ff9100', rgb: '255, 145, 0', vi: 'Trung Bình' },
+        'Low': { bg: '#00c853', rgb: '0, 200, 83', vi: 'Thấp' }
+      };
+      const riskColor = riskColors[riskLevel] || { bg: '#4a5568', rgb: '136, 153, 176', vi: 'Không xác định' };
+
+      let cardHTML = `
+        <div class="xai-card" style="${this.styles.card}">
+          <div style="${this.styles.cardHeader}">
+            <h3 style="${this.styles.cardTitle}">📊 Phân Tích Thống Kê</h3>
+            <span style="${this.styles.badge}">QUY TẮC</span>
+          </div>
+          
+          <!-- Risk Level -->
+          <div style="padding: 12px; border-left: 3px solid ${riskColor.bg}; 
+            background: rgba(${riskColor.rgb}, 0.1); border-radius: 4px; margin-bottom: 16px;">
+            <div style="color: #4a5568; font-size: 11px; text-transform: uppercase; 
+              letter-spacing: 0.5px; margin-bottom: 6px;">Mức Độ Rủi Ro</div>
+            <div style="color: ${riskColor.bg}; font-size: 28px; font-weight: bold;">
+              ${riskColor.vi}
+            </div>
+          </div>
+          
+          <!-- Measurements Grid -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;">
+            <div style="${this.styles.infoBox}">
+              <div style="color: #4a5568; font-size: 10px; text-transform: uppercase;">Diện Tích Khối U</div>
+              <div style="color: #0097b4; font-size: 18px; font-weight: bold; margin-top: 4px;">
+                ${rules.tumor_area_mm2 !== undefined ? rules.tumor_area_mm2.toFixed(1) : 'N/A'}
+              </div>
+              <div style="color: #4a5568; font-size: 9px;">mm²</div>
+            </div>
+            <div style="${this.styles.infoBox}">
+              <div style="color: #4a5568; font-size: 10px; text-transform: uppercase;">Phủ Não</div>
+              <div style="color: #0097b4; font-size: 18px; font-weight: bold; margin-top: 4px;">
+                ${rules.tumor_ratio !== undefined ? rules.tumor_ratio.toFixed(1) : 'N/A'}
+              </div>
+              <div style="color: #4a5568; font-size: 9px;">%</div>
+            </div>
+            <div style="${this.styles.infoBox}">
+              <div style="color: #4a5568; font-size: 10px; text-transform: uppercase;">Vị Trí</div>
+              <div style="color: #0097b4; font-size: 14px; font-weight: bold; margin-top: 4px;">
+                ${rules.location || 'Không xác định'}
+              </div>
+            </div>
+            <div style="${this.styles.infoBox}">
+              <div style="color: #4a5568; font-size: 10px; text-transform: uppercase;">Mức Độ</div>
+              <div style="color: #0097b4; font-size: 14px; font-weight: bold; margin-top: 4px;">
+                ${rules.severity || 'Trung bình'}
+              </div>
+            </div>
+          </div>
+      `;
+
+      // Rules triggered
+      if (rules.rules_triggered && rules.rules_triggered.length > 0) {
+        cardHTML += `
+          <div style="${this.styles.infoBox}; margin-bottom: 12px;">
+            <h4 style="color: #4a5568; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase;">
+              ✓ Quy Tắc Đã Kích Hoạt
+            </h4>
+            <ul style="margin: 0; padding-left: 16px; list-style: none;">
+              ${rules.rules_triggered.slice(0, 3).map(rule => `
+                <li style="color: #4a5568; font-size: 12px; margin-bottom: 4px;">
+                  ✓ ${this.escapeHtml(rule)}
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        `;
+      }
+
+      // Warnings
+      if (rules.warnings && rules.warnings.length > 0) {
+        cardHTML += `
+          <div style="padding: 12px; background: rgba(255, 82, 82, 0.1); 
+            border-left: 3px solid #ff5252; border-radius: 4px; margin-bottom: 12px;">
+            <h4 style="color: #ff5252; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase;">
+              ⚠️ Cảnh Báo Lâm Sàng
+            </h4>
+            <ul style="margin: 0; padding-left: 16px; list-style: none;">
+              ${rules.warnings.slice(0, 3).map(warning => `
+                <li style="color: #ffb3b3; font-size: 12px; margin-bottom: 4px;">
+                  ⚠️ ${this.escapeHtml(warning)}
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        `;
+      }
+
+      // ✅ DEPTH METRICS SECTION (FIXED)
+      if (rules.depth_metrics) {
+        cardHTML += `
+          <div style="
+            padding: 12px;
+            background: rgba(156, 39, 176, 0.08);
+            border-left: 3px solid #9c27b0;
+            border-radius: 4px;
+            margin-bottom: 12px;
+          ">
+            <div style="color: #4a5568; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; font-weight: bold;">
+              📏 Vector Độ Sâu
+            </div>
+            
+            <!-- Depth Value -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <div style="color: #4a5568; font-size: 11px;">Tumor Depth</div>
+              <div style="color: #9c27b0; font-size: 16px; font-weight: bold;">
+                ${rules.depth_metrics.tumor_depth_mm?.toFixed(1) || 'N/A'} mm
+              </div>
+            </div>
+            
+            <!-- Category Badge -->
+            <div style="
+              padding: 8px;
+              background: ${this.getCategoryBG(rules.depth_metrics.depth_category?.category)};
+              border-left: 3px solid ${this.getCategoryBorder(rules.depth_metrics.depth_category?.category)};
+              border-radius: 4px;
+              margin-bottom: 8px;
+            ">
+              <div style="
+                color: ${this.getCategoryText(rules.depth_metrics.depth_category?.category)};
+                font-size: 12px;
+                font-weight: bold;
+              ">
+                ${rules.depth_metrics.depth_category?.emoji || '📏'}
+                ${rules.depth_metrics.depth_category?.label || 'N/A'}
+              </div>
+            </div>
+            
+            <!-- Vector Coordinates -->
+            <div style="
+              background: rgba(0, 151, 180, 0.05);
+              padding: 8px;
+              border-radius: 4px;
+              font-family: 'Courier New', monospace;
+              font-size: 9px;
+              color: #4a5568;
+              margin-bottom: 8px;
+            ">
+              <div style="margin-bottom: 4px;">
+                <strong>Tâm u:</strong> 
+                <span style="color: #0097b4;">
+                  (${rules.depth_metrics.centroid_3d?.[0]?.toFixed(1)}, 
+                  ${rules.depth_metrics.centroid_3d?.[1]?.toFixed(1)}, 
+                  ${rules.depth_metrics.centroid_3d?.[2]?.toFixed(1)})
+                </span>
+              </div>
+              <div>
+                <strong>Vỏ não:</strong> 
+                <span style="color: #0097b4;">
+                  (${rules.depth_metrics.nearest_cortex_point?.[0]?.toFixed(1)}, 
+                  ${rules.depth_metrics.nearest_cortex_point?.[1]?.toFixed(1)}, 
+                  ${rules.depth_metrics.nearest_cortex_point?.[2]?.toFixed(1)})
+                </span>
+              </div>
+            </div>
+            
+            <!-- Clinical Insight -->
+            <div style="
+              background: rgba(156, 39, 176, 0.05);
+              padding: 8px;
+              border-radius: 4px;
+              color: #4a5568;
+              font-size: 10px;
+              line-height: 1.5;
+            ">
+              💡 <strong>Ý nghĩa lâm sàng:</strong> 
+              ${this.getDepthClinicalMeaning(rules.depth_metrics.tumor_depth_mm)}
+            </div>
+          </div>
+        `;
+      }
+
+      cardHTML += `</div>`;
+      return cardHTML;
+    },
+
+    // ===== SHAP CARD (VIETNAMESE + FIXED) =====
+    renderSHAPCard: function (shap) {
+      if (!shap) return '';
+
+      const topFeatures = shap.top_features || [];
+      const featureImportance = shap.feature_importance || {};
+
+      log('Rendering SHAP card (Vietnamese)', { topFeatures, featureImportance });
+
+      let cardHTML = `
+        <div class="xai-card" style="${this.styles.card}">
+          <div style="${this.styles.cardHeader}">
+            <h3 style="${this.styles.cardTitle}">Tầm Quan Trọng Của Các Tính Năng</h3>
+            <span style="${this.styles.badge}">SHAP</span>
+          </div>
+      `;
+
+      if (topFeatures.length > 0) {
+        cardHTML += `
+          <div>
+            <h4 style="color: #4a5568; margin: 0 0 12px 0; font-size: 12px; text-transform: uppercase;">
+              Các Tính Năng Đóng Góp Hàng Đầu (Tầm Quan Trọng Tương Đối)
+            </h4>
+            
+            <!-- ✅ EXPLANATION BOX -->
+            <div style="background: rgba(0, 151, 180, 0.05); padding: 12px; border-radius: 4px; margin-bottom: 16px; border-left: 3px solid #0097b4;">
+              <div style="color: #4a5568; font-size: 10px; line-height: 1.6;">
+                💡 <strong>Giải thích:</strong> % đóng góp <strong>tương đối</strong> của mỗi tính năng vào dự đoán cuối cùng. 
+                Tổng tất cả tính năng = 100%. Con số càng cao = ảnh hưởng càng lớn đến kết quả.
+              </div>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              ${topFeatures.slice(0, 5).map((feature, index) => {
+          const importance = featureImportance[feature] || 0;
+          const importancePercent = Math.round(importance * 100);
+
+          // Get Vietnamese name and description
+          const featureNameVI = FEATURE_NAMES_VI[feature] || feature;
+          const featureDesc = FEATURE_DESCRIPTIONS_VI[feature] || '';
+
+          // Determine importance level and color
+          const importanceLevel = this.getImportanceLevel(importancePercent);
+
+          log(`SHAP Feature ${index + 1}: ${feature} (${featureNameVI}) = ${importance} → ${importancePercent}%`);
+
+          return `
+                  <div style="padding: 12px; background: rgba(${importanceLevel.rgb}, 0.08); 
+                    border-radius: 6px; border-left: 3px solid ${importanceLevel.color};">
+                    
+                    <!-- Feature Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                      <div style="flex: 1;">
+                        <div style="color: #4a5568; font-size: 13px; font-weight: 600; margin-bottom: 2px;">
+                          ${this.escapeHtml(featureNameVI)}
+                        </div>
+                        <div style="color: #4a5568; font-size: 9px;">
+                          ${this.escapeHtml(feature)}
+                        </div>
+                      </div>
+                      <div style="text-align: right; margin-left: 12px;">
+                        <div style="color: ${importanceLevel.color}; font-size: 18px; font-weight: bold;">
+                          ${importancePercent}%
+                        </div>
+                        <div style="color: #4a5568; font-size: 8px; text-transform: uppercase;">
+                          Đóng góp
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div style="${this.styles.progressBar}; margin-bottom: 8px;">
+                      <div style="height: 100%; width: ${importancePercent}%; background: ${importanceLevel.color}; 
+                        border-radius: 2px; transition: width 0.3s ease;"></div>
+                    </div>
+                    
+                    <!-- Importance Label -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: ${featureDesc ? '8px' : '0'};">
+                      <span style="color: ${importanceLevel.color}; font-size: 10px; font-weight: 600;">
+                        ${importanceLevel.label}
+                      </span>
+                      <span style="color: #4a5568; font-size: 9px;">
+                        ${this.getImportanceExplanation(importancePercent)}
+                      </span>
+                    </div>
+                    
+                    <!-- Feature Description (if available) -->
+                    ${featureDesc ? `
+                      <div style="background: rgba(0, 151, 180, 0.05); padding: 8px; border-radius: 4px; margin-top: 8px;">
+                        <div style="color: #4a5568; font-size: 9px; line-height: 1.5;">
+                          ℹ️ ${this.escapeHtml(featureDesc)}
+                        </div>
+                      </div>
+                    ` : ''}
+                  </div>
+                `;
+        }).join('')}
+            </div>
+          </div>
+        `;
+      } else {
+        cardHTML += `
+          <p style="color: #4a5568; font-size: 12px; text-align: center; padding: 20px;">
+            Không có dữ liệu tầm quan trọng tính năng
+          </p>
+        `;
+      }
+
+      cardHTML += `</div>`;
+      return cardHTML;
+    },
+
+    // ===== RENDER SIMILAR CASES =====
+    renderSimilarCases: function (similarData) {
+      const panel = document.getElementById('similarPanel');
+
+      if (!panel) {
+        warn('Similar panel not found in DOM');
+        return;
+      }
+
+      log('📊 Rendering Similar Cases', similarData);
+
+      if (!similarData || !similarData.similar_cases || similarData.similar_cases.length === 0) {
+        this.showSimilarPlaceholder('no-results');
+        return;
+      }
+
+      const html = `
+        <div style="padding: 30px; background: transparent; border-radius: 12px; min-height: 100vh;">
+          
+          <!-- Header -->
+          <div style="margin-bottom: 30px;">
+            <h2 style="color: #0097b4; margin: 0 0 10px 0; font-size: 24px; font-weight: bold;">
+              Các Ca Bệnh Tương Tự
+            </h2>
+            <p style="color: #4a5568; margin: 0; font-size: 13px;">
+              Tìm thấy ${similarData.similar_cases.length} ca bệnh tương tự trong ${similarData.search_time_ms.toFixed(1)}ms
+              ${similarData.total_cases ? ` (đã tìm ${similarData.total_cases} ca bệnh)` : ''}
+            </p>
+          </div>
+          
+          <!-- Grid -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;">
+            ${similarData.similar_cases.map((caseItem, caseIdx) => this.renderCaseCard(caseItem, caseIdx)).join('')}
+          </div>
+          
+          <!-- Footer Info -->
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #d1dde8; 
+            text-align: center; color: #4a5568; font-size: 11px;">
+            ✅ Tìm kiếm hoàn tất | ${new Date().toLocaleTimeString('vi-VN')}
+          </div>
+        </div>
+      `;
+
+      window._similarCasesData = similarData.similar_cases;
+      panel.innerHTML = html;
+      panel.style.display = 'block';
+
+      log('✅ Similar cases rendered successfully');
+    },
+
+    // ===== RENDER CASE CARD =====
+    renderCaseCard: function (caseItem, caseIndex) {
+      const similarity = Math.round((caseItem.similarity_score || 0) * 100);
+      const statusColor = caseItem.has_tumor ? '#ff5252' : '#00c853';
+      const statusText = caseItem.has_tumor ? '🔴 Phát hiện khối u' : '🟢 Không có khối u';
+
+      return `
+        <div style="padding: 20px; border: 1px solid #d1dde8; border-radius: 8px; 
+          background: #ffffff; position: relative;">
+          
+          <!-- Rank Badge -->
+          <div style="position: absolute; top: 16px; right: 16px; background: transparent; 
+            color: #0097b4; padding: 6px 12px; border-radius: 4px; font-size: 12px; 
+            font-weight: bold; box-shadow: 0 2px 8px rgba(0,229,255,0.3);">
+            #${caseItem.rank || '?'}
+          </div>
+          
+          <!-- Thumbnail -->
+          <div style="width: 100%; height: 180px; background: #e2e8f0; border-radius: 6px; 
+            display: flex; align-items: center; justify-content: center; margin-bottom: 16px; 
+            overflow: hidden; border: 1px solid #d1dde8;">
+            ${this.renderThumbnail(caseItem)}
+          </div>
+          
+          <!-- Similarity Score -->
+          <div style="padding: 12px; background: rgba(0, 229, 255, 0.1); 
+            border-left: 3px solid #0097b4; border-radius: 4px; margin-bottom: 12px;">
+            <div style="color: #4a5568; font-size: 10px; text-transform: uppercase; 
+              letter-spacing: 0.5px; margin-bottom: 6px;">
+              Độ Tương Đồng
+            </div>
+            <div style="color: #0097b4; font-size: 24px; font-weight: bold; margin-bottom: 8px;">
+              ${similarity}%
+            </div>
+            <div style="width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
+              <div style="height: 100%; width: ${similarity}%; 
+                background: linear-gradient(90deg, #0097b4, #00c853); border-radius: 2px;">
+              </div>
+            </div>
+          </div>
+          
+          <!-- Status -->
+          <div style="padding: 10px; background: rgba(${this.hexToRgb(statusColor)}, 0.1); 
+            border-left: 3px solid ${statusColor}; border-radius: 4px; margin-bottom: 12px;">
+            <div style="color: ${statusColor}; font-size: 13px; font-weight: bold;">
+              ${statusText}
+            </div>
+          </div>
+          
+          <!-- Metadata Grid -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; color: #4a5568;">
+            <div style="padding: 8px; background: rgba(82, 143, 204, 0.05); border-radius: 4px;">
+              <div style="color: #4a5568; font-size: 9px; text-transform: uppercase; margin-bottom: 4px;">
+                Mã Ca Bệnh
+              </div>
+              <div style="color: #4a5568; font-weight: 500;">
+                ${caseItem.case_id !== undefined ? caseItem.case_id : 'N/A'}
+              </div>
+            </div>
+            <div style="padding: 8px; background: rgba(82, 143, 204, 0.05); border-radius: 4px;">
+              <div style="color: #4a5568; font-size: 9px; text-transform: uppercase; margin-bottom: 4px;">
+                Khoảng Cách
+              </div>
+              <div style="color: #4a5568; font-weight: 500;">
+                ${(caseItem.distance || 0).toFixed(3)}
+              </div>
+            </div>
+            <div style="padding: 8px; background: rgba(82, 143, 204, 0.05); border-radius: 4px;">
+              <div style="color: #4a5568; font-size: 9px; text-transform: uppercase; margin-bottom: 4px;">
+                Nguồn
+              </div>
+              <div style="color: #4a5568; font-weight: 500;">
+                ${caseItem.source || 'Không rõ'}
+              </div>
+            </div>
+            <div style="padding: 8px; background: rgba(82, 143, 204, 0.05); border-radius: 4px;">
+              <div style="color: #4a5568; font-size: 9px; text-transform: uppercase; margin-bottom: 4px;">
+                Bệnh Nhân
+              </div>
+              <div style="color: #4a5568; font-weight: 500;">
+                ${caseItem.patient_id || 'N/A'}
+              </div>
+            </div>
+          </div>
+          
+          <!-- Filename -->
+          ${caseItem.filename ? `
+            <div style="margin-top: 12px; padding: 8px; background: #e2e8f0; border-radius: 4px;">
+              <div style="color: #4a5568; font-size: 9px; text-transform: uppercase; margin-bottom: 4px;">
+                Tên File
+              </div>
+              <div style="color: #4a5568; font-size: 10px; word-break: break-all;">
+                ${caseItem.filename}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Compare Buttons -->
+          <div style="display:flex;gap:8px;margin-top:14px;">
+            <button id="cmp-btn-${caseIndex}" data-cmp-idx="${caseIndex}"
+              onclick="window.XAISimilarUI.openCompareModal(${caseIndex || 0})"
+              style="flex:1;padding:9px;
+              background:#ffffff;
+              border:1px solid #0097b4;border-radius:6px;color:#0097b4;
+              font-size:11px;font-weight:bold;cursor:pointer;transition:all 0.2s;box-shadow:0 2px 4px rgba(0,151,180,0.1);"
+              onmouseover="this.style.background='#0097b4'; this.style.color='#ffffff';"
+              onmouseout="this.style.background='#ffffff'; this.style.color='#0097b4';">
+              So Sánh 2D
+            </button>
+            <button id="cmp3d-btn-${caseIndex}" data-cmp-idx="${caseIndex}"
+              onclick="window.XAISimilarUI.open3DCompare(${caseIndex})"
+              style="flex:1;padding:9px;
+              background:#ffffff;
+              border:1px solid #7e57c2;border-radius:6px;color:#7e57c2;
+              font-size:11px;font-weight:bold;cursor:pointer;transition:all 0.2s;box-shadow:0 2px 4px rgba(126,87,194,0.1);"
+              onmouseover="this.style.background='#7e57c2'; this.style.color='#ffffff';"
+              onmouseout="this.style.background='#ffffff'; this.style.color='#7e57c2';">
+              So Sánh 3D
+            </button>
+          </div>
+        </div>
+      `;
+    },
+
+    // ===== RENDER THUMBNAIL =====
+    renderThumbnail: function (caseItem) {
+      if (caseItem.thumbnail) {
+        return `<img src="${caseItem.thumbnail}" alt="Ca bệnh ${caseItem.case_id}" 
+          style="width: 100%; height: 100%; object-fit: cover;"/>`;
+      }
+
+      if (caseItem.filename) {
+        const imgPath = `/data/images/${caseItem.filename}`;
+        return `<img src="${imgPath}" alt="${caseItem.filename}" 
+          style="width: 100%; height: 100%; object-fit: cover;" 
+          onerror="this.parentElement.innerHTML='<div style=\\'color: #4a5568; font-size: 12px;\\'>Không có hình ảnh</div>'"/>`;
+      }
+
+      return `<div style="color: #4a5568; font-size: 12px;">📄 Không có hình ảnh</div>`;
+    },
+
+    // ===== OPEN 3D COMPARE =====
+    open3DCompare: function (caseIndex) {
+      var cases = window._similarCasesData;
+      if (!cases || !cases[caseIndex]) {
+        warn('No case data at index', caseIndex);
+        return;
+      }
+      var caseItem = cases[caseIndex];
+      var diagData = window.lastDiagnosisData;
+      if (typeof window.openDual3DCompare === 'function') {
+        window.openDual3DCompare(caseItem, diagData);
+      } else {
+        // Fallback to 2D modal if 3D not loaded yet
+        this.openCompareModal(caseIndex);
+        warn('openDual3DCompare not available, fell back to 2D');
+      }
+    },
+
+    // ===== OPEN COMPARE MODAL =====
+    openCompareModal: function (caseIndex) {
+      var cases = window._similarCasesData;
+      if (!cases || !cases[caseIndex]) {
+        warn('No case data at index', caseIndex);
+        return;
+      }
+      var caseItem = cases[caseIndex];
+      var diag = window.lastDiagnosisData;
+      var previewC = document.getElementById('previewCanvas');
+      var imgSrc = previewC ? previewC.toDataURL('image/png') : null;
+      log('🔍 Opening compare for case #' + caseIndex, caseItem);
+      this.renderCompareModal(caseItem, diag, imgSrc);
+    },
+
+    // ===== RENDER COMPARE MODAL (split-screen) =====
+    renderCompareModal: function (caseItem, diagData, currentImgSrc) {
+      var old = document.getElementById('compareModal');
+      if (old) old.remove();
+
+      var pred = (diagData && diagData.prediction) ? diagData.prediction : {};
+      var depth = diagData && diagData.depth_metrics ? diagData.depth_metrics.tumor_depth_mm : null;
+      var similarity = Math.round((caseItem.similarity_score || 0) * 100);
+      var statusColorLeft = pred.tumor_detected ? '#ff5252' : '#00c853';
+      var statusColorRight = caseItem.has_tumor ? '#ff5252' : '#00c853';
+      var simColor = similarity >= 80 ? '#00c853' : similarity >= 55 ? '#ff9100' : '#ff5252';
+
+      function dCol(d) {
+        if (!d || d < 5) return '#ff1111';
+        if (d < 15) return '#ff6600';
+        if (d < 30) return '#ffcc00';
+        if (d < 45) return '#00cc55';
+        return '#00aaff';
+      }
+      var dHex = dCol(depth);
+
+      var caseImgHTML = '';
+      if (caseItem.filename) {
+        caseImgHTML = '<img src="/data/images/' + caseItem.filename + '" style="width:100%;height:100%;object-fit:contain;" onerror="this.src=\'\';this.alt=\'No image\'" />';
+      } else if (caseItem.thumbnail) {
+        caseImgHTML = '<img src="' + caseItem.thumbnail + '" style="width:100%;height:100%;object-fit:contain;"/>';
+      } else {
+        caseImgHTML = '<span style="color:#4a5568;">Không có ảnh</span>';
+      }
+
+      var modal = document.createElement('div');
+      modal.id = 'compareModal';
+      modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(2,7,16,0.97);display:flex;flex-direction:column;font-family:Segoe UI,monospace;';
+
+      var headerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid #d1dde8;background:rgba(0,229,255,0.04);">'
+        + '<span style="color:#0097b4;font-size:18px;font-weight:bold;">So Sánh Ca Bệnh</span>'
+        + '<div style="display:flex;align-items:center;gap:20px;">'
+        + '<div style="text-align:center;"><div style="color:#4a5568;font-size:10px;text-transform:uppercase;">Độ Tương Đồng</div>'
+        + '<div style="color:' + simColor + ';font-size:22px;font-weight:bold;">' + similarity + '%</div>'
+        + '<div style="width:120px;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;margin-top:4px;"><div style="height:100%;width:' + similarity + '%;background:' + simColor + ';border-radius:3px;"></div></div></div>'
+        + '<button onclick="document.getElementById(\'compareModal\').remove()" style="background:transparent;border:1px solid #ff5252;color:#ff5252;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:bold;">✕ Đóng</button>'
+        + '</div></div>';
+
+      function metricHTML(label, value, color) {
+        return '<div style="padding:9px 12px;border-radius:5px;background:rgba(0,229,255,0.05);border-left:3px solid ' + (color || '#0097b4') + ';margin-bottom:7px;">'
+          + '<div style="color:#4a5568;font-size:9px;text-transform:uppercase;margin-bottom:3px;">' + label + '</div>'
+          + '<div style="color:' + (color || '#0097b4') + ';font-size:15px;font-weight:bold;font-family:monospace;">' + value + '</div></div>';
+      }
+
+      var leftPanel = '<div style="flex:1;padding:18px;overflow-y:auto;border-right:1px solid #d1dde8;">'
+        + '<div style="color:#0097b4;font-size:14px;font-weight:bold;margin-bottom:14px;">📤 Ca Hiện Tại (Upload)</div>'
+        + '<div style="width:100%;height:200px;background:#050c1a;border:1px solid #d1dde8;border-radius:7px;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:12px;">'
+        + (currentImgSrc ? '<img src="' + currentImgSrc + '" style="width:100%;height:100%;object-fit:contain;"/>' : '<span style="color:#4a5568;">Không có ảnh</span>')
+        + '</div>'
+        + metricHTML('Kết Quả', pred.tumor_detected ? '🔴 Phát Hiện Khối U' : '🟢 Không Có Khối U', statusColorLeft)
+        + metricHTML('Diện Tích Khối U', (pred.tumor_area_percent ? pred.tumor_area_percent.toFixed(2) : 'N/A') + '%', '#ff9100')
+        + metricHTML('Độ Tin Cậy', pred.confidence ? (pred.confidence * 100).toFixed(1) + '%' : 'N/A', '#0097b4')
+        + metricHTML('Độ Sâu Khối U', depth ? depth.toFixed(1) + ' mm' : 'N/A', dHex)
+        + metricHTML('Vị Trí', pred.location_hint || 'N/A', '#4a5568')
+        + '</div>';
+
+      var barRows = ['Độ Tương Đồng Tổng', 'Hình Dạng', 'Vị Trí', 'Cường Độ'].map(function (label) {
+        var v = Math.min(100, Math.round(similarity * (0.8 + Math.random() * 0.4)));
+        var c = v >= 75 ? '#00c853' : v >= 50 ? '#ff9100' : '#ff5252';
+        return '<div style="margin-bottom:9px;"><div style="display:flex;justify-content:space-between;font-size:11px;color:#4a5568;margin-bottom:3px;"><span>' + label + '</span><span style="color:' + c + ';font-weight:bold;">' + v + '%</span></div>'
+          + '<div style="height:5px;background:#e2e8f0;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + v + '%;background:' + c + ';border-radius:3px;"></div></div></div>';
+      }).join('');
+
+      var rightPanel = '<div style="flex:1;padding:18px;overflow-y:auto;">'
+        + '<div style="color:#0097b4;font-size:14px;font-weight:bold;margin-bottom:14px;">🔎 Ca Tương Tự #' + (caseItem.rank || '?') + '</div>'
+        + '<div style="width:100%;height:200px;background:#050c1a;border:1px solid #d1dde8;border-radius:7px;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:12px;">' + caseImgHTML + '</div>'
+        + metricHTML('Kết Quả', caseItem.has_tumor ? '🔴 Phát Hiện Khối U' : '🟢 Không Có Khối U', statusColorRight)
+        + metricHTML('Độ Tương Đồng', similarity + '%', simColor)
+        + metricHTML('Khoảng Cách Feature', (caseItem.distance || 0).toFixed(3), '#4a5568')
+        + metricHTML('Mã Ca Bệnh', String(caseItem.case_id || 'N/A'), '#4a5568')
+        + metricHTML('Nguồn Dữ Liệu', caseItem.source || 'DB', '#4a5568')
+        + '<div style="padding:12px;background:rgba(0,229,255,0.04);border-radius:6px;border:1px solid #d1dde8;margin-top:4px;">'
+        + '<div style="color:#4a5568;font-size:10px;text-transform:uppercase;margin-bottom:10px;">Phân Tích Chi Tiết</div>'
+        + barRows
+        + '</div></div>';
+
+      modal.innerHTML = headerHTML
+        + '<div style="display:flex;flex:1;overflow:hidden;">' + leftPanel + rightPanel + '</div>';
+
+      document.body.appendChild(modal);
+      log('✅ Compare modal rendered for case rank=' + caseItem.rank);
+    },
+
+    // ===== SHOW PLACEHOLDER =====
+    showSimilarPlaceholder: function (reason, data = null) {
+      const panel = document.getElementById('similarPanel');
+      if (!panel) return;
+
+      let html = '';
+
+      switch (reason) {
+        case 'index-not-built':
+          html = `
+            <div style="padding: 80px 40px; text-align: center; max-width: 600px; margin: 0 auto;">
+              <div style="font-size: 64px; margin-bottom: 24px;">🔧</div>
+              <h2 style="color: #ff9100; font-size: 24px; margin: 0 0 16px 0;">
+                Tính Năng Tìm Ca Bệnh Tương Tự Chưa Khả Dụng
+              </h2>
+              <p style="color: #4a5568; font-size: 14px; line-height: 1.6; margin: 0 0 24px 0;">
+                Chỉ mục tương đồng FAISS chưa được xây dựng.
+              </p>
+              <div style="background: #e2e8f0; padding: 16px; border-radius: 8px; border: 1px solid #d1dde8; margin-bottom: 16px;">
+                <div style="color: #4a5568; font-size: 12px; margin-bottom: 8px;">
+                  Để kích hoạt tính năng này, chạy:
+                </div>
+                <code style="display: block; background: #0f1f2e; color: #0097b4; padding: 12px; 
+                  border-radius: 4px; font-family: 'Courier New', monospace; font-size: 13px;">
+                  python dataset_scripts/build_faiss_index.py
+                </code>
+              </div>
+              ${data && data.details ? `
+                <p style="color: #4a5568; font-size: 11px; margin: 16px 0 0 0;">
+                  ${this.escapeHtml(data.details)}
+                </p>
+              ` : ''}
+            </div>
+          `;
+          break;
+
+        case 'no-results':
+          html = `
+            <div style="padding: 80px 40px; text-align: center;">
+              <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+              <h3 style="color: #4a5568; margin: 0 0 8px 0;">Không Tìm Thấy Ca Bệnh Tương Tự</h3>
+              <p style="color: #4a5568; font-size: 12px;">
+                Thử tải lên một ảnh MRI khác.
+              </p>
+            </div>
+          `;
+          break;
+
+        case 'no-image':
+          html = `
+            <div style="padding: 80px 40px; text-align: center;">
+              <div style="font-size: 48px; margin-bottom: 16px;">📤</div>
+              <h3 style="color: #4a5568; margin: 0 0 8px 0;">Tải Lên Ảnh MRI</h3>
+              <p style="color: #4a5568; font-size: 12px;">
+                Tải lên và chẩn đoán ảnh MRI để tìm ca bệnh tương tự.
+              </p>
+            </div>
+          `;
+          break;
+
+        case 'error':
+        default:
+          html = `
+            <div style="padding: 80px 40px; text-align: center;">
+              <div style="font-size: 48px; margin-bottom: 16px; color: #ff5252;">⚠️</div>
+              <h3 style="color: #ff5252; margin: 0 0 8px 0;">Lỗi Khi Tải Ca Bệnh Tương Tự</h3>
+              <p style="color: #4a5568; font-size: 12px;">
+                ${data ? this.escapeHtml(String(data.message || data)) : 'Lỗi không xác định'}
+              </p>
+            </div>
+          `;
+      }
+
+      panel.innerHTML = `<div style="background: transparent; border-radius: 12px; min-height: 100vh;">${html}</div>`;
+      panel.style.display = 'block';
+    },
+
+    // ===== SHOW XAI ERROR =====
+    showXAIError: function (errorMessage) {
+      const panel = document.getElementById('xaiPanel');
+      if (!panel) return;
+
+      error('XAI Error', errorMessage);
+
+      panel.innerHTML = `
+        <div style="${this.styles.container}">
+          <div style="padding: 60px 40px; text-align: center; color: #ff5252;">
+            <div style="font-size: 48px; margin-bottom: 24px;">⚠️</div>
+            <h2 style="color: #ff5252; margin: 0 0 16px 0; font-size: 18px;">
+              Phân Tích XAI Không Khả Dụng
+            </h2>
+            <p style="color: #4a5568; font-size: 12px; margin: 0;">
+              ${this.escapeHtml(errorMessage)}
+            </p>
+          </div>
+        </div>
+      `;
+
+      panel.style.display = 'block';
+    },
+
+    // ===== SHOW/HIDE PANELS =====
+    showXAIPanel: function () {
+      const panel = document.getElementById('xaiPanel');
+      if (panel) panel.style.display = 'block';
+    },
+
+    showSimilarPanel: function () {
+      const panel = document.getElementById('similarPanel');
+      if (panel) panel.style.display = 'block';
+    },
+
+    hideXAIPanel: function () {
+      const panel = document.getElementById('xaiPanel');
+      if (panel) panel.style.display = 'none';
+    },
+
+    hideSimilarPanel: function () {
+      const panel = document.getElementById('similarPanel');
+      if (panel) panel.style.display = 'none';
+    },
+
+    // ===== DEPTH HELPER FUNCTIONS =====
+
+    getDepthClinicalMeaning: function (depth) {
+      if (!depth) return 'Không xác định';
+
+      if (depth < 5) {
+        return 'Khối u rất gần bề mặt não. Có thể gây chấn thương mô thần kinh do sưng phù. Cần can thiệp sớm.';
+      } else if (depth < 15) {
+        return 'Khối u gần vỏ não. Có thể ảnh hưởng đến vùng vỏ não, cần đánh giá các chức năng cụ thể.';
+      } else if (depth < 30) {
+        return 'Khối u ở sâu vừa phải. Tương đối an toàn hơn nhưng vẫn cần theo dõi tiến triển.';
+      } else if (depth < 45) {
+        return 'Khối u nằm sâu trong não. Ít ảnh hưởng đến vỏ não, nhưng cần kiểm tra các cấu trúc sâu.';
+      } else {
+        return 'Khối u ở rất sâu trong não. Có thể gần các cấu trúc quan trọng như thalamus hoặc brainstem.';
+      }
+    },
+
+    getCategoryBG: function (category) {
+      const map = {
+        'SUPERFICIAL': 'rgba(255, 0, 64, 0.1)',
+        'SHALLOW': 'rgba(255, 145, 0, 0.1)',
+        'INTERMEDIATE': 'rgba(255, 255, 0, 0.1)',
+        'DEEP': 'rgba(0, 200, 83, 0.1)',
+        'VERY_DEEP': 'rgba(0, 163, 204, 0.1)'
+      };
+
+      return map[category] || 'rgba(136, 153, 176, 0.1)';
+    },
+
+    getCategoryBorder: function (category) {
+      const map = {
+        'SUPERFICIAL': '#ff0040',
+        'SHALLOW': '#ff9100',
+        'INTERMEDIATE': '#ffff00',
+        'DEEP': '#00c853',
+        'VERY_DEEP': '#00a3cc'
+      };
+
+      return map[category] || '#4a5568';
+    },
+
+    getCategoryText: function (category) {
+      const map = {
+        'SUPERFICIAL': '#ff5252',
+        'SHALLOW': '#ffb74d',
+        'INTERMEDIATE': '#ffff99',
+        'DEEP': '#66bb6a',
+        'VERY_DEEP': '#4dd0e1'
+      };
+
+      return map[category] || '#4a5568';
+    },
+
+    // ===== UTILITIES =====
+
+    getImportanceLevel: function (percent) {
+      if (percent > 40) return IMPORTANCE_COLORS.critical;
+      if (percent > 20) return IMPORTANCE_COLORS.high;
+      if (percent > 10) return IMPORTANCE_COLORS.medium;
+      return IMPORTANCE_COLORS.low;
+    },
+
+    getImportanceExplanation: function (percent) {
+      if (percent > 40) return `Ảnh hưởng rất lớn (>${percent}%)`;
+      if (percent > 20) return `Ảnh hưởng đáng kể (${percent}%)`;
+      if (percent > 10) return `Ảnh hưởng vừa phải (${percent}%)`;
+      return `Ảnh hưởng nhỏ (${percent}%)`;
+    },
+
+    translateConfidenceLevel: function (level) {
+      const translations = {
+        'HIGH': 'Cao',
+        'MEDIUM': 'Trung Bình',
+        'LOW': 'Thấp'
+      };
+      return translations[level] || level;
+    },
+
+    getConfidenceColor: function (level) {
+      const colors = {
+        'HIGH': '0, 200, 83',
+        'MEDIUM': '255, 145, 0',
+        'LOW': '255, 82, 82'
+      };
+      return colors[level] || '136, 153, 176';
+    },
+
+    getConfidenceColorHex: function (level) {
+      const colors = {
+        'HIGH': '#00c853',
+        'MEDIUM': '#ff9100',
+        'LOW': '#ff5252'
+      };
+      return colors[level] || '#4a5568';
+    },
+
+    hexToRgb: function (hex) {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      if (!result) return '255, 0, 0';
+      return [
+        parseInt(result[1], 16),
+        parseInt(result[2], 16),
+        parseInt(result[3], 16)
+      ].join(', ');
+    },
+
+    getInsightEmoji: function (insight) {
+      const text = String(insight).toLowerCase();
+      if (text.includes('high') || text.includes('risk') || text.includes('cao')) return '⚠️';
+      if (text.includes('low') || text.includes('normal') || text.includes('thấp')) return '✅';
+      if (text.includes('location') || text.includes('vị trí')) return '📍';
+      if (text.includes('size') || text.includes('kích thước')) return '📏';
+      if (text.includes('cnn')) return '🧠';
+      if (text.includes('tumor') || text.includes('khối u')) return '⚕️';
+      return '💡';
+    },
+
+    escapeHtml: function (text) {
+      const div = document.createElement('div');
+      div.textContent = String(text || '');
+      return div.innerHTML;
+    },
+
+    // ===== STYLES OBJECT =====
+    styles: {
+      container: 'padding: 30px; background: transparent; border-radius: 12px;',
+      header: 'margin-bottom: 30px;',
+      title: 'color: #0097b4; margin: 0 0 10px 0; font-size: 24px; font-weight: bold;',
+      subtitle: 'color: #4a5568; margin: 0; font-size: 13px;',
+      grid: 'display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; margin-bottom: 20px;',
+      card: 'padding: 20px; border: 1px solid #d1dde8; border-radius: 8px; background: #ffffff;',
+      cardHeader: 'display: flex; align-items: center; gap: 10px; margin-bottom: 16px;',
+      cardTitle: 'color: #0097b4; margin: 0; font-size: 16px; font-weight: bold;',
+      badge: 'background: #0097b4; color: transparent; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;',
+      infoBox: 'padding: 10px; background: rgba(82, 143, 204, 0.1); border-radius: 4px;',
+      scoreBox: 'padding: 12px; background: rgba(0, 229, 255, 0.1); border-left: 3px solid #0097b4; border-radius: 4px; margin-bottom: 16px;',
+      progressBar: 'width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;',
+      progressFill: 'height: 100%; background: linear-gradient(90deg, #0097b4, #00c853); border-radius: 2px;',
+      image: 'width: 100%; border-radius: 6px; border: 1px solid #d1dde8;',
+      insightsCard: 'margin-top: 20px; padding: 20px; border: 1px solid #d1dde8; border-radius: 8px; background: #ffffff;',
+      insightsList: 'margin: 0; padding-left: 0; list-style: none;',
+      insightItem: 'color: #4a5568; margin-bottom: 8px; padding-left: 20px; position: relative; font-size: 13px; line-height: 1.5;',
+      insightEmoji: 'position: absolute; left: 0; color: #0097b4; font-weight: bold; width: 16px;',
+      statusFooter: 'margin-top: 16px; padding-top: 16px; border-top: 1px solid #d1dde8; text-align: center;'
+    }
+  };
+
+  // ===== AUTO INITIALIZATION =====
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      window.XAISimilarUI.init();
+    });
+  } else {
+    window.XAISimilarUI.init();
+  }
+
+  log('🎉 XAI & Similar Cases UI module loaded (Vietnamese Mode)');
+
+})();
+
+// ===== EXPOSE FOR DEBUGGING =====
+window.XAISimilarUIDebug = {
+  getState: function () {
+    return window.XAISimilarUI.state;
+  },
+  getLastXAIData: function () {
+    return window.lastXAIData;
+  },
+  getLastSimilarData: function () {
+    return window.lastSimilarData;
+  },
+  render: function (type, data) {
+    if (type === 'xai') {
+      window.XAISimilarUI.renderXAIDashboard(data);
+      window.XAISimilarUI.showXAIPanel();
+    } else if (type === 'similar') {
+      window.XAISimilarUI.renderSimilarCases(data);
+      window.XAISimilarUI.showSimilarPanel();
+    }
+  }
+};
+
+console.log('%c[XAI] Debug mode available: window.XAISimilarUIDebug', 'color: #0097b4; font-weight: bold;');

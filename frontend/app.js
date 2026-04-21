@@ -1,0 +1,1311 @@
+/**
+ * app.js (HOÀN CHỈNH & FIX ĐẦY ĐỦ)
+ * Main application logic for NeuroScan AI frontend.
+ *
+ * ✅ MAJOR FIXES:
+ *   1. Tỷ lệ u/não hiển thị đúng: 0.0674% → 0.07% hoặc 64% → 64%
+ *   2. Độ sâu khối u diễn đạt y khoa rõ ràng (CRITICAL, LOW, INTERMEDIATE, HIGH, VERY HIGH)
+ *   3. Tích hợp đầy đủ XAI và Similar Cases
+ *   4. Atlas 3D button handler đúng vị trí (INSIDE btnReset listener)
+ *   5. displayMetricsPanel được gọi từ window.updateTumorMetrics
+ *   6. Tab switching logic hoàn thiện
+ *   7. Pre-load atlas background không blocking
+ *   8. Update 3D brain gọi updateTumorMetrics đúng
+ *
+ * Features:
+ *   - File upload (drag & drop + click)
+ *   - MRI preview canvas rendering
+ *   - POST to /api/diagnose
+ *   - Render segmentation mask overlay
+ *   - Display Groq AI diagnosis report
+ *   - Trigger 3D brain tumor update
+ *   - Tab navigation (Scan, 3D Brain, XAI, Similar Cases, Info)
+ *   - XAI Dashboard rendering (Grad-CAM, Rules, SHAP, Insights)
+ *   - Similar Cases grid with modal details
+ *   - BigBrain Atlas 3D toggle with isocortex visualization
+ *   - Health check on load
+ */
+
+(function App() {
+
+  const API_BASE = 'http://127.0.0.1:8000/api';
+
+  window.lastDiagnosisData = null;
+
+  // ===== DOM References - Main Report Section =====
+  const uploadZone = document.getElementById('uploadZone');
+  const fileInput = document.getElementById('fileInput');
+  const previewWrap = document.getElementById('previewWrap');
+  const previewCanvas = document.getElementById('previewCanvas');
+  const btnDiagnose = document.getElementById('btnDiagnose');
+  const reportPlaceholder = document.getElementById('reportPlaceholder');
+  const reportContent = document.getElementById('reportContent');
+  const loadingState = document.getElementById('loadingState');
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+
+  // ===== Report Fields =====
+  const confidenceBar = document.getElementById('confidenceBar');
+  const confidenceValue = document.getElementById('confidenceValue');
+  const statStatus = document.getElementById('statStatus');
+  const statArea = document.getElementById('statArea');
+  const statLocation = document.getElementById('statLocation');
+  const statSeverity = document.getElementById('statSeverity');
+  const reportSummary = document.getElementById('reportSummary');
+  const findingsList = document.getElementById('findingsList');
+  const recommendationsList = document.getElementById('recommendationsList');
+  const disclaimer = document.getElementById('disclaimer');
+
+  // ===== Viewer Controls =====
+  const btnRotate = document.getElementById('btnRotate');
+  const btnSlice = document.getElementById('btnSlice');
+  const btnReset = document.getElementById('btnReset');
+  const btnAtlas3D = document.getElementById('btnAtlas3D');
+
+  // ===== Tab Navigation =====
+  const pills = document.querySelectorAll('.pill');
+  const infoPanel = document.getElementById('infoPanel');
+  const xaiPanel = document.getElementById('xaiPanel');
+  const similarPanel = document.getElementById('similarPanel');
+  const atlasPanel = document.getElementById('atlasViewPanel');
+  const mainLayout = document.querySelector('.main-layout');
+
+
+  // ===== State =====
+  let currentFile = null;
+  let currentImageFile = null;
+  let maskOverlayCanvas = null;
+  let lastPredictionData = null;
+  let lastXAIData = null;
+  let lastSimilarData = null;
+  let isProcessingDiagnosis = false;
+
+  // ===== HEALTH CHECK =====
+  async function checkHealth() {
+    try {
+      console.log('[App] 🏥 Checking backend health...');
+      const res = await fetch(`${API_BASE}/health`);
+      if (res.ok) {
+        const health = await res.json();
+        console.log('[App] ✅ Backend online:', health);
+        statusDot.className = 'status-dot online';
+        statusText.textContent = 'Trực Tiếp';
+      } else {
+        throw new Error('not ok');
+      }
+    } catch (err) {
+      console.error('[App] ❌ Backend offline:', err);
+      statusDot.className = 'status-dot error';
+      statusText.textContent = 'Ngoại Tuyến';
+    }
+  }
+
+  // ===== FILE UPLOAD HANDLERS =====
+  uploadZone.addEventListener('click', (e) => {
+    // Prevent double-open: skip if the click comes from the input itself
+    if (e.target === fileInput) return;
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length) {
+      handleFile(e.target.files[0]);
+    }
+  });
+
+  uploadZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadZone.classList.add('drag-over');
+  });
+
+  uploadZone.addEventListener('dragleave', () => {
+    uploadZone.classList.remove('drag-over');
+  });
+
+  uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  });
+
+
+  function handleFile(file) {
+    if (!file) return;
+
+    if (!['image/png', 'image/jpeg'].includes(file.type)) {
+      alert('❌ Vui lòng tải lên hình ảnh định dạng PNG hoặc JPG.');
+      return;
+    }
+
+    console.log('[App] 📂 File selected:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+
+    currentFile = file;
+    currentImageFile = file;
+    // ✅ Store blob for Atlas4Panel slice re-fetch
+    window._lastUploadedBlob = file;
+    renderPreview(file);
+    btnDiagnose.disabled = false;
+  }
+
+  // ===== RENDER PREVIEW CANVAS =====
+  function renderPreview(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        console.log('[App] 🖼️ Rendering preview...');
+
+        // Show preview container
+        previewWrap.style.display = 'block';
+
+        // Draw on canvas
+        const ctx = previewCanvas.getContext('2d');
+        previewCanvas.width = 256;
+        previewCanvas.height = 256;
+        ctx.drawImage(img, 0, 0, 256, 256);
+
+        // Remove old mask overlay if exists
+        if (maskOverlayCanvas) {
+          maskOverlayCanvas.remove();
+          maskOverlayCanvas = null;
+        }
+
+        console.log('[App] ✅ Preview rendered');
+      };
+      img.onerror = () => {
+        alert('❌ Lỗi không tải được ảnh');
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ===== RENDER MASK OVERLAY =====
+  function renderMaskOverlay(mask) {
+    // mask is 256×256 array of 0/1 values
+    console.log('[App] 🎨 Rendering mask overlay...');
+
+    if (maskOverlayCanvas) {
+      maskOverlayCanvas.remove();
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    canvas.style.position = 'absolute';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.pointerEvents = 'none';
+    canvas.style.borderRadius = '10px';
+
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(256, 256);
+
+    for (let y = 0; y < 256; y++) {
+      for (let x = 0; x < 256; x++) {
+        const idx = (y * 256 + x) * 4;
+        const val = mask[y][x];
+
+        if (val > 0.5) {
+          // Red tumor overlay with alpha
+          imageData.data[idx] = 255;   // R
+          imageData.data[idx + 1] = 82;    // G
+          imageData.data[idx + 2] = 82;    // B
+          imageData.data[idx + 3] = 140;   // A (semi-transparent)
+        } else {
+          imageData.data[idx + 3] = 0;     // transparent
+        }
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    previewWrap.appendChild(canvas);
+    maskOverlayCanvas = canvas;
+
+    console.log('[App] ✅ Mask overlay rendered');
+  }
+
+  // ===== RUN DIAGNOSIS =====
+  btnDiagnose.addEventListener('click', async () => {
+    if (!currentFile || isProcessingDiagnosis) return;
+
+    isProcessingDiagnosis = true;
+    console.log('%c[App] 🚀 Starting diagnosis...', 'color: #00e5ff; font-weight: bold;');
+
+    showState('loading');
+    btnDiagnose.disabled = true;
+
+    try {
+      // 1️⃣ Call main diagnosis API
+      const formData = new FormData();
+      formData.append('file', currentFile);
+
+      console.log('[App] 📡 Sending to /api/diagnose...');
+      const res = await fetch(`${API_BASE}/diagnose`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Diagnosis failed');
+      }
+
+      const diagnosisResult = await res.json();
+      console.log('[App] ✅ Diagnosis complete:', diagnosisResult);
+
+      // Store prediction
+      lastPredictionData = diagnosisResult.prediction;
+
+      // ✅ Store XAI data (already included in response)
+      if (diagnosisResult.xai && !diagnosisResult.xai.error) {
+        lastXAIData = diagnosisResult.xai;
+        window.lastXAIData = diagnosisResult.xai;
+        console.log('[App] ✅ XAI data stored:', lastXAIData);
+      } else {
+        console.warn('[App] ⚠️  XAI data not available');
+        lastXAIData = null;
+        window.lastXAIData = null;
+      }
+
+      // 2️⃣ Render mask overlay
+      if (diagnosisResult.mask) {
+        renderMaskOverlay(diagnosisResult.mask);
+      }
+
+      // 3️⃣ Display report
+      displayReport(diagnosisResult);
+
+      // ✅ 3b: Load Atlas 4-Panel Viewer (EBRAINS-style) with diagnosis data
+      if (window.Atlas4PanelViewer) {
+        window.Atlas4PanelViewer.loadDiagnosis(diagnosisResult);
+        console.log('[App] 🧠 Atlas4Panel loaded with diagnosis data');
+      }
+
+
+      // 4️⃣ Display metrics panel
+      // displayMetricsPanel(diagnosisResult);
+
+      // 5️⃣ Update 3D brain
+      update3DBrain(diagnosisResult);
+
+      // 6️⃣ Fetch Similar cases (optional, separate call)
+      if (currentImageFile && window.XAISimilarUI?.fetchSimilarCases) {
+        try {
+          const similarData = await window.XAISimilarUI.fetchSimilarCases(currentImageFile);
+          lastSimilarData = similarData;
+          window.lastSimilarData = similarData;
+          console.log('[App] ✅ Similar cases received');
+
+          // ✅ Hiện nút Compare và cập nhật badge
+          _showCompareButton(similarData);
+        } catch (err) {
+          console.warn('[App] ⚠️  Similar fetch failed:', err);
+        }
+      }
+
+      // Show report
+      showState('report');
+
+    } catch (err) {
+      console.error('[App] ❌ Diagnosis error:', err);
+      alert('❌ Lỗi: ' + err.message);
+      showState('placeholder');
+    } finally {
+      isProcessingDiagnosis = false;
+      btnDiagnose.disabled = false;
+    }
+  });
+
+  // ===== ✅ Hiện/cập nhật nút Compare sau khi có Similar Cases =====
+  function _showCompareButton(similarData) {
+    const btn = document.getElementById('btnCompare');
+    const badge = document.getElementById('compareBadge');
+    if (!btn) return;
+
+    const count = similarData?.similar_cases?.length || 0;
+    if (count > 0) {
+      btn.style.display = 'flex';
+      btn.style.alignItems = 'center';
+      btn.style.justifyContent = 'center';
+      btn.title = `So sánh 3D ca bệnh tương tự (${count} ca)`;
+
+      // Pulse animation để thu hút sự chú ý
+      btn.style.animation = 'none';
+      btn.offsetHeight; // reflow
+      btn.style.animation = 'compareBtnPulse 0.6s ease 3';
+
+      // Badge count
+      if (badge) {
+        badge.textContent = count;
+        badge.style.display = 'block';
+      }
+
+      // Inject CSS nếu chưa có
+      if (!document.getElementById('compareBtnCSS')) {
+        const style = document.createElement('style');
+        style.id = 'compareBtnCSS';
+        style.textContent = `
+          @keyframes compareBtnPulse {
+            0%,100% { box-shadow: 0 0 0 0 rgba(0,229,255,0); background: ''; }
+            50% { box-shadow: 0 0 0 6px rgba(0,229,255,0.25); background: rgba(0,229,255,0.15); }
+          }
+          #btnCompare:hover {
+            background: rgba(0,229,255,0.18) !important;
+            border-color: #00e5ff !important;
+            color: #00e5ff !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      console.log(`[App] ✅ Compare button shown (${count} cases)`);
+    } else {
+      btn.style.display = 'none';
+      if (badge) badge.style.display = 'none';
+    }
+  }
+
+  // ===== DISPLAY REPORT =====
+  function displayReport(data) {
+    console.log('[App] 📋 Displaying report...');
+
+    const pred = data.prediction;
+    const report = data.report;
+
+    // Confidence
+    const confPct = Math.round(pred.confidence * 100);
+    confidenceBar.style.width = confPct + '%';
+    confidenceValue.textContent = confPct + '%';
+
+    // Status
+    statStatus.textContent = pred.tumor_detected ? 'Phát Hiện U' : 'Không Có U';
+    statStatus.className = 'stat-value ' + (pred.tumor_detected ? 'detected' : 'clear');
+
+    // Area
+    statArea.textContent = pred.tumor_area_percent + '%';
+
+    // Location
+    statLocation.textContent = pred.location_hint || 'Không';
+
+    // Severity
+    const sev = report.severity || 'Không Rõ';
+    statSeverity.textContent = sev;
+    statSeverity.className = 'stat-value severity-' + sev.toLowerCase();
+
+    // Summary
+    reportSummary.textContent = report.summary || '—';
+
+    // Findings
+    findingsList.innerHTML = (report.findings || [])
+      .map(f => `<li>✓ ${f}</li>`)
+      .join('');
+
+    // Recommendations
+    recommendationsList.innerHTML = (report.recommendations || [])
+      .map(r => `<li>→ ${r}</li>`)
+      .join('');
+
+    // Populate methods comparison table
+    const comparisonBody = document.getElementById('methodsComparisonBody');
+
+    if (comparisonBody && data.xai) {
+      const methods = [
+        {
+          name: 'CNN Phân Đoạn',
+          result: data.prediction.tumor_detected ? 'Phát Hiện U' : 'Không Có U',
+          confidence: `${(data.prediction.confidence * 100).toFixed(1)}%`
+        },
+        {
+          name: 'Chú Ý Grad-CAM',
+          result: data.xai.gradcam ? `${data.xai.gradcam.confidence_level} Tập Trung` : 'Không',
+          confidence: data.xai.gradcam ? `${(data.xai.gradcam.attention_score * 100).toFixed(1)}%` : 'Không'
+        },
+        {
+          name: 'Phân Tích Quy Tắc',
+          result: data.xai.rule_based ? data.xai.rule_based.risk_level : 'Không',
+          confidence: data.xai.rule_based ? `${data.xai.rule_based.risk_rationale?.risk_score || 0}/9 Điểm` : 'Không'
+        },
+        {
+          name: 'Phân Tích SHAP',
+          result: data.xai.shap && data.xai.shap.top_features ?
+            `Top: ${data.xai.shap.top_features[0]}` : 'Không',
+          confidence: data.xai.shap && data.xai.shap.top_features ?
+            `${(data.xai.shap.feature_importance[data.xai.shap.top_features[0]] * 100).toFixed(0)}%` : 'Không'
+        }
+      ];
+
+      comparisonBody.innerHTML = methods.map(m => `
+        <tr style="border-bottom: 1px solid var(--border);">
+          <td style="padding: 10px; color: var(--text-sec);">${m.name}</td>
+          <td style="padding: 10px; text-align: center; color: var(--cyan); font-weight: 500;">${m.result}</td>
+          <td style="padding: 10px; text-align: center; color: var(--text-dim);">${m.confidence}</td>
+        </tr>
+      `).join('');
+    }
+
+    // Disclaimer
+    disclaimer.textContent = report.disclaimer ||
+      '⚠️ Đây là báo cáo do AI sinh ra. Nó không thay thế lời khuyên y tế chuyên môn.';
+
+    // ✅ Render Depth Status Card on main screen (right panel)
+    renderDepthCard(data);
+    // ✅ Render Depth Overlay directly on 3D Brain viewer
+    renderDepthOn3DViewer(data);
+
+    console.log('[App] ✅ Report displayed');
+  }
+
+  // ===== ✅ DEPTH OVERLAY ON 3D BRAIN VIEWER (main screen center panel) =====
+  function renderDepthOn3DViewer(data) {
+    const viewer = document.getElementById('viewer3d');
+    if (!viewer || !data.prediction?.tumor_detected) {
+      const old = document.getElementById('viewer3dDepthOverlay');
+      if (old) old.remove();
+      return;
+    }
+
+    const depth = data.depth_metrics?.tumor_depth_mm;
+    const category = data.depth_metrics?.depth_category?.category || 'INTERMEDIATE';
+    const area = data.prediction?.tumor_area_percent;
+    const location = data.prediction?.location_hint || 'N/A';
+    const conf = Math.round((data.prediction?.confidence || 0) * 100);
+
+    const STYLES = {
+      'OUTSIDE': { border: '#dd0000', text: '#ff4444', bg: 'rgba(220,0,0,0.18)', emoji: '🔴', badge: 'NGUY HIỂM KỊCH TRẦN' },
+      'SUPERFICIAL': { border: '#ff2828', text: '#ff5252', bg: 'rgba(255,40,40,0.18)', emoji: '🔴', badge: 'RỦI RO BAO PHỦ' },
+      'SHALLOW': { border: '#ff9100', text: '#ffb74d', bg: 'rgba(255,145,0,0.16)', emoji: '🟠', badge: 'NÔNG & RỦI RO CAO' },
+      'INTERMEDIATE': { border: '#ffd600', text: '#ffe57a', bg: 'rgba(255,214,0,0.12)', emoji: '🟡', badge: 'RỦI RO TRUNG BÌNH' },
+      'DEEP': { border: '#00c853', text: '#66bb6a', bg: 'rgba(0,200,83,0.12)', emoji: '🟢', badge: 'SÂU & RỦI RO THẤP' },
+      'VERY_DEEP': { border: '#00a3ff', text: '#4dd0e1', bg: 'rgba(0,163,255,0.12)', emoji: '🔵', badge: 'RẤT SÂU, ÍT RỦI RO' },
+    };
+    const S = STYLES[category] || STYLES['INTERMEDIATE'];
+    const depthPct = depth != null ? Math.min((depth / 55) * 100, 100) : 0;
+
+    // Remove old overlay if exists
+    const existing = document.getElementById('viewer3dDepthOverlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'viewer3dDepthOverlay';
+    overlay.style.cssText = [
+      'position:absolute;bottom:44px;left:10px',
+      'width:192px;z-index:8;pointer-events:none',
+      `background:${S.bg}`,
+      `border:1px solid ${S.border}40`,
+      `border-left:3px solid ${S.border}`,
+      'border-radius:8px;padding:9px 11px',
+      'font-family:Consolas,monospace',
+      'backdrop-filter:blur(6px)',
+    ].join(';');
+
+    overlay.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+        <span style="color:var(--text-sec);font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:700;">ĐỘ SÂU U TỪ VỎ NÃO</span>
+        <span style="color:${S.text};font-size:9px;font-weight:700;background:${S.bg};padding:1px 6px;
+          border:1px solid ${S.border}50;border-radius:10px;">${S.emoji} ${S.badge}</span>
+      </div>
+      <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:5px;">
+        <span style="color:${S.text};font-size:22px;font-weight:800;line-height:1;">${depth != null ? depth.toFixed(1) : '—'}</span>
+        <span style="color:var(--text-dim);font-size:11px;">mm</span>
+      </div>
+      <div style="width:100%;height:4px;background:rgba(0,0,0,0.4);border-radius:3px;overflow:hidden;margin-bottom:6px;">
+        <div style="height:100%;width:${depthPct}%;background:${S.border};border-radius:3px;
+          transition:width 1s ease;"></div>
+      </div>
+      <div style="color:var(--text-sec);font-size:9px;line-height:1.4;border-top:1px solid rgba(255,255,255,0.06);padding-top:5px;">
+        <div style="margin-bottom:2px;"><span style="color:var(--text-dim);">Diện Tích:</span> <span style="color:${S.text};">${area != null ? area.toFixed(2) + '%' : 'Không'}</span></div>
+        <div style="margin-bottom:2px;"><span style="color:var(--text-dim);">Tin Cậy:</span> <span style="color:var(--cyan);">${conf}%</span></div>
+        <div style="color:var(--text-dim);font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${location}">${location}</div>
+      </div>
+    `;
+
+    // Ensure viewer3d is position:relative for absolute child
+    if (getComputedStyle(viewer).position === 'static') {
+      viewer.style.position = 'relative';
+    }
+    viewer.appendChild(overlay);
+
+    console.log(`[App] 📌 Depth overlay on 3D viewer: ${depth?.toFixed(1)}mm | ${category}`);
+  }
+
+  // ===== ✅ DEPTH STATUS CARD — MAIN SCREEN (right panel) =====
+  function renderDepthCard(data) {
+    const card = document.getElementById('depthStatusCard');
+    const inner = document.getElementById('depthCardInner');
+    const glowBar = document.getElementById('depthGlowBar');
+    const badge = document.getElementById('depthBadge');
+    const mmVal = document.getElementById('depthMmValue');
+    const catLbl = document.getElementById('depthCategoryLabel');
+    const progBar = document.getElementById('depthProgressBar');
+    const desc = document.getElementById('depthMedDesc');
+    const emoji = document.getElementById('depthEmoji');
+
+    if (!card || !data.prediction?.tumor_detected) {
+      if (card) card.style.display = 'none';
+      return;
+    }
+
+    const depth = data.depth_metrics?.tumor_depth_mm;
+    const category = data.depth_metrics?.depth_category?.category || 'INTERMEDIATE';
+
+    // ── Color palette per depth category ──
+    const DEPTH_STYLES = {
+      'OUTSIDE': { bg: 'rgba(220,0,0,0.10)', border: '#dd0000', text: '#c62828', glow: '#dd0000', emoji: '🔴', label: 'NGOÀI VỎ NÃO', badge: 'NGUY KỊCH', grad: '#dd0000,#ff4444' },
+      'SUPERFICIAL': { bg: 'rgba(255,40,40,0.10)', border: '#ff2828', text: '#d32f2f', glow: '#ff2828', emoji: '🔴', label: 'QUÁ NÔNG', badge: 'NGHIÊM TRỌNG', grad: '#ff2828,#ff6b6b' },
+      'SHALLOW': { bg: 'rgba(255,145,0,0.10)', border: '#ff9100', text: '#e65100', glow: '#ff9100', emoji: '🟠', label: 'NÔNG / GẦN VỎ NÃO', badge: 'RỦI RO CAO', grad: '#ff6b00,#ffb300' },
+      'INTERMEDIATE': { bg: 'rgba(255,214,0,0.08)', border: '#ffd600', text: '#f57f17', glow: '#ffd600', emoji: '🟡', label: 'TRUNG BÌNH', badge: 'RỦI RO VỪA', grad: '#ffc200,#ffed4a' },
+      'DEEP': { bg: 'rgba(0,200,83,0.08)', border: '#00c853', text: '#2e7d32', glow: '#00c853', emoji: '🟢', label: 'SÂU ĐÁNG KỂ', badge: 'RỦI RO THẤP', grad: '#00a844,#43e97b' },
+      'VERY_DEEP': { bg: 'rgba(0,163,255,0.08)', border: '#00a3ff', text: '#1565c0', glow: '#00a3ff', emoji: '🔵', label: 'RẤT SÂU, BÊN TRONG', badge: 'AN TOÀN HƠN', grad: '#0062cc,#00d2ff' }
+    };
+
+    const S = DEPTH_STYLES[category] || DEPTH_STYLES['INTERMEDIATE'];
+
+    // Medical descriptions per category
+    const DEPTH_DESC = {
+      'OUTSIDE': '⚠️ Khối u dường như vượt qua ranh giới bề mặt vỏ não. Cần đánh giá của bác sĩ chuyên khoa ngay lập tức.',
+      'SUPERFICIAL': '⚠️ Khối u rất gần bề mặt ngoài của vỏ não (< 5mm). Nguy cơ tổn thương vỏ não cao — khuyến cáo tư vấn phẫu thuật thần kinh khẩn cấp.',
+      'SHALLOW': '⚠️ Khối u nằm ở nông, cách vỏ não 5–15mm. Nguy cơ trung bình khi động chạm vùng vỏ não chức năng, yêu cầu phải thiết kế phẫu thuật cẩn trọng.',
+      'INTERMEDIATE': '✓ Khối u sâu mức trung bình so với vỏ não (15–30mm). Nguy cơ cho vỏ não thấp — phù hợp thực hiện các quy trình theo dõi kỹ thuật chuẩn.',
+      'DEEP': '✓ Khối u ở vị trí sâu đáng kể (30–45mm). Hầu như không đe dọa vỏ não — có thể cân nhắc sinh thiết lập thể hoặc xạ phẫu.',
+      'VERY_DEEP': '✓ Khối u nằm ở vùng rất sâu (>45mm). Không có nguy cơ xâm lấn bề mặt vỏ não — có khả năng thuộc vùng quanh não thất hoặc chất trắng sâu.'
+    };
+
+    // Progress (0→55mm scale, higher = deeper = safer)
+    const maxDepth = 55;
+    const depthPct = depth != null ? Math.min((depth / maxDepth) * 100, 100) : 0;
+
+    // Update DOM
+    card.style.display = 'block';
+    inner.style.background = S.bg;
+    inner.style.border = `1px solid ${S.border}40`;
+    inner.style.borderLeft = `4px solid ${S.border}`;
+    if (glowBar) { glowBar.style.background = `linear-gradient(90deg,transparent,${S.glow},transparent)`; }
+
+    if (emoji) emoji.textContent = S.emoji;
+    if (mmVal) {
+      mmVal.textContent = depth != null ? depth.toFixed(1) : '—';
+      mmVal.style.color = S.text;
+    }
+    if (catLbl) {
+      catLbl.textContent = S.label;
+      catLbl.style.color = S.text;
+    }
+    if (badge) {
+      badge.textContent = S.badge;
+      badge.style.color = S.text;
+      badge.style.background = S.bg;
+      badge.style.border = `1px solid ${S.border}60`;
+    }
+    if (progBar) {
+      progBar.style.background = `linear-gradient(90deg,${S.grad})`;
+      // Animate after brief delay
+      requestAnimationFrame(() => {
+        setTimeout(() => { progBar.style.width = depthPct + '%'; }, 80);
+      });
+    }
+    if (desc) {
+      desc.innerHTML = DEPTH_DESC[category] || '—';
+      desc.style.color = S.text + 'cc';
+    }
+
+    console.log(`[App] 📏 DepthCard rendered: ${depth?.toFixed(1)}mm | ${category} | ${S.badge}`);
+  }
+
+  // ===== UPDATE 3D BRAIN =====
+  function update3DBrain(data) {
+    if (!data.prediction || !data.prediction.tumor_detected) {
+      console.log('[App] ℹ️  No tumor detected, skipping 3D update');
+      return;
+    }
+    window.lastDiagnosisData = data;
+
+    console.log('%c[App] 🧠 Updating 3D brain with FULL metrics and depth visualization...', 'color: #00c853; font-weight: bold;');
+
+    const location = mapLocationToKey(data.prediction.location_hint);
+    const tumorSize = Math.min(data.prediction.tumor_area_percent / 5, 0.5);
+
+    fetch(`${API_BASE}/brain3d?location=${location}&tumor_size=${tumorSize}`)
+      .then(r => r.json())
+      .then(brainData => {
+        if (window.updateBrainTumor && brainData.tumor_points) {
+          console.log('[App] ✅ Calling updateBrainTumor with:');
+          console.log('  - tumorPoints:', brainData.tumor_points.length, 'points');
+          console.log('  - metrics:', data.detailed_metrics);
+          console.log('  - depthMetrics:', data.depth_metrics);
+
+          // ✅ FIX: Truyền đầy đủ 3 tham số
+          window.updateBrainTumor(
+            brainData.tumor_points,
+            data.detailed_metrics,        // metrics từ diagnosis
+            data.depth_metrics            // ✅ MỚI: depth metrics từ diagnosis
+          );
+        }
+      })
+      .catch(err => {
+        console.warn('[App] ⚠️  3D update failed:', err);
+      });
+  }
+
+  // ===== ✅ DISPLAY METRICS PANEL - FIXED TỶ LỆ U/NÃO =====
+  function displayMetricsPanel(diagnosisData) {
+    const panel = document.getElementById('tumorMetricsPanel');
+    if (!panel) {
+      console.warn('[App] ⚠️  Metrics panel not found');
+      return;
+    }
+
+    const metrics = diagnosisData.detailed_metrics || {};
+    const depthMetrics = diagnosisData.depth_metrics || {};
+    const pred = diagnosisData.prediction || {};
+
+    console.log('[App] 📊 Displaying metrics panel with depth info');
+    console.log('  Raw tumor_brain_ratio:', metrics.tumor_brain_ratio);
+    console.log('  Depth:', depthMetrics.tumor_depth_mm, 'mm');
+    console.log('  Category:', depthMetrics.depth_category?.category);
+
+    // ✅ FIX: Chuyển đổi tỷ lệ u/não CHÍNH XÁC
+    // Backend trả về giá trị ĐÃ NHÂN 100 (ví dụ: 0.0674 = 0.0674%)
+    // Frontend chỉ cần format và hiển thị rõ ràng
+    let tumorBrainRatioPercent = 'N/A';
+
+    if (metrics.tumor_brain_ratio !== undefined && metrics.tumor_brain_ratio !== null) {
+      const rawValue = parseFloat(metrics.tumor_brain_ratio);
+
+      // Làm tròn 2 chữ số thập phân để hiển thị rõ ràng
+      // 0.0674 → "0.07%"
+      // 64.5 → "64.50%"
+      tumorBrainRatioPercent = rawValue.toFixed(2) + '%';
+    }
+
+    console.log('  Formatted tumor_brain_ratio:', tumorBrainRatioPercent);
+
+    // Build HTML
+    let html = `
+      
+      <div style="
+        padding: 14px;
+        background: ${getDepthCategoryColor(depthMetrics.depth_category?.category).bg};
+        border-left: 3px solid ${getDepthCategoryColor(depthMetrics.depth_category?.category).border};
+        border-radius: 6px;
+        margin-bottom: 14px;
+      ">
+        <!-- Header -->
+        <div style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 10px;
+          padding-bottom: 8px;
+          border-bottom: 1px solid rgba(255,255,255,0.1);
+        ">
+          <div style="
+            color: var(--text-sec);
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 1px;
+          ">
+            ${depthMetrics.depth_category?.emoji || '📏'} DEPTH FROM CORTICAL SURFACE
+          </div>
+        </div>
+        
+        <!-- ✅ Main Depth Value (RÕ RÀNG HƠN) -->
+        <div style="
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline;
+          margin-bottom: 10px;
+        ">
+          <div style="color: var(--text-sec); font-size: 11px;">Khoảng cách tới mặt ngoài vỏ não</div>
+          <div style="
+            color: ${getDepthCategoryColor(depthMetrics.depth_category?.category).text};
+            font-size: 24px;
+            font-weight: bold;
+            font-family: 'Consolas', monospace;
+          ">
+            ${depthMetrics.tumor_depth_mm !== undefined ? depthMetrics.tumor_depth_mm.toFixed(1) : 'Không có'} <span style="font-size: 14px;">mm</span>
+          </div>
+        </div>
+  
+        <!-- ✅ Safety Status Badge (DIỄN ĐẠT Y KHOA) -->
+        <div style="
+          padding: 10px 12px;
+          background: ${getDepthCategoryColor(depthMetrics.depth_category?.category).bg};
+          border: 1px solid ${getDepthCategoryColor(depthMetrics.depth_category?.category).border};
+          border-radius: 6px;
+          margin-bottom: 10px;
+        ">
+          <div style="
+            color: ${getDepthCategoryColor(depthMetrics.depth_category?.category).text};
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 4px;
+          ">
+            Mức Cảnh Báo An Toàn: ${getCorticalSafetyLevel(depthMetrics.tumor_depth_mm)}
+          </div>
+          <div style="
+            color: var(--text-sec);
+            font-size: 10px;
+            line-height: 1.4;
+          ">
+            ${getCorticalRiskDescription(depthMetrics.tumor_depth_mm)}
+          </div>
+        </div>
+        
+        <!-- Depth Visualization Bar -->
+        <div style="
+          width: 100%;
+          height: 28px;
+          background: rgba(0,0,0,0.35);
+          border-radius: 6px;
+          overflow: hidden;
+          margin-bottom: 10px;
+          border: 1px solid rgba(255,255,255,0.1);
+        ">
+          ${createDepthBar(depthMetrics.tumor_depth_mm)}
+        </div>
+        
+        <!-- Technical Details (Collapsible) -->
+        <details style="margin-top: 8px;">
+          <summary style="
+            color: var(--text-sec);
+            font-size: 10px;
+            cursor: pointer;
+            user-select: none;
+            padding: 4px 0;
+          ">
+            📋 Technical Coordinates
+          </summary>
+          <div style="
+            background: rgba(10, 14, 26, 0.05);
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 9px;
+            color: var(--text-sec);
+            margin-top: 6px;
+            line-height: 1.6;
+          ">
+            <div style="margin-bottom: 6px;">
+              <strong style="color: var(--cyan);">Tumor Center:</strong>
+              <div style="margin-left: 8px; color: #66bb6a;">
+                X: ${depthMetrics.centroid_3d?.[0]?.toFixed(1) || 'N/A'} mm<br/>
+                Y: ${depthMetrics.centroid_3d?.[1]?.toFixed(1) || 'N/A'} mm<br/>
+                Z: ${depthMetrics.centroid_3d?.[2]?.toFixed(1) || 'N/A'} mm
+              </div>
+            </div>
+            <div>
+              <strong style="color: #00e5ff;">Nearest Cortex Point:</strong>
+              <div style="margin-left: 8px; color: #ffb74d;">
+                X: ${depthMetrics.nearest_cortex_point?.[0]?.toFixed(1) || 'N/A'} mm<br/>
+                Y: ${depthMetrics.nearest_cortex_point?.[1]?.toFixed(1) || 'N/A'} mm<br/>
+                Z: ${depthMetrics.nearest_cortex_point?.[2]?.toFixed(1) || 'N/A'} mm
+              </div>
+            </div>
+            <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.1);">
+              <strong style="color: #00e5ff;">Khoảng Cách Từ Tâm Não:</strong>
+              <span style="color: #9c27b0; margin-left: 4px;">
+                ${depthMetrics.distance_from_center_mm?.toFixed(1) || 'Không Tồn Tại'} mm
+              </span>
+            </div>
+          </div>
+        </details>
+      </div>
+  
+      <!-- ===== VOLUME ===== -->
+      <div style="
+        padding: 12px;
+        background: rgba(0, 229, 255, 0.08);
+        border-left: 3px solid #00e5ff;
+        border-radius: 6px;
+        margin-bottom: 10px;
+      ">
+        <div style="color: #5a7a99; font-size: 10px; text-transform: uppercase; margin-bottom: 6px;">
+          📦 THỂ TÍCH KHỐI U
+        </div>
+        <div style="color: #00e5ff; font-size: 18px; font-weight: bold; font-family: 'Consolas', monospace;">
+          ${metrics.volume_cm3 !== undefined ? metrics.volume_cm3.toFixed(2) : 'Không Tồn Tại'} <span style="font-size: 12px;">cm³</span>
+        </div>
+        <div style="color: #5a7a99; font-size: 9px; margin-top: 2px;">
+          = ${metrics.volume_mm3 !== undefined ? metrics.volume_mm3.toFixed(0) : 'Không Tồn Tại'} mm³
+        </div>
+      </div>
+      
+      <!-- ===== AREA ===== -->
+      <div style="
+        padding: 12px;
+        background: rgba(255, 145, 0, 0.08);
+        border-left: 3px solid #ff9100;
+        border-radius: 6px;
+        margin-bottom: 10px;
+      ">
+        <div style="color: #5a7a99; font-size: 10px; text-transform: uppercase; margin-bottom: 6px;">
+          📐 DIỆN TÍCH MẶT CẮT
+        </div>
+        <div style="color: #ff9100; font-size: 18px; font-weight: bold; font-family: 'Consolas', monospace;">
+          ${metrics.area_mm2 !== undefined ? metrics.area_mm2.toFixed(1) : 'Không Rõ'} <span style="font-size: 12px;">mm²</span>
+        </div>
+        <div style="color: #5a7a99; font-size: 9px; margin-top: 2px;">
+          Kích thước mặt phẳng dọc lát cắt đơn
+        </div>
+      </div>
+      
+      <!-- ===== ✅ TỶ LỆ U/NÃO - FIXED HIỂN THỊ RÕ RÀNG ===== -->
+      <div style="
+        padding: 12px;
+        background: rgba(255, 82, 82, 0.08);
+        border-left: 3px solid #ff5252;
+        border-radius: 6px;
+        margin-bottom: 10px;
+      ">
+        <div style="color: #5a7a99; font-size: 10px; text-transform: uppercase; margin-bottom: 6px;">
+          📊 TỶ LỆ KÍCH THƯỚC U / NÃO
+        </div>
+        <div style="color: #ff5252; font-size: 18px; font-weight: bold; font-family: 'Consolas', monospace;">
+          ${tumorBrainRatioPercent}
+        </div>
+        <div style="color: #5a7a99; font-size: 9px; margin-top: 2px;">
+          Dựa trên thể tích trung bình của bộ não trưởng thành (khoảng 1400 cm³)
+        </div>
+      </div>
+      
+      <!-- ===== TÂM KHỐI U ===== -->
+      <div style="
+        padding: 12px;
+        background: rgba(0, 200, 83, 0.08);
+        border-left: 3px solid #00c853;
+        border-radius: 6px;
+        margin-bottom: 10px;
+      ">
+        <div style="color: #5a7a99; font-size: 10px; text-transform: uppercase; margin-bottom: 6px;">
+          🎯 HIỆU CHỈNH TRỤC TỌA ĐỘ U (3D)
+        </div>
+        <div style="
+          color: #00c853;
+          font-family: 'Courier New', monospace;
+          font-size: 11px;
+          line-height: 1.6;
+        ">
+          <div>Trục X: ${metrics.centroid_mm?.[0]?.toFixed(1) || '0.0'} mm</div>
+          <div>Trục Y: ${metrics.centroid_mm?.[1]?.toFixed(1) || '0.0'} mm</div>
+          <div>Trục Z: ${metrics.centroid_mm?.[2]?.toFixed(1) || '0.0'} mm</div>
+        </div>
+        <div style="color: #5a7a99; font-size: 9px; margin-top: 4px;">
+          Tương đối so với trung tâm của mô hình
+        </div>
+      </div>
+      
+      <!-- ===== KHOẢNG CÁCH VỎ NÃO (LEGACY - Simple Estimation) ===== -->
+      <div style="
+        padding: 12px;
+        background: rgba(156, 39, 176, 0.08);
+        border-left: 3px solid #9c27b0;
+        border-radius: 6px;
+        margin-bottom: 10px;
+      ">
+        <div style="color: #5a7a99; font-size: 10px; text-transform: uppercase; margin-bottom: 6px;">
+          📏 KHOẢNG CÁCH TỚI MẶT VỎ NÃO KHÁI TOÁN MỞ RỘNG
+        </div>
+        <div style="color: #9c27b0; font-size: 16px; font-weight: bold; font-family: 'Consolas', monospace;">
+          ${metrics.distance_to_cortex_mm !== undefined ? metrics.distance_to_cortex_mm.toFixed(2) : 'Không Tồn Tại'} <span style="font-size: 12px;">mm</span>
+        </div>
+        <div style="color: #5a7a99; font-size: 9px; margin-top: 4px;">
+          ${metrics.cortex_proximity || 'Ước tính dạng cấu trúc hình cầu'}
+        </div>
+      </div>
+      
+      <!-- ===== DIVIDER ===== -->
+      <div style="height: 1px; background: #1e3a52; margin: 14px 0;"></div>
+      
+      <!-- ===== PREDICTION METADATA ===== -->
+      <div style="color: #5a7a99; font-size: 10px; line-height: 1.8;">
+        <div style="margin-bottom: 6px;">
+          <strong style="color: #00e5ff;">Mức Tin Cậy Của Mô Hình CNN:</strong>
+          <span style="color: #00c853; font-weight: bold; margin-left: 4px;">
+            ${(pred.confidence * 100).toFixed(1)}%
+          </span>
+        </div>
+        <div style="margin-bottom: 6px;">
+          <strong style="color: #00e5ff;">Khu Vực Phỏng Đoán:</strong>
+          <span style="color: #ffb74d; margin-left: 4px;">${pred.location_hint || 'Không Rõ'}</span>
+        </div>
+        <div>
+          <strong style="color: #00e5ff;">Vi Kiến Trúc Nhận Dạng Cốt Lõi:</strong>
+          <span style="color: #8899b0; margin-left: 4px;">U-Net CNN v1.0</span>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('metricsContent').innerHTML = html;
+    panel.style.display = 'block';
+
+    console.log('[App] ✅ Metrics panel displayed (FIXED: depth + ratio correctly formatted)');
+  }
+
+  // ===== ✅ HELPER FUNCTIONS - DIỄN ĐẠT Y KHOA RÕ RÀNG =====
+  function getCorticalSafetyLevel(depth) {
+    if (!depth || depth < 0) return 'UNKNOWN';
+    if (depth < 5) return 'CRITICAL';
+    if (depth < 15) return 'LOW';
+    if (depth < 30) return 'INTERMEDIATE';
+    if (depth < 45) return 'HIGH';
+    return 'VERY HIGH';
+  }
+
+  function getCorticalRiskDescription(depth) {
+    if (!depth || depth < 0) return 'Unable to assess cortical involvement risk';
+    if (depth < 5) return '⚠️ Very close to outer cortical surface - high involvement risk';
+    if (depth < 15) return '⚠️ Near cortical surface - moderate involvement risk';
+    if (depth < 30) return '✓ Moderate depth - low cortical involvement risk';
+    if (depth < 45) return '✓ Deep location - minimal cortical involvement risk';
+    return '✓ Very deep location - negligible cortical involvement risk';
+  }
+
+  function getDepthCategoryColor(category) {
+    const colors = {
+      'OUTSIDE': { bg: 'rgba(255, 0, 0, 0.1)', border: '#ff0000', text: '#ff5555' },
+      'SUPERFICIAL': { bg: 'rgba(255, 0, 64, 0.1)', border: '#ff0040', text: '#ff5252' },
+      'SHALLOW': { bg: 'rgba(255, 145, 0, 0.1)', border: '#ff9100', text: '#ffb74d' },
+      'INTERMEDIATE': { bg: 'rgba(255, 255, 0, 0.1)', border: '#ffff00', text: '#ffff99' },
+      'DEEP': { bg: 'rgba(0, 200, 83, 0.1)', border: '#00c853', text: '#66bb6a' },
+      'VERY_DEEP': { bg: 'rgba(0, 163, 204, 0.1)', border: '#00a3cc', text: '#4dd0e1' }
+    };
+
+    return colors[category] || colors['INTERMEDIATE'];
+  }
+
+  function createDepthBar(depth) {
+    const maxDepth = 55;
+    const percentage = Math.min((depth / maxDepth) * 100, 100);
+
+    let color;
+    if (depth < 5) color = '#ff0040';
+    else if (depth < 15) color = '#ff9100';
+    else if (depth < 30) color = '#ffff00';
+    else if (depth < 45) color = '#00c853';
+    else color = '#00a3cc';
+
+    return `
+      <div style="
+        height: 100%;
+        width: ${percentage}%;
+        background: ${color};
+        transition: width 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding-right: 8px;
+        font-size: 10px;
+        color: #0a0e1a;
+        font-weight: bold;
+      ">
+        ${percentage > 10 ? percentage.toFixed(0) + '%' : ''}
+      </div>
+    `;
+  }
+
+  function mapLocationToKey(hint) {
+    if (!hint) return 'left_frontal';
+
+    const h = hint.toLowerCase();
+
+    if (h.includes('left') && h.includes('frontal')) return 'left_frontal';
+    if (h.includes('right') && h.includes('frontal')) return 'right_frontal';
+    if (h.includes('left') && h.includes('temporal')) return 'left_temporal';
+    if (h.includes('right') && h.includes('temporal')) return 'right_temporal';
+    if (h.includes('left') && h.includes('parietal')) return 'left_parietal';
+    if (h.includes('right') && h.includes('parietal')) return 'right_parietal';
+    if (h.includes('superior') && h.includes('left')) return 'superior_left';
+    if (h.includes('inferior')) return 'inferior_right';
+
+    return 'left_frontal';
+  }
+
+  // ===== STATE MANAGEMENT =====
+  function showState(state) {
+    reportPlaceholder.style.display = 'none';
+    reportContent.style.display = 'none';
+    loadingState.style.display = 'none';
+
+    switch (state) {
+      case 'loading':
+        loadingState.style.display = 'flex';
+        break;
+      case 'report':
+        reportContent.style.display = 'block';
+        break;
+      case 'placeholder':
+        reportPlaceholder.style.display = 'flex';
+        break;
+    }
+  }
+
+  // ===== TAB NAVIGATION (HOÀN THIỆN) =====
+  function switchTab(tabName) {
+    console.log(`[App] 📑 Switching to tab: ${tabName}`);
+
+    // Hide all panels
+    if (mainLayout) mainLayout.style.display = 'none';
+    if (xaiPanel) xaiPanel.style.display = 'none';
+    if (similarPanel) similarPanel.style.display = 'none';
+    if (infoPanel) infoPanel.style.display = 'none';
+    if (atlasPanel) atlasPanel.classList.remove('active');
+
+    // Show based on tab
+    switch (tabName) {
+      case 'scan':
+      case 'brain3d':
+        if (mainLayout) mainLayout.style.display = 'grid';
+        break;
+
+      case 'xai':
+        // ✅ Call XAISimilarUI to render XAI panel
+        if (window.XAISimilarUI?.renderXAIDashboard && lastXAIData) {
+          window.XAISimilarUI.renderXAIDashboard(lastXAIData);
+        } else if (window.XAISimilarUI?.showXAIPanel) {
+          window.XAISimilarUI.showXAIPanel();
+        } else {
+          // Fallback placeholder
+          if (xaiPanel) {
+            xaiPanel.innerHTML = `
+              <div style="padding: 80px 40px; text-align: center; color: var(--text-sec);">
+                <div style="font-size: 64px; margin-bottom: 24px;">🔍</div>
+                <h2 style="color: var(--cyan);">XAI Analysis</h2>
+                <p style="margin-top: 16px;">
+                  Upload an MRI image and run diagnosis to see XAI analysis.
+                </p>
+              </div>
+            `;
+          }
+        }
+        if (xaiPanel) xaiPanel.style.display = 'block';
+        break;
+
+      case 'similar':
+        // ✅ Call XAISimilarUI to render Similar panel
+        if (window.XAISimilarUI?.renderSimilarCases && lastSimilarData) {
+          window.XAISimilarUI.renderSimilarCases(lastSimilarData);
+        } else if (window.XAISimilarUI?.showSimilarPanel) {
+          window.XAISimilarUI.showSimilarPanel();
+        } else {
+          // Fallback placeholder
+          if (similarPanel) {
+            similarPanel.innerHTML = `
+              <div style="padding: 80px 40px; text-align: center; color: var(--text-sec);">
+                <div style="font-size: 64px; margin-bottom: 24px;">🔎</div>
+                <h2 style="color: var(--cyan);">Similar Cases</h2>
+                <p style="margin-top: 16px;">
+                  Upload an MRI to find similar cases from database.
+                </p>
+              </div>
+            `;
+          }
+        }
+        if (similarPanel) similarPanel.style.display = 'block';
+        break;
+
+      case 'info':
+        if (infoPanel) infoPanel.style.display = 'block';
+        break;
+
+      case 'atlas':
+        // Initialize viewer on first visit
+        if (window.Atlas4PanelViewer && atlasPanel) {
+          atlasPanel.classList.add('active');
+          window.Atlas4PanelViewer.init();
+          // If diagnosis data already available, reload
+          if (window.lastDiagnosisData) {
+            window.Atlas4PanelViewer.loadDiagnosis(window.lastDiagnosisData);
+          }
+          console.log('[App] 🧠 Atlas View activated');
+        } else {
+          // Show placeholder if atlas viewer not loaded
+          if (atlasPanel) {
+            atlasPanel.classList.add('active');
+            atlasPanel.innerHTML = `
+              <div style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:20px;color:var(--text-sec);">
+                <div style="font-size:64px;">🧠</div>
+                <h2 style="color:var(--cyan);">Atlas View</h2>
+                <p>Upload an MRI image and run diagnosis to view the 4-panel atlas.</p>
+              </div>`;
+          }
+        }
+        break;
+    }
+
+    // Update active pill
+    pills.forEach(p => p.classList.remove('active'));
+    document.querySelector(`.pill[data-tab="${tabName}"]`)?.classList.add('active');
+  }
+
+  // Attach tab click handlers
+  pills.forEach(pill => {
+    pill.addEventListener('click', (e) => {
+      const tab = e.target.dataset.tab;
+      switchTab(tab);
+    });
+  });
+
+  // ===== VIEWER CONTROLS =====
+  if (btnRotate) {
+    btnRotate.addEventListener('click', () => {
+      const active = window.toggleAutoRotate && window.toggleAutoRotate();
+      btnRotate.classList.toggle('active', active);
+      console.log('[App] 🔄 Auto-rotate:', active ? 'ON' : 'OFF');
+    });
+  }
+
+  if (btnSlice) {
+    btnSlice.addEventListener('click', () => {
+      const active = window.toggleDetailView && window.toggleDetailView();
+      btnSlice.classList.toggle('active', active);
+      console.log('[App] 🔍 Detail view:', active ? 'ON' : 'OFF');
+    });
+  }
+  const btnSliceBrain3D = document.getElementById('btnSliceBrain3D');
+  if (btnSliceBrain3D) {
+    btnSliceBrain3D.addEventListener('click', async () => {
+      console.log('[App] 🧬 Opening EBRAINS-style Atlas Viewer...');
+
+      if (!window.AtlasViewerComplete) {
+        alert('⚠️ Atlas Viewer module not loaded');
+        return;
+      }
+
+      const isActive = window.AtlasViewerComplete.toggle();
+      btnSliceBrain3D.classList.toggle('active', isActive);
+
+      console.log(`[App] 🔄 Atlas Viewer: ${isActive ? 'OPENED' : 'CLOSED'}`);
+    });
+  }
+
+  if (btnReset) {
+    btnReset.addEventListener('click', () => {
+      if (window.resetBrainView) {
+        window.resetBrainView();
+      }
+
+      btnRotate.classList.add('active');
+      btnSlice.classList.remove('active');
+      btnSliceBrain3D.classList.remove('active');
+      console.log('[App] ↺ Brain view reset');
+    });
+  }
+
+  // ===== ✅ ATLAS 3D BUTTON HANDLER (HOÀN CHỈNH) =====
+  if (btnAtlas3D) {
+    btnAtlas3D.addEventListener('click', async () => {
+      console.log('[App] 🧠 Atlas 3D button clicked');
+
+      if (!window.AtlasLoader) {
+        console.warn('[App] ⚠️  Atlas module not loaded. Waiting...');
+
+        // Wait max 5 seconds for Atlas module to load
+        let attempts = 0;
+        const waitForAtlas = setInterval(() => {
+          if (window.AtlasLoader || attempts++ > 50) {
+            clearInterval(waitForAtlas);
+            if (!window.AtlasLoader) {
+              alert('⚠️ Atlas module not available. Please check console.');
+              return;
+            }
+            // Recursively call again
+            btnAtlas3D.click();
+          }
+        }, 100);
+        return;
+      }
+
+      const status = window.AtlasLoader.getStatus();
+
+      if (!status.templateLoaded && !status.isocortexLoaded) {
+        console.log('[App] ⏳ Initializing BigBrain Atlas...');
+        btnAtlas3D.disabled = true;
+
+        try {
+          const initialized = await window.AtlasLoader.initialize();
+
+          if (initialized && window.scene) {
+            window.AtlasLoader.addToScene(window.scene);
+            console.log('[App] ✅ Atlas added to scene');
+          }
+        } catch (err) {
+          console.error('[App] ❌ Atlas error:', err);
+          alert('❌ Error loading BigBrain Atlas: ' + err.message);
+        } finally {
+          btnAtlas3D.disabled = false;
+        }
+      }
+
+      const isVisible = window.AtlasLoader.toggleVisibility();
+      btnAtlas3D.classList.toggle('active', isVisible);
+
+      const atlasIndicator = document.getElementById('atlasIndicator');
+      if (atlasIndicator) {
+        atlasIndicator.style.display = isVisible ? 'block' : 'none';
+      }
+
+      console.log(`[App] 🔄 Atlas toggle: ${isVisible ? 'VISIBLE' : 'HIDDEN'}`);
+    });
+  }
+
+  // ===== PRE-LOAD ATLAS IN BACKGROUND =====
+  window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(async () => {
+      if (window.AtlasLoader && !window.AtlasLoader.getStatus().templateLoaded) {
+        console.log('[App] 📚 Pre-loading BigBrain Atlas in background...');
+        try {
+          await window.AtlasLoader.initialize();
+          console.log('[App] ✅ BigBrain Atlas pre-loaded successfully');
+        } catch (err) {
+          console.warn('[App] ⚠️  Atlas pre-load failed (non-critical):', err.message);
+        }
+      }
+    }, 2000); // Wait 2s after page load to avoid blocking
+  });
+
+  // ===== INITIALIZATION =====
+  window.addEventListener('DOMContentLoaded', () => {
+    console.log('%c[App] 🚀 Initializing NeuroScan AI...', 'color: #00e5ff; font-weight: bold; font-size: 14px;');
+
+    // Health check
+    checkHealth();
+
+    // Init 3D viewer (defined in brain3d.js)
+    if (window.initBrainViewer) {
+      window.initBrainViewer();
+      console.log('[App] ✅ 3D viewer initialized');
+    }
+
+    // Init XAI/Similar UI (defined in xai_similar_ui.js)
+    if (window.XAISimilarUI?.init) {
+      window.XAISimilarUI.init();
+      console.log('[App] ✅ XAI/Similar UI initialized');
+    } else {
+      console.warn('[App] ⚠️  XAISimilarUI not available - check script loading order');
+    }
+
+    // Set rotate button active by default
+    if (btnRotate) btnRotate.classList.add('active');
+
+    console.log('%c[App] ✅ All systems ready!', 'color: #00c853; font-weight: bold; font-size: 14px;');
+  });
+
+  // ===== EXPOSE displayMetricsPanel TO GLOBAL =====
+  window.updateTumorMetrics = displayMetricsPanel;
+
+  // ===== WINDOW EXPORTS (for external scripts) ===== 
+  window.App = {
+    switchTab,
+    lastPredictionData: () => lastPredictionData,
+    lastXAIData: () => lastXAIData,
+    lastSimilarData: () => lastSimilarData,
+    getCurrentFile: () => currentFile
+  };
+
+})();

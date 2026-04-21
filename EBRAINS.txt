@@ -1,0 +1,28 @@
+Thông tin ghi chú kỹ thuật : ===
+
+Feature ExtractionTrích xuất vector đặc trưng từ ảnh (thường dùng CNN/ResNet)
+
+Vector Search (kNN)So sánh vector ảnh mới với toàn bộ database, lấy k gần nhất
+
+Cosine SimilarityĐo góc giữa 2 vector đặc trưng → cho ra similarity_score
+
+----------
+- CÁC CÁCH SO SÁCH MÔ HÌNH : < 
+
++ Rule-based + thống kê (ngưỡng diện tích u, vị trí, thể tích)
+
++ Grad-CAM / Attention Map (giải thích CNN trực tiếp trên ảnh MRI)
+
++ Decision Tree / Random Forest trên đặc trưng trích xuất
+
++ SHAP / LIME để giải thích đầu ra mô hình
+
++ Prototype-based models (so sánh ca bệnh tương tự)
+
+--------- FIX 
+
++ Fix chỉnh màu sáng giao diện 
++ Ngôn ngữ 
++ Tổng hợp các thông tin trọng tâm , không trùng lặp lại 
++ Chưa hiển thị tiếng việt khi xem trong atlas 
++ Điều chỉnh hiển thị lại bảng phân tích chi tiết sang nút chỉ số khối U
