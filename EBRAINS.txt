@@ -25,6 +25,7 @@ Cosine SimilarityĐo góc giữa 2 vector đặc trưng → cho ra similarity_sc
 + Ngôn ngữ 
 
 -----
++ Điều chỉnh nội dung chuẩn đoán
 + Tổng hợp các thông tin trọng tâm , không trùng lặp lại 
 + Chưa hiển thị tiếng việt khi xem trong atlas 
 + Chỉnh lại 

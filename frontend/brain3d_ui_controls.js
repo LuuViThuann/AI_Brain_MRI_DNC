@@ -1,5 +1,3 @@
-
-
 (function Brain3DUIControlsSimplified() {
   'use strict';
 
@@ -24,36 +22,30 @@
     setupEventListeners();
     loadSavedState();
     setupMetricsPanel();
-
     console.log('[UI Controls] ✅ Nút toggle sẵn sàng');
   }
 
   // ===== TẠO NÚT TOGGLE CHỈ SỐ =====
   function createMetricsToggle() {
     const viewerControls = document.querySelector('.viewer-controls');
-
     if (!viewerControls) {
       console.error('[UI Controls] ❌ Không tìm thấy viewer-controls');
       return;
     }
 
-    // Kiểm tra nút đã tồn tại chưa
     if (document.getElementById('btnMetrics')) {
       console.log('[UI Controls] ⚠️ Nút đã tồn tại');
       return;
     }
 
-    // Tạo nút mới (cùng style với rotate/slice/reset)
     const btn = document.createElement('button');
     btn.id = 'btnMetrics';
     btn.className = 'ctrl-btn';
     btn.title = 'Hiển thị/Ẩn Detail Analysis (M)';
-    btn.innerHTML = '🔍'; // Icon kính lúp
+    btn.innerHTML = '🔍';
 
-    // Thêm sự kiện click
     btn.addEventListener('click', toggleMetricsPanel);
 
-    // Chèn nút (trước nút reset nếu có, hoặc thêm cuối)
     const resetBtn = document.getElementById('btnReset');
     if (resetBtn) {
       viewerControls.insertBefore(btn, resetBtn);
@@ -62,6 +54,30 @@
     }
 
     console.log('[UI Controls] ✅ Đã tạo nút Detail Analysis');
+  }
+
+  // ===== SHOW PANEL (tách riêng để tái sử dụng) =====
+  function _showPanel(panel) {
+    // FIX: Xóa animation cũ trước, force reflow, rồi mới chạy lại
+    // Tránh animation lần 2 ghi đè flex-direction
+    panel.classList.add('metrics-open');
+    panel.style.display = 'flex';         // Explicit flex instead of empty
+    panel.style.flexDirection = 'column';   // Explicit column instead of empty
+    panel.style.animation = 'none';   // Reset animation
+    panel.offsetHeight;               // Force reflow (bắt buộc để animation chạy lại)
+    panel.style.animation = '';       // Xóa override → CSS animation chạy
+    console.log('[UI Controls] 📊 Bảng chỉ số HIỂN THỊ');
+  }
+
+  // ===== HIDE PANEL =====
+  function _hidePanel(panel) {
+    panel.style.animation = 'slideOutRight 0.3s ease-out forwards';
+    setTimeout(() => {
+      panel.classList.remove('metrics-open');
+      panel.style.display = 'none';
+      panel.style.animation = '';
+    }, 300);
+    console.log('[UI Controls] 📊 Bảng chỉ số ẨN');
   }
 
   // ===== TOGGLE BẢNG CHỈ SỐ =====
@@ -73,26 +89,13 @@
 
     if (panel) {
       if (state.metricsVisible) {
-        // Hiển thị panel
-        panel.style.display = 'block';
-        panel.style.animation = 'slideInRight 0.3s ease-out';
-
-        console.log('[UI Controls] 📊 Bảng chỉ số HIỂN THỊ');
+        _showPanel(panel);
       } else {
-        // Ẩn panel
-        panel.style.animation = 'slideOutRight 0.3s ease-out';
-        setTimeout(() => {
-          panel.style.display = 'none';
-        }, 300);
-
-        console.log('[UI Controls] 📊 Bảng chỉ số ẨN');
+        _hidePanel(panel);
       }
     }
 
-    // Cập nhật trạng thái nút
     updateButtonState(btn, state.metricsVisible);
-
-    // Lưu trạng thái
     saveState();
   }
 
@@ -121,30 +124,21 @@
       return;
     }
 
-    // Bắt đầu ở trạng thái ẩn
+    // Ẩn ban đầu — dùng inline style để chắc chắn class chưa can thiệp
     panel.style.display = 'none';
-
-    // Xóa nút đóng mặc định (dùng nút toggle thay thế)
-    const existingClose = panel.querySelector('.close-btn');
-    if (existingClose) existingClose.remove();
+    panel.classList.remove('metrics-open');
 
     console.log('[UI Controls] ✅ Đã cấu hình bảng chỉ số (ẩn mặc định)');
   }
 
   // ===== THIẾT LẬP SỰ KIỆN =====
   function setupEventListeners() {
-    // Phím tắt: M
     document.addEventListener('keydown', (e) => {
       if (e.key === 'm' || e.key === 'M') {
-        // Không kích hoạt khi đang gõ trong input/textarea
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-          return;
-        }
-
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         toggleMetricsPanel();
       }
     });
-
     console.log('[UI Controls] ⌨️ Đã bật phím tắt: M');
   }
 
@@ -163,14 +157,12 @@
       if (saved !== null) {
         state.metricsVisible = JSON.parse(saved);
 
-        // Áp dụng trạng thái đã lưu
         if (state.metricsVisible) {
           setTimeout(() => {
             const panel = document.getElementById('tumorMetricsPanel');
             const btn = document.getElementById('btnMetrics');
-
             if (panel) {
-              panel.style.display = 'block';
+              _showPanel(panel);
               updateButtonState(btn, true);
             }
           }, 500);
@@ -188,14 +180,27 @@
     toggleMetricsPanel,
     isMetricsVisible: () => state.metricsVisible,
     showMetrics: () => {
-      if (!state.metricsVisible) toggleMetricsPanel();
+      if (!state.metricsVisible) {
+        state.metricsVisible = true;
+        const panel = document.getElementById('tumorMetricsPanel');
+        const btn = document.getElementById('btnMetrics');
+        if (panel) _showPanel(panel);
+        updateButtonState(btn, true);
+        saveState();
+      }
     },
     hideMetrics: () => {
-      if (state.metricsVisible) toggleMetricsPanel();
+      if (state.metricsVisible) {
+        state.metricsVisible = false;
+        const panel = document.getElementById('tumorMetricsPanel');
+        const btn = document.getElementById('btnMetrics');
+        if (panel) _hidePanel(panel);
+        updateButtonState(btn, false);
+        saveState();
+      }
     }
   };
 
-  // Xuất hàm toggle toàn cục để tương thích
   window.toggleMetricsPanel = toggleMetricsPanel;
 
   // ===== TỰ ĐỘNG KHỞI ĐỘNG =====
@@ -206,63 +211,104 @@
 // ===== CSS ANIMATIONS =====
 const style = document.createElement('style');
 style.textContent = `
-    /* Hiệu ứng slide cho bảng chỉ số */
-    @keyframes slideInRight {
-      from {
-        opacity: 0;
-        transform: translateX(100%);
-      }
-      to {
-        opacity: 1;
-        transform: translateX(0);
-      }
+  /* ============================================================
+     FIX: Dùng class .metrics-open thay vì inline style để
+     tránh animation ghi đè flex-direction lần thứ 2+
+  ============================================================ */
+  #tumorMetricsPanel.metrics-open {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* FIX: metricsContent phải có flex:1 và overflow-y:auto
+     min-height:0 là bắt buộc để flex child có thể scroll */
+  #metricsContent {
+    flex: 1 1 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    min-height: 0 !important;
+    overscroll-behavior: contain;
+  }
+
+  /* Animation dùng forwards để giữ trạng thái cuối */
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(100%);
     }
-  
-    @keyframes slideOutRight {
-      from {
-        opacity: 1;
-        transform: translateX(0);
-      }
-      to {
-        opacity: 0;
-        transform: translateX(100%);
-      }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+      /* KHÔNG set flex-direction ở đây — để class kiểm soát */
     }
-  
-    /* Trạng thái active của nút */
-    #btnMetrics.active {
-      background: rgba(0, 229, 255, 0.15) !important;
-      color: #00e5ff !important;
-      border-color: #00e5ff !important;
-      box-shadow: 0 0 12px rgba(0, 229, 255, 0.3) !important;
+  }
+
+  @keyframes slideOutRight {
+    from {
+      opacity: 1;
+      transform: translateX(0);
     }
-  
-    /* Hover effect cho nút */
-    #btnMetrics:hover {
-      background: rgba(0, 229, 255, 0.08);
-      border-color: #00b8d0;
-      color: #00b8d0;
+    to {
+      opacity: 0;
+      transform: translateX(100%);
     }
-  
-    /* Chuyển đổi mượt */
+  }
+
+  /* Áp animation CHỈ khi panel đang mở (class .metrics-open) */
+  #tumorMetricsPanel.metrics-open {
+    animation: slideInRight 0.3s ease-out;
+    /* animation KHÔNG dùng forwards ở đây để
+       tránh fill-mode ghi đè flex-direction sau khi chạy xong */
+  }
+
+  /* Trạng thái active của nút */
+  #btnMetrics.active {
+    background: rgba(0, 229, 255, 0.15) !important;
+    color: #00e5ff !important;
+    border-color: #00e5ff !important;
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.3) !important;
+  }
+
+  #btnMetrics:hover {
+    background: rgba(0, 229, 255, 0.08);
+    border-color: #00b8d0;
+    color: #00b8d0;
+  }
+
+  /* Scrollbar styling cho metrics panel */
+  #tumorMetricsPanel::-webkit-scrollbar,
+  #metricsContent::-webkit-scrollbar {
+    width: 4px;
+  }
+  #tumorMetricsPanel::-webkit-scrollbar-track,
+  #metricsContent::-webkit-scrollbar-track {
+    background: rgba(30, 58, 82, 0.3);
+    border-radius: 4px;
+  }
+  #tumorMetricsPanel::-webkit-scrollbar-thumb,
+  #metricsContent::-webkit-scrollbar-thumb {
+    background: rgba(0, 229, 255, 0.35);
+    border-radius: 4px;
+  }
+  #tumorMetricsPanel::-webkit-scrollbar-thumb:hover,
+  #metricsContent::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 229, 255, 0.65);
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
     #tumorMetricsPanel {
-      transition: opacity 0.3s ease, transform 0.3s ease;
+      max-width: calc(100vw - 80px) !important;
+      font-size: 11px !important;
     }
-  
-    /* Responsive cho mobile */
-    @media (max-width: 768px) {
-      #tumorMetricsPanel {
-        max-width: calc(100vw - 80px) !important;
-        font-size: 11px !important;
-      }
-      
-      #btnMetrics {
-        width: 36px !important;
-        height: 36px !important;
-        font-size: 18px !important;
-      }
+    #btnMetrics {
+      width: 36px !important;
+      height: 36px !important;
+      font-size: 18px !important;
     }
-  `;
+  }
+`;
 document.head.appendChild(style);
 
-console.log('%c[UI Controls] 📊 Phiên bản đơn giản hóa đã tải', 'color: #00e5ff; font-weight: bold;');
+console.log('%c[UI Controls] 📊 Phiên bản FIX scroll đã tải', 'color: #00e5ff; font-weight: bold;');

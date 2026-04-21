@@ -373,12 +373,15 @@
             <div style="color:#94a3b8;font-size:10px;margin-top:1px;">NeuroScan AI · U-Net v1.0</div>
           </div>
         </div>
-        <button onclick="document.getElementById('tumorMetricsPanel').style.display='none';document.getElementById('tumorMetricsPanel').style.flexDirection='column';var b=document.getElementById('btnMetrics');if(b)b.classList.remove('active');"
-          style="background:transparent;border:0.5px solid #e2e8f0;color:#94a3b8;font-size:16px;cursor:pointer;
-          width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;
-          flex-shrink:0;transition:all 0.15s;"
-          onmouseover="this.style.background='#fee2e2';this.style.color='#ef4444';this.style.borderColor='#fca5a5';"
-          onmouseout="this.style.background='transparent';this.style.color='#94a3b8';this.style.borderColor='#e2e8f0';">✕</button>
+         <button
+    onclick="if(window.Brain3DUIControls){ window.Brain3DUIControls.hideMetrics(); } else { var p=document.getElementById('tumorMetricsPanel'); if(p){ p.classList.remove('metrics-open'); p.style.display='none'; } var b=document.getElementById('btnMetrics'); if(b){ b.classList.remove('active'); b.style.background=''; b.style.color=''; b.style.borderColor=''; } }"
+    style="background:transparent;border:0.5px solid #e2e8f0;color:#94a3b8;font-size:16px;cursor:pointer;
+    width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;transition:all 0.15s;"
+    onmouseover="this.style.background='#fee2e2';this.style.color='#ef4444';this.style.borderColor='#fca5a5';"
+    onmouseout="this.style.background='transparent';this.style.color='#94a3b8';this.style.borderColor='#e2e8f0';">
+    ✕
+  </button>
       </div>
 
       <!-- Vùng cuộn -->
@@ -591,7 +594,7 @@
             <div style="font-size:13px;font-weight:600;color:#0f172a;">${bboxText}</div>
           </div>
         </div>
-      `)}
+      `)} 
 
       <!-- 5. Vùng Giải Phẫu -->
       ${sec('Vùng Giải Phẫu', `
@@ -608,7 +611,7 @@
           <div style="flex:1;min-width:0;">
             <div style="font-size:12px;font-weight:600;color:#0f172a;margin-bottom:3px;
               white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-              ${pred.location_hint || '—'}
+              ${window.translateLocationToVi ? window.translateLocationToVi(pred.location_hint) : (pred.location_hint || '—')}
             </div>
             <div style="font-size:10px;color:${lobe.color};padding-left:7px;
               border-left:2px solid ${lobe.color}66;line-height:1.5;">
@@ -652,6 +655,7 @@
     `;
 
     // Kích hoạt hiển thị dạng flex để scroll hoạt động
+    panel.classList.add('metrics-open');
     panel.style.display = 'flex';
     panel.style.flexDirection = 'column';
 
@@ -3111,7 +3115,7 @@
   // ════════════════════════════════════════════════════════════
   // HELPER: Build animated SVG brain lobe diagram
   // ════════════════════════════════════════════════════════════
-  function _buildBrainLobeSVG(locKey, tumorColor, label) {
+  function _buildBrainLobeSVG(locKey, tumorColor, label, lightMode = false) {
     const k = (locKey || '').toLowerCase();
     const lobe = _getLobeInfo(locKey);
     const side = k.includes('right') ? 'Phải (R)' : k.includes('left') ? 'Trái (L)' : '';
@@ -3123,8 +3127,23 @@
     const isCentral = k.includes('central') || (!isFrontal && !isTemporal && !isParietal && !isOccipital);
 
     const activeAlpha = '99'; // ~60% opacity fill
-    const dimFill = 'rgba(255,255,255,0.03)';
-    const dimStroke = 'rgba(255,255,255,0.08)';
+    const dimFill = lightMode ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)';
+    const dimStroke = lightMode ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+    const txt1 = lightMode ? '#475569' : '#5a7a99';
+    const txt2 = lightMode ? '#1e293b' : '#c1cfe8';
+    const borderInactive = lightMode ? '#cbd5e1' : '#1e3a52';
+
+    function lcDark(c) {
+      if(!lightMode) return c;
+      if(c==='#00e5ff') return '#0284c7';
+      if(c==='#00c853') return '#15803d';
+      if(c==='#ff9100') return '#b45309';
+      if(c==='#ff5252') return '#dc2626';
+      if(c==='#aa44ff') return '#7e22ce';
+      if(c==='#35a8ff') return '#2563eb';
+      if(c==='#ff6b35') return '#c2410c';
+      return c;
+    }
 
     // Tumor marker position based on lobe
     let tmX = 52, tmY = 38; // default center
@@ -3136,56 +3155,56 @@
 
     return `
     <div style="margin-bottom:12px;">
-      <div style="color:#5a7a99;font-size:9px;letter-spacing:0.5px;margin-bottom:6px;">📍 VỊ TRÍ KHỐI U (${label})</div>
+      <div style="color:${txt1};font-size:9px;letter-spacing:0.5px;margin-bottom:6px;font-weight:600;">📍 VỊ TRÍ KHỐI U (${label})</div>
       <div style="display:flex;align-items:flex-start;gap:10px;">
         <svg width="100" height="76" viewBox="0 0 100 76" style="flex-shrink:0;filter:drop-shadow(0 0 6px ${tumorColor}44);">
           <!-- Brain outline -->
-          <ellipse cx="52" cy="38" rx="42" ry="32" fill="rgba(20,40,60,0.6)" stroke="rgba(100,150,200,0.3)" stroke-width="1"/>
+          <ellipse cx="52" cy="38" rx="42" ry="32" fill="${lightMode ? 'rgba(230,235,240,1)' : 'rgba(20,40,60,0.6)'}" stroke="${lightMode ? 'rgba(0,0,0,0.1)' : 'rgba(100,150,200,0.3)'}" stroke-width="1"/>
           <!-- Frontal lobe -->
           <ellipse cx="30" cy="27" rx="20" ry="16"
-            fill="${isFrontal ? '#ff6b35' + activeAlpha : dimFill}"
-            stroke="${isFrontal ? '#ff6b35' : dimStroke}" stroke-width="${isFrontal ? 1.5 : 0.6}"/>
+            fill="${isFrontal ? lcDark('#ff6b35') + activeAlpha : dimFill}"
+            stroke="${isFrontal ? lcDark('#ff6b35') : dimStroke}" stroke-width="${isFrontal ? 1.5 : 0.6}"/>
           <!-- Parietal lobe -->
           <ellipse cx="52" cy="22" rx="18" ry="13"
-            fill="${isParietal ? '#aa44ff' + activeAlpha : dimFill}"
-            stroke="${isParietal ? '#aa44ff' : dimStroke}" stroke-width="${isParietal ? 1.5 : 0.6}"/>
+            fill="${isParietal ? lcDark('#aa44ff') + activeAlpha : dimFill}"
+            stroke="${isParietal ? lcDark('#aa44ff') : dimStroke}" stroke-width="${isParietal ? 1.5 : 0.6}"/>
           <!-- Temporal lobe -->
           <ellipse cx="76" cy="42" rx="16" ry="21"
-            fill="${isTemporal ? '#35a8ff' + activeAlpha : dimFill}"
-            stroke="${isTemporal ? '#35a8ff' : dimStroke}" stroke-width="${isTemporal ? 1.5 : 0.6}"/>
+            fill="${isTemporal ? lcDark('#35a8ff') + activeAlpha : dimFill}"
+            stroke="${isTemporal ? lcDark('#35a8ff') : dimStroke}" stroke-width="${isTemporal ? 1.5 : 0.6}"/>
           <!-- Occipital lobe -->
           <ellipse cx="54" cy="60" rx="16" ry="12"
-            fill="${isOccipital ? '#ff5252' + activeAlpha : dimFill}"
-            stroke="${isOccipital ? '#ff5252' : dimStroke}" stroke-width="${isOccipital ? 1.5 : 0.6}"/>
+            fill="${isOccipital ? lcDark('#ff5252') + activeAlpha : dimFill}"
+            stroke="${isOccipital ? lcDark('#ff5252') : dimStroke}" stroke-width="${isOccipital ? 1.5 : 0.6}"/>
           <!-- Central sulcus line -->
-          <line x1="44" y1="14" x2="38" y2="54" stroke="${isCentral ? '#00e5ff' : 'rgba(255,255,255,0.06)'}" stroke-width="${isCentral ? 1.2 : 0.5}" stroke-dasharray="2,2"/>
+          <line x1="44" y1="14" x2="38" y2="54" stroke="${isCentral ? lcDark('#00e5ff') : dimStroke}" stroke-width="${isCentral ? 1.2 : 0.5}" stroke-dasharray="2,2"/>
           <!-- Tumor marker -->
-          <circle cx="${tmX}" cy="${tmY}" r="5" fill="${tumorColor}" style="filter:drop-shadow(0 0 4px ${tumorColor})" opacity="0.9"/>
-          <circle cx="${tmX}" cy="${tmY}" r="9" fill="none" stroke="${tumorColor}" stroke-width="1" opacity="0.5"/>
-          <circle cx="${tmX}" cy="${tmY}" r="13" fill="none" stroke="${tumorColor}" stroke-width="0.5" opacity="0.25"/>
+          <circle cx="${tmX}" cy="${tmY}" r="5" fill="${lcDark(tumorColor)}" style="filter:drop-shadow(0 0 4px ${tumorColor})" opacity="0.9"/>
+          <circle cx="${tmX}" cy="${tmY}" r="9" fill="none" stroke="${lcDark(tumorColor)}" stroke-width="1" opacity="0.5"/>
+          <circle cx="${tmX}" cy="${tmY}" r="13" fill="none" stroke="${lcDark(tumorColor)}" stroke-width="0.5" opacity="0.25"/>
           <!-- Crosshair -->
-          <line x1="${tmX - 14}" y1="${tmY}" x2="${tmX - 7}" y2="${tmY}" stroke="${tumorColor}" stroke-width="0.8" opacity="0.6"/>
-          <line x1="${tmX + 7}" y1="${tmY}" x2="${tmX + 14}" y2="${tmY}" stroke="${tumorColor}" stroke-width="0.8" opacity="0.6"/>
-          <line x1="${tmX}" y1="${tmY - 14}" x2="${tmX}" y2="${tmY - 7}" stroke="${tumorColor}" stroke-width="0.8" opacity="0.6"/>
-          <line x1="${tmX}" y1="${tmY + 7}" x2="${tmX}" y2="${tmY + 14}" stroke="${tumorColor}" stroke-width="0.8" opacity="0.6"/>
+          <line x1="${tmX - 14}" y1="${tmY}" x2="${tmX - 7}" y2="${tmY}" stroke="${lcDark(tumorColor)}" stroke-width="0.8" opacity="0.6"/>
+          <line x1="${tmX + 7}" y1="${tmY}" x2="${tmX + 14}" y2="${tmY}" stroke="${lcDark(tumorColor)}" stroke-width="0.8" opacity="0.6"/>
+          <line x1="${tmX}" y1="${tmY - 14}" x2="${tmX}" y2="${tmY - 7}" stroke="${lcDark(tumorColor)}" stroke-width="0.8" opacity="0.6"/>
+          <line x1="${tmX}" y1="${tmY + 7}" x2="${tmX}" y2="${tmY + 14}" stroke="${lcDark(tumorColor)}" stroke-width="0.8" opacity="0.6"/>
           <!-- Lobe labels -->
-          <text x="22" y="21" font-size="5" fill="${isFrontal ? '#ff6b35' : '#2a4a62'}" font-weight="${isFrontal ? 'bold' : 'normal'}">F</text>
-          <text x="49" y="16" font-size="5" fill="${isParietal ? '#aa44ff' : '#2a4a62'}" font-weight="${isParietal ? 'bold' : 'normal'}">P</text>
-          <text x="78" y="35" font-size="5" fill="${isTemporal ? '#35a8ff' : '#2a4a62'}" font-weight="${isTemporal ? 'bold' : 'normal'}">T</text>
-          <text x="50" y="73" font-size="5" fill="${isOccipital ? '#ff5252' : '#2a4a62'}" font-weight="${isOccipital ? 'bold' : 'normal'}">O</text>
+          <text x="22" y="21" font-size="5" fill="${isFrontal ? lcDark('#ff6b35') : txt1}" font-weight="${isFrontal ? 'bold' : 'normal'}">F</text>
+          <text x="49" y="16" font-size="5" fill="${isParietal ? lcDark('#aa44ff') : txt1}" font-weight="${isParietal ? 'bold' : 'normal'}">P</text>
+          <text x="78" y="35" font-size="5" fill="${isTemporal ? lcDark('#35a8ff') : txt1}" font-weight="${isTemporal ? 'bold' : 'normal'}">T</text>
+          <text x="50" y="73" font-size="5" fill="${isOccipital ? lcDark('#ff5252') : txt1}" font-weight="${isOccipital ? 'bold' : 'normal'}">O</text>
         </svg>
         <div style="flex:1;">
           <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;">
             <span style="font-size:13px;">${lobe.emoji}</span>
-            <span style="color:#c1cfe8;font-size:10px;font-weight:700;">${lobe.label}${side ? ' · ' + side : ''}</span>
+            <span style="color:${txt2};font-size:10px;font-weight:700;">${lobe.label}${side ? ' · ' + side : ''}</span>
           </div>
-          <div style="color:${lobe.color};font-size:8.5px;line-height:1.5;border-left:2px solid ${lobe.color}55;padding-left:6px;">${lobe.fn}</div>
+          <div style="color:${lcDark(lobe.color)};font-size:8.5px;line-height:1.5;border-left:2px solid ${lcDark(lobe.color)}55;padding-left:6px;">${lobe.fn}</div>
           <div style="margin-top:5px;display:flex;gap:4px;flex-wrap:wrap;">
             ${['F', 'P', 'T', 'O'].map((l, i) => {
       const nm = ['Frontal', 'Parietal', 'Temporal', 'Occipital'][i];
-      const cl = ['#ff6b35', '#aa44ff', '#35a8ff', '#ff5252'][i];
+      const cl = lcDark(['#ff6b35', '#aa44ff', '#35a8ff', '#ff5252'][i]);
       const act = k.includes(nm.toLowerCase());
-      return `<div style="padding:1px 5px;border-radius:3px;font-size:7px;font-weight:${act ? 'bold' : 'normal'};color:${act ? cl : '#2a4a62'};border:1px solid ${act ? cl : '#1e3a52'};background:${act ? cl + '22' : 'transparent'}">${nm}</div>`;
+      return `<div style="padding:1px 5px;border-radius:3px;font-size:7px;font-weight:${act ? 'bold' : 'normal'};color:${act ? cl : txt1};border:1px solid ${act ? cl : borderInactive};background:${act ? cl + '22' : 'transparent'}">${nm}</div>`;
     }).join('')}
           </div>
         </div>
@@ -3205,8 +3224,9 @@
     const similarity = Math.round((caseItem.similarity_score || 0) * 100);
     const depth = dm.tumor_depth_mm;
     const cat = dm.depth_category || {};
-    const simColor = similarity >= 80 ? '#00c853' : similarity >= 55 ? '#ff9100' : '#ff5252';
-    const dHex = depth != null ? (depth < 5 ? '#ff1111' : depth < 15 ? '#ff6600' : depth < 30 ? '#ffcc00' : depth < 45 ? '#00cc55' : '#00aaff') : '#8899b0';
+    const simColor = similarity >= 80 ? '#15803d' : similarity >= 55 ? '#b45309' : '#dc2626';
+    const rawSimColor = similarity >= 80 ? '21,128,61' : similarity >= 55 ? '180,83,9' : '220,38,38';
+    const dHex = depth != null ? (depth < 5 ? '#e53935' : depth < 15 ? '#f57c00' : depth < 30 ? '#fbc02d' : depth < 45 ? '#43a047' : '#1e88e5') : '#475569';
     const stL = pred.tumor_detected ? '#ff5252' : '#00c853';
     const stR = caseItem.has_tumor ? '#ff5252' : '#00c853';
 
@@ -3225,156 +3245,209 @@
     const locMatchCol = locMatch ? '#00c853' : '#ff9100';
     const locMatchTxt = locMatch ? '✓ Cùng vùng não' : '≠ Khác vùng não';
 
+    function cDark(c) {
+      if (c === '#00e5ff') return '#0284c7';
+      if (c === '#00c853') return '#15803d';
+      if (c === '#ff9100') return '#b45309';
+      if (c === '#ff5252') return '#dc2626';
+      if (c === '#aa44ff') return '#7e22ce';
+      if (c === '#8899b0' || c === '#5a7a99') return '#475569';
+      return c;
+    }
+
     function mBox(label, value, color) {
-      return `<div style="padding:8px 10px;border-radius:6px;background:rgba(255,255,255,0.03);border:1px solid #1e3a5233;margin-bottom:5px;">
-        <div style="color:#5a7a99;font-size:9px;text-transform:uppercase;margin-bottom:2px;">${label}</div>
-        <div style="color:${color};font-size:12px;font-weight:700;">${value}</div></div>`;
+      return `<div style="padding:10px 12px;border-radius:6px;background:#ffffff;border:1px solid #e2e8f0;margin-bottom:8px;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+        <div style="color:#64748b;font-size:10px;text-transform:uppercase;margin-bottom:4px;letter-spacing:0.5px;font-weight:600;">${label}</div>
+        <div style="color:${cDark(color)};font-size:13px;font-weight:700;">${value}</div></div>`;
     }
 
     // ── Depth zone strip (cho ca hiện tại) ──
-    const ZONE_STRIP = `<div style="margin-bottom:10px;">
-      <div style="color:#5a7a99;font-size:9px;margin-bottom:4px;letter-spacing:0.5px;">📏 DEPTH ZONE MAP (CA HIỆN TẠI)</div>
-      <div style="display:flex;height:14px;border-radius:4px;overflow:hidden;gap:1px;">
-        ${[['0-5', 'SUPERFICIAL', '#ff2222'], ['5-15', 'SHALLOW', '#ff9100'], ['15-30', 'INTER', '#ffdd00'], ['30-45', 'DEEP', '#00c853'], ['45+', 'V.DEEP', '#00a3cc']]
-        .map(([r, n, c]) => {
+    const ZONE_STRIP = `<div style="margin-bottom:12px;padding:10px 12px;border-radius:6px;background:#ffffff;border:1px solid #e2e8f0;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+      <div style="color:#64748b;font-size:10px;margin-bottom:8px;letter-spacing:0.5px;text-transform:uppercase;font-weight:600;">📏 DEPTH ZONE MAP (CA HIỆN TẠI)</div>
+      <div style="display:flex;height:12px;border-radius:6px;overflow:hidden;gap:2px;">
+        ${[['0-5', 'SUPERFICIAL', '#fca5a5', '#b91c1c'], ['5-15', 'SHALLOW', '#fdba74', '#c2410c'], ['15-30', 'INTER', '#fef08a', '#a16207'], ['30-45', 'DEEP', '#bbf7d0', '#15803d'], ['45+', 'V.DEEP', '#bae6fd', '#0369a1']]
+        .map(([r, n, bgC, txtC]) => {
+          // INTER => INTERMEDIATE, V.DEEP => VERY_DEEP
           const isActive = cat.category === n.replace('INTER', 'INTERMEDIATE').replace('V.DEEP', 'VERY_DEEP');
-          return `<div style="flex:1;background:${c};opacity:${isActive ? 1 : 0.2};display:flex;align-items:center;justify-content:center;font-size:5.5px;color:rgba(0,0,0,0.85);font-weight:900;letter-spacing:0px;">${r}</div>`;
+          return `<div style="flex:1;background:${isActive ? bgC : '#f1f5f9'};display:flex;align-items:center;justify-content:center;font-size:8.5px;color:${isActive ? txtC : '#94a3b8'};font-weight:bold;letter-spacing:0px;border-radius:3px;">${r}</div>`;
         }).join('')}
       </div>
-      <div style="color:${dHex};font-size:10px;font-weight:700;margin-top:3px;">▶ ${cat.label || 'Unknown Zone'} · ${depth != null ? depth.toFixed(1) + 'mm' : 'N/A'}</div>
+      <div style="color:${cDark(dHex)};font-size:11px;font-weight:700;margin-top:8px;display:flex;align-items:center;gap:6px;">
+        <span style="font-size:12px;">▶</span>
+        <span>${cat.label || 'Unknown Zone'} · ${depth != null ? depth.toFixed(1) + 'mm' : 'N/A'}</span>
+      </div>
     </div>`;
 
     // ── Location comparison table ──
     const LOC_COMPARE = `
-    <div style="margin-bottom:12px;padding:10px 12px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid #1e3a52;">
-      <div style="color:#5a7a99;font-size:9px;letter-spacing:0.5px;margin-bottom:8px;">⚖️ SO SÁNH VỊ TRÍ GIẢI PHẪU</div>
-      <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:center;">
+    <div style="margin-bottom:12px;padding:12px;border-radius:8px;background:#ffffff;border:1px solid #e2e8f0;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+      <div style="color:#64748b;font-size:10px;letter-spacing:0.5px;margin-bottom:10px;font-weight:600;text-transform:uppercase;">⚖️ SO SÁNH VỊ TRÍ GIẢI PHẪU</div>
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;">
         <div style="text-align:center;">
-          <div style="color:#00e5ff;font-size:8px;margin-bottom:3px;">CA HIỆN TẠI</div>
-          <div style="color:${curLobe.color};font-size:11px;font-weight:bold;">${curLobe.emoji} ${curLobe.label}</div>
-          <div style="color:#5a7a99;font-size:8px;margin-top:2px;">${curLocHint || 'Chưa xác định'}</div>
+          <div style="color:#0284c7;font-size:9px;margin-bottom:4px;font-weight:bold;">CA HIỆN TẠI</div>
+          <div style="color:${cDark(curLobe.color)};font-size:12px;font-weight:bold;">${curLobe.emoji} ${curLobe.label}</div>
+          <div style="color:#64748b;font-size:10px;margin-top:3px;">${curLocHint || 'Chưa xác định'}</div>
         </div>
-        <div style="text-align:center;padding:4px 8px;border-radius:6px;background:${locMatchCol}22;border:1px solid ${locMatchCol}55;">
-          <div style="color:${locMatchCol};font-size:9px;font-weight:bold;">${locMatchTxt}</div>
+        <div style="text-align:center;padding:5px 10px;border-radius:6px;background:${locMatch ? '#f0fdf4' : '#fff7ed'};border:1px solid ${locMatch ? '#bbf7d0' : '#fed7aa'};">
+          <div style="color:${locMatch ? '#166534' : '#9a3412'};font-size:10px;font-weight:bold;">${locMatchTxt}</div>
         </div>
         <div style="text-align:center;">
-          <div style="color:#aa44ff;font-size:8px;margin-bottom:3px;">CA TƯƠNG TỰ</div>
-          <div style="color:${refLobe.color};font-size:11px;font-weight:bold;">${refLobe.emoji} ${refLobe.label}</div>
-          <div style="color:#5a7a99;font-size:8px;margin-top:2px;">${refLocKey.replace(/_/g, ' ')}</div>
+          <div style="color:#7e22ce;font-size:9px;margin-bottom:4px;font-weight:bold;">CA TƯƠNG TỰ</div>
+          <div style="color:${cDark(refLobe.color)};font-size:12px;font-weight:bold;">${refLobe.emoji} ${refLobe.label}</div>
+          <div style="color:#64748b;font-size:10px;margin-top:3px;">${refLocKey.replace(/_/g, ' ')}</div>
         </div>
       </div>
     </div>`;
 
     const modal = document.createElement('div');
     modal.id = 'dual3DModal';
-    modal.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(2,5,15,0.98);display:flex;flex-direction:column;font-family:Consolas,Segoe UI,monospace;';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(248,250,252,0.98);display:flex;flex-direction:column;font-family:Consolas,Segoe UI,monospace;';
 
     modal.innerHTML = `
     <style>
-      #dual3DModal { --c-border: #1e3a52; }
-      #dual3DModal .d3-col { flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden; }
-      #dual3DModal .d3-label { padding:7px 14px;font-size:11px;font-weight:bold;letter-spacing:0.8px;border-bottom:1px solid var(--c-border);flex-shrink:0; }
-      #dual3DModal .d3-canvas-wrap { position:relative;flex:0 0 auto;background:#040810;border-bottom:1px solid var(--c-border); }
-      #dual3DModal .d3-info { flex:1;overflow-y:auto;padding:10px 12px; }
-      #dual3DModal .d3-hint { position:absolute;bottom:6px;left:50%;transform:translateX(-50%);
-        background:rgba(0,0,0,0.65);border:1px solid #1e3a52;padding:2px 10px;border-radius:10px;
-        font-size:8.5px;color:#5a7a99;pointer-events:none;white-space:nowrap; }
-      #dual3DModal .d3-badge { position:absolute;top:7px;right:8px;
-        background:rgba(0,229,255,0.12);border:1px solid #00e5ff44;padding:2px 7px;
-        border-radius:4px;font-size:8.5px;color:#00e5ff;pointer-events:none; }
-      #dual3DModal .d3-info::-webkit-scrollbar { width:3px; }
-      #dual3DModal .d3-info::-webkit-scrollbar-thumb { background:#1e3a52;border-radius:2px; }
-      #dual3DModal .d3-bar-row { margin-bottom:6px; }
-      #dual3DModal .d3-bar-row .d3-lbl { display:flex;justify-content:space-between;font-size:9.5px;color:#8899b0;margin-bottom:3px; }
-      #dual3DModal .d3-bar-row .track { height:4px;background:#0a1a28;border-radius:2px;overflow:hidden; }
-      #dual3DModal .d3-bar-row .fill { height:100%;border-radius:2px; }
+      #dual3DModal { --c-border: #e2e8f0; }
+      #dual3DModal .d3-col-top { flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;border-right:2px solid var(--c-border); }
+      #dual3DModal .d3-col-bot { flex:1;display:flex;flex-direction:column;min-width:0;overflow-y:auto;padding:16px;background:#f8fafc;border-right:2px solid var(--c-border); }
+      #dual3DModal .d3-col-top:last-child { border-right:none; }
+      #dual3DModal .d3-col-bot:last-child { border-right:none; }
+      #dual3DModal .d3-label { padding:10px 16px;font-size:12px;font-weight:bold;letter-spacing:0.8px;border-bottom:1px solid var(--c-border);flex-shrink:0; }
+      #dual3DModal .d3-canvas-wrap { position:relative;flex:1;background:#060c1a; }
+      #dual3DModal .d3-hint { position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+        background:rgba(255,255,255,0.85);border:1px solid #cbd5e1;padding:4px 12px;border-radius:12px;
+        font-size:10px;color:#334155;pointer-events:none;white-space:nowrap;font-weight:600;box-shadow:0 2px 4px rgba(0,0,0,0.1); }
+      #dual3DModal .d3-badge { position:absolute;top:10px;right:10px;
+        background:rgba(2,132,199,0.9);border:1px solid #0284c7;padding:4px 10px;
+        border-radius:6px;font-size:10px;color:#ffffff;pointer-events:none;font-weight:600;box-shadow:0 2px 4px rgba(0,0,0,0.1); }
+      #dual3DModal .d3-col-bot::-webkit-scrollbar { width:6px; }
+      #dual3DModal .d3-col-bot::-webkit-scrollbar-thumb { background:#cbd5e1;border-radius:3px; }
+      #dual3DModal .d3-bar-row { margin-bottom:8px; }
+      #dual3DModal .d3-bar-row .d3-lbl { display:flex;justify-content:space-between;font-size:11px;color:#475569;margin-bottom:4px;font-weight:600; }
+      #dual3DModal .d3-bar-row .track { height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden; }
+      #dual3DModal .d3-bar-row .fill { height:100%;border-radius:3px; }
     </style>
 
     <!-- ── Header ── -->
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 18px;border-bottom:1px solid #1e3a52;background:rgba(0,229,255,0.04);flex-shrink:0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid #e2e8f0;background:#ffffff;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
       <div style="display:flex;align-items:center;gap:12px;">
-        <span style="color:#00e5ff;font-size:14px;font-weight:bold;">🧠 SO SÁNH TRỰC QUAN 3D NÃO BỘ</span>
-        <div style="padding:3px 11px;border-radius:12px;background:rgba(${similarity >= 80 ? '0,200,83' : similarity >= 55 ? '255,145,0' : '255,82,82'},0.15);border:1px solid ${simColor};color:${simColor};font-size:11px;font-weight:bold;">Tương đồng: ${similarity}%</div>
-        <div style="width:80px;height:4px;background:#0a1a28;border-radius:3px;overflow:hidden;">
+        <span style="color:#0f172a;font-size:15px;font-weight:900;letter-spacing:0.5px;">SO SÁNH TRỰC QUAN 3D NÃO BỘ</span>
+        <div style="padding:4px 12px;border-radius:12px;background:rgba(${rawSimColor},0.1);border:1px solid ${simColor}88;color:${simColor};font-size:11px;font-weight:bold;">Tương đồng: ${similarity}%</div>
+        <div style="width:80px;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
           <div style="height:100%;width:${similarity}%;background:${simColor};border-radius:3px;"></div>
         </div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <div style="color:#5a7a99;font-size:9.5px;">Kéo để xoay · Cuộn để zoom</div>
-        <button onclick="document.getElementById('dual3DModal').remove()" style="background:transparent;border:1px solid #ff5252;color:#ff5252;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:bold;transition:all 0.2s;"
-          onmouseover="this.style.background='rgba(255,82,82,0.15)'" onmouseout="this.style.background='transparent'">✕ Đóng</button>
+      <div style="display:flex;gap:12px;align-items:center;">
+        <div style="color:#64748b;font-size:10px;font-weight:600;">Kéo để xoay · Cuộn để zoom</div>
+        <button onclick="document.getElementById('dual3DModal').remove()" style="background:transparent;border:1px solid #ef4444;color:#ef4444;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:bold;transition:all 0.2s;"
+          onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background='transparent'">✕ Đóng</button>
       </div>
     </div>
 
-    <!-- ── Body: 2 cột song song ── -->
-    <div style="display:flex;flex:1;overflow:hidden;">
-
-      <!-- ══ LEFT: Ca hiện tại ══ -->
-      <div class="d3-col" style="border-right:2px solid #1e3a52;">
-        <div class="d3-label" style="background:rgba(0,229,255,0.06);color:#00e5ff;">
-          📤 CA HIỆN TẠI <span style="font-weight:normal;color:#5a7a99;">· Upload</span>
+    <!-- ── Body: Top Row (3D Views) ── -->
+    <div id="dual3DTopRow" style="display:flex; height:52vh; flex-shrink:0;">
+      <!-- LEFT TOP -->
+      <div class="d3-col-top">
+        <div class="d3-label" style="background:#f0f9ff;color:#0284c7;">
+          CA HIỆN TẠI <span style="font-weight:normal;color:#64748b;">· Upload</span>
         </div>
-        <div class="d3-canvas-wrap" style="height:52vh;">
+        <div class="d3-canvas-wrap">
           <canvas id="dual3DLeft" style="width:100%;height:100%;display:block;cursor:grab;"></canvas>
-          <div class="d3-badge">🔬 Ca Đang Chẩn Đoán</div>
-          <div class="d3-hint">🖱️ Kéo để xoay · Cuộn để zoom</div>
-        </div>
-        <div class="d3-info">
-          ${_buildBrainLobeSVG(curLocKey, stL === '#ff5252' ? '#ff5252' : '#00c853', 'Ca Hiện Tại')}
-          ${ZONE_STRIP}
-          ${mBox('Kết Quả', pred.tumor_detected ? '🔴 PHÁT HIỆN KHỐI U' : '🟢 KHÔNG CÓ KHỐI U', stL)}
-          ${mBox('Vị Trí Giải Phẫu', curLobe.label + (curLocHint ? ' · ' + curLocHint : ''), curLobe.color)}
-          ${mBox('Chức Năng Vùng', curLobe.fn, '#8899b0')}
-          ${mBox('Độ Sâu (mm)', depth != null ? depth.toFixed(1) + ' mm · ' + (cat.label || '') : 'N/A', dHex)}
-          ${mBox('Diện Tích U', pred.tumor_area_percent != null ? pred.tumor_area_percent.toFixed(2) + '%' : 'N/A', '#ff9100')}
-          ${mBox('Confidence', pred.confidence != null ? (pred.confidence * 100).toFixed(1) + '%' : 'N/A', '#00e5ff')}
+          <div class="d3-badge">Ca Đang Chẩn Đoán</div>
+          <div class="d3-hint">Kéo để xoay · Cuộn để zoom</div>
         </div>
       </div>
-
-      <!-- ══ RIGHT: Ca tương tự ══ -->
-      <div class="d3-col">
-        <div class="d3-label" style="background:rgba(170,68,255,0.06);color:#aa44ff;">
-          CA TƯƠNG TỰ #${caseItem.rank || '?'} <span style="font-weight:normal;color:#5a7a99;">· ${caseItem.source || 'Database'}</span>
+      <!-- RIGHT TOP -->
+      <div class="d3-col-top">
+        <div class="d3-label" style="background:#faf5ff;color:#7e22ce;">
+          CA TƯƠNG TỰ #${caseItem.rank || '?'} <span style="font-weight:normal;color:#64748b;">· ${caseItem.source || 'Database'}</span>
         </div>
-        <div class="d3-canvas-wrap" style="height:52vh;">
+        <div class="d3-canvas-wrap">
           <canvas id="dual3DRight" style="width:100%;height:100%;display:block;cursor:grab;"></canvas>
-          <div class="d3-badge" style="background:rgba(170,68,255,0.12);border-color:#aa44ff44;color:#aa44ff;">🔄 Mô Hình Tham Chiếu</div>
+          <div class="d3-badge" style="background:rgba(170,68,255,0.12);border-color:#aa44ff44;color:#aa44ff;">Mô Hình Tham Chiếu</div>
           <div class="d3-hint">🖱️ Kéo để xoay · Cuộn để zoom</div>
         </div>
-        <div class="d3-info">
-          ${_buildBrainLobeSVG(refLocKey, '#aa44ff', 'Ca Tương Tự')}
-          ${LOC_COMPARE}
-
-          <!-- Feature similarity bars -->
-          <div style="margin-bottom:10px;">
-            <div style="color:#5a7a99;font-size:9px;margin-bottom:6px;letter-spacing:0.5px;">📊 PHÂN TÍCH ĐẶC TRƯNG TƯƠNG ĐỒNG</div>
-            ${[
-        ['Hình Dạng Khối U', similarity * 0.95],
-        ['Vùng Não Khớp', locMatch ? similarity : Math.max(40, similarity * 0.65)],
-        ['Kích Thước Tương Đối', similarity * (0.82 + Math.abs(Math.sin(similarity * 0.19)) * 0.15)],
-        ['Cường Độ Tín Hiệu', similarity * (0.78 + Math.abs(Math.cos(similarity * 0.23)) * 0.18)]
-      ].map(([label, rawV]) => {
-        const v = Math.min(100, Math.round(rawV));
-        const c = v >= 75 ? '#00c853' : v >= 50 ? '#ff9100' : '#ff5252';
-        return `<div class="d3-bar-row">
-                <div class="d3-lbl"><span>${label}</span><span style="color:${c};font-weight:bold;">${v}%</span></div>
-                <div class="track"><div class="fill" style="width:${v}%;background:${c};"></div></div>
-              </div>`;
-      }).join('')}
-          </div>
-
-          ${mBox('Kết Quả', caseItem.has_tumor ? '🔴 PHÁT HIỆN KHỐI U' : '🟢 KHÔNG CÓ KHỐI U', stR)}
-          ${mBox('Vị Trí Ước Tính', refLobe.label + ' · ' + refLocKey.replace(/_/g, ' '), refLobe.color)}
-          ${mBox('Chức Năng Vùng', refLobe.fn, '#8899b0')}
-          ${mBox('Độ Tương Đồng', similarity + '%', simColor)}
-          ${mBox('Khoảng Cách Feature', (caseItem.distance || 0).toFixed(4), '#8899b0')}
-          ${mBox('Mã Ca Bệnh / Bệnh Nhân', (caseItem.case_id || '?') + ' · ' + (caseItem.patient_id || 'N/A'), '#5a7a99')}
-        </div>
       </div>
+    </div>
 
+    <!-- ── Splitter ── -->
+    <div id="dual3DSplitter" style="height:12px; background:#f1f5f9; border-top:1px solid #e2e8f0; border-bottom:1px solid #cbd5e1; cursor:ns-resize; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background 0.2s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+      <div style="width:40px;height:4px;background:#94a3b8;border-radius:2px;"></div>
+    </div>
+
+    <!-- ── Body: Bottom Row (Info Panels) ── -->
+    <div style="display:flex; flex:1; overflow:hidden;">
+      <!-- LEFT INFO -->
+      <div class="d3-col-bot">
+        ${_buildBrainLobeSVG(curLocKey, stL === '#ff5252' ? '#ef4444' : '#22c55e', 'Ca Hiện Tại', true)}
+        ${ZONE_STRIP}
+        ${mBox('Kết Quả', pred.tumor_detected ? '🔴 PHÁT HIỆN KHỐI U' : '🟢 KHÔNG CÓ KHỐI U', stL)}
+        ${mBox('Vị Trí Giải Phẫu', curLobe.label + (curLocHint ? ' · ' + curLocHint : ''), curLobe.color)}
+        ${mBox('Chức Năng Vùng', curLobe.fn, '#8899b0')}
+        ${mBox('Độ Sâu (mm)', depth != null ? depth.toFixed(1) + ' mm · ' + (cat.label || '') : 'N/A', dHex)}
+        ${mBox('Diện Tích U', pred.tumor_area_percent != null ? pred.tumor_area_percent.toFixed(2) + '%' : 'N/A', '#ff9100')}
+        ${mBox('Confidence', pred.confidence != null ? (pred.confidence * 100).toFixed(1) + '%' : 'N/A', '#00e5ff')}
+      </div>
+      <!-- RIGHT INFO -->
+      <div class="d3-col-bot">
+        ${_buildBrainLobeSVG(refLocKey, '#aa44ff', 'Ca Tương Tự', true)}
+        ${LOC_COMPARE}
+        <!-- Feature similarity bars -->
+        <div style="margin-bottom:12px;padding:12px;border-radius:8px;background:#ffffff;border:1px solid #e2e8f0;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+          <div style="color:#64748b;font-size:10px;margin-bottom:10px;letter-spacing:0.5px;font-weight:600;text-transform:uppercase;">📊 PHÂN TÍCH ĐẶC TRƯNG TƯƠNG ĐỒNG</div>
+          ${[
+      ['Hình Dạng Khối U', similarity * 0.95],
+      ['Vùng Não Khớp', locMatch ? similarity : Math.max(40, similarity * 0.65)],
+      ['Kích Thước Tương Đối', similarity * (0.82 + Math.abs(Math.sin(similarity * 0.19)) * 0.15)],
+      ['Cường Độ Tín chuyên sâu', similarity * (0.78 + Math.abs(Math.cos(similarity * 0.23)) * 0.18)]
+    ].map(([label, rawV]) => {
+      const v = Math.min(100, Math.round(rawV));
+      const c = v >= 75 ? '#15803d' : v >= 50 ? '#b45309' : '#dc2626';
+      return `<div class="d3-bar-row">
+              <div class="d3-lbl"><span>${label}</span><span style="color:${c};">${v}%</span></div>
+              <div class="track"><div class="fill" style="width:${v}%;background:${c};"></div></div>
+            </div>`;
+    }).join('')}
+        </div>
+        ${mBox('Kết Quả', caseItem.has_tumor ? '🔴 PHÁT HIỆN KHỐI U' : '🟢 KHÔNG CÓ KHỐI U', stR)}
+        ${mBox('Vị Trí Ước Tính', refLobe.label + ' · ' + refLocKey.replace(/_/g, ' '), refLobe.color)}
+        ${mBox('Chức Năng Vùng', refLobe.fn, '#8899b0')}
+        ${mBox('Độ Tương Đồng', similarity + '%', simColor)}
+        ${mBox('Khoảng Cách Feature', (caseItem.distance || 0).toFixed(4), '#8899b0')}
+        ${mBox('Mã Ca Bệnh / Bệnh Nhân', (caseItem.case_id || '?') + ' · ' + (caseItem.patient_id || 'N/A'), '#5a7a99')}
+      </div>
     </div>`;
 
     document.body.appendChild(modal);
+
+    // ── Resizer logic ──
+    let isResizing = false;
+    const topRow = document.getElementById('dual3DTopRow');
+    const splitter = document.getElementById('dual3DSplitter');
+
+    splitter.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      e.preventDefault();
+      document.body.style.cursor = 'ns-resize';
+      splitter.style.background = '#cbd5e1';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      // Trừ ~52px header
+      let newHeight = e.clientY - 52;
+      if (newHeight < 150) newHeight = 150;
+      if (newHeight > window.innerHeight - 150) newHeight = window.innerHeight - 150;
+      topRow.style.height = newHeight + 'px';
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isResizing) {
+        isResizing = false;
+        document.body.style.cursor = '';
+        splitter.style.background = '#f1f5f9';
+        // Trigger window resize event so that Three.js canvas dynamically recalculates aspect ratio
+        window.dispatchEvent(new Event('resize'));
+      }
+    });
 
     // Khởi động 2 scene sau khi DOM render
     requestAnimationFrame(() => {

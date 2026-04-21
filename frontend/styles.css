@@ -685,20 +685,30 @@ body::before {
    NEW: TUMOR METRICS PANEL STYLES
    ============================================================ */
 
+  #metricsContent {
+    min-height: 0;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+   #metricsContent::-webkit-scrollbar,
    #tumorMetricsPanel::-webkit-scrollbar {
     width: 4px;
   }
   
+  #metricsContent::-webkit-scrollbar-track,
   #tumorMetricsPanel::-webkit-scrollbar-track {
     background: rgba(30, 58, 82, 0.3);
     border-radius: 4px;
   }
   
+  #metricsContent::-webkit-scrollbar-thumb,
   #tumorMetricsPanel::-webkit-scrollbar-thumb {
     background: rgba(0, 229, 255, 0.3);
     border-radius: 4px;
   }
   
+  #metricsContent::-webkit-scrollbar-thumb:hover,
   #tumorMetricsPanel::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 229, 255, 0.6);
   }
@@ -914,7 +924,8 @@ body::before {
   width: 360px !important;        /* Tăng từ 320px → 500px */
   max-height: 90vh !important;    /* Tăng từ 80vh → 90vh */
   min-height: 690px !important;   /* Thêm chiều cao tối thiểu */
-  padding: 24px !important;       /* Tăng padding từ 20px → 24px */
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 /* ============================================================
@@ -1408,7 +1419,7 @@ body::before {
 .atlas-tooltip {
   position: fixed; z-index: 999;
   background: rgba(10,14,26,0.96);
-  border: 1px solid var(--cyan-dim);
+  border: 1px solid var(--cyan-dim); 
   border-radius: var(--radius-sm);
   padding: 8px 12px;
   pointer-events: none;
@@ -1417,10 +1428,10 @@ body::before {
   animation: fadeIn 0.15s ease;
 }
 .atlas-tooltip-region {
-  font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px;
+  font-size: 13px; font-weight: 600; color: #ffffff; margin-bottom: 4px;
 }
 .atlas-tooltip-fn {
-  font-size: 10px; color: var(--text-dim);
+  font-size: 11px; color: #00e5ff;
 }
 
 /* ── Info bar ── */
@@ -1633,4 +1644,4 @@ body::before {
   color: #c1cfe8;
   font-size: 11px;
 }
-
+

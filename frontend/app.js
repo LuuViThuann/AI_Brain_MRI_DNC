@@ -27,10 +27,40 @@
  */
 
 (function App() {
-
+ 
   const API_BASE = 'http://127.0.0.1:8000/api';
 
   window.lastDiagnosisData = null;
+
+  window.translateLocationToVi = function(loc) {
+    if (!loc || loc === '—') return loc || '—';
+    let l = loc.toLowerCase();
+    let lobe = '';
+    if (l.includes('frontal')) lobe = 'Thùy trán';
+    else if (l.includes('temporal')) lobe = 'Thùy thái dương';
+    else if (l.includes('parietal')) lobe = 'Thùy đỉnh';
+    else if (l.includes('occipital')) lobe = 'Thùy chẩm';
+    else if (l.includes('cerebellum') || l.includes('cerebellar')) lobe = 'Tiểu não';
+    else if (l.includes('stem')) lobe = 'Thân não';
+    else return loc; // fallback
+    
+    let side = '';
+    if (l.includes('left')) side = 'trái';
+    if (l.includes('right')) side = 'phải';
+    
+    let pos = '';
+    if (l.includes('inferior')) pos = 'dưới';
+    if (l.includes('superior')) pos = 'trên';
+    if (l.includes('anterior')) pos = 'trước';
+    if (l.includes('posterior')) pos = 'sau';
+    if (l.includes('medial')) pos = 'giữa';
+    if (l.includes('lateral')) pos = 'bên';
+    
+    let res = lobe;
+    if (side) res += ' ' + side;
+    if (pos) res += ' ' + pos;
+    return res;
+  };
 
   // ===== DOM References - Main Report Section =====
   const uploadZone = document.getElementById('uploadZone');
@@ -514,7 +544,7 @@
     statArea.textContent = pred.tumor_area_percent + '%';
 
     // Location
-    statLocation.textContent = pred.location_hint || 'Không';
+    statLocation.textContent = window.translateLocationToVi(pred.location_hint) || 'Không';
 
     // Severity
     const sev = report.severity || 'Không Rõ';
@@ -596,7 +626,7 @@
     const depth = data.depth_metrics?.tumor_depth_mm;
     const category = data.depth_metrics?.depth_category?.category || 'INTERMEDIATE';
     const area = data.prediction?.tumor_area_percent;
-    const location = data.prediction?.location_hint || 'N/A';
+    const location = window.translateLocationToVi(data.prediction?.location_hint) || 'N/A';
     const conf = Math.round((data.prediction?.confidence || 0) * 100);
 
     const STYLES = {
@@ -1066,7 +1096,7 @@
     `;
 
     document.getElementById('metricsContent').innerHTML = html;
-    panel.style.display = 'block';
+    panel.style.display = 'flex';
 
     console.log('[App] ✅ Metrics panel displayed (FIXED: depth + ratio correctly formatted)');
   }
@@ -1170,8 +1200,17 @@
   }
 
   // ===== TAB NAVIGATION (HOÀN THIỆN) =====
-  function switchTab(tabName) {
+  let tabHistory = [];
+
+  function switchTab(tabName, isGoBack = false) {
     console.log(`[App] 📑 Switching to tab: ${tabName}`);
+
+    if (!isGoBack) {
+      const currentActive = document.querySelector('.pill.active');
+      if (currentActive && currentActive.dataset.tab && currentActive.dataset.tab !== tabName) {
+        tabHistory.push(currentActive.dataset.tab);
+      }
+    }
 
     // Hide all panels
     if (mainLayout) mainLayout.style.display = 'none';
@@ -1266,17 +1305,37 @@
     pills.forEach(p => p.classList.remove('active'));
     document.querySelector(`.pill[data-tab="${tabName}"]`)?.classList.add('active');
 
+    const btnBackTab = document.getElementById('btnBackTab');
+    if (btnBackTab) {
+      if (tabHistory.length > 0) {
+        btnBackTab.style.display = 'inline-block';
+      } else {
+        btnBackTab.style.display = 'none';
+      }
+    }
+
     // 💾 Persist last active tab
     try { localStorage.setItem(LS_KEY_TAB, tabName); } catch(e) {}
   }
 
   // Attach tab click handlers
   pills.forEach(pill => {
+    if (pill.id === 'btnBackTab') return;
     pill.addEventListener('click', (e) => {
-      const tab = e.target.dataset.tab;
-      switchTab(tab);
+      const tab = e.currentTarget.dataset.tab || e.target.dataset.tab;
+      if (tab) switchTab(tab);
     });
   });
+
+  const btnBackTabEl = document.getElementById('btnBackTab');
+  if (btnBackTabEl) {
+    btnBackTabEl.addEventListener('click', () => {
+      if (tabHistory.length > 0) {
+        const prevTab = tabHistory.pop();
+        switchTab(prevTab, true);
+      }
+    });
+  }
 
   // ===== VIEWER CONTROLS =====
   if (btnRotate) {

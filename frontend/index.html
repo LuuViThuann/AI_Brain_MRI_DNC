@@ -7,7 +7,7 @@
   <title>NeuroScan AI — Chẩn Đoán MRI Não</title>
 
   <!-- ===== STYLESHEETS ===== -->
-  <link rel="stylesheet" href="styles.css?v=3" />
+  <link rel="stylesheet" href="styles.css?v=4" />
   <link rel="stylesheet" href="xai_similar_styles.css?v=3" />
 
   <script src="static/mni_registration.js"></script>
@@ -35,6 +35,7 @@
         <button class="pill" data-tab="atlas">Atlas</button>
         <button class="pill" data-tab="xai">Giải Thích AI</button>
         <button class="pill" data-tab="similar">Ca Tương Tự</button>
+  
         <button class="pill" data-tab="info">Thông Tin</button>
       </nav>
 
@@ -85,8 +86,7 @@
             <span id="compareBadge"
               style="position:absolute;top:-4px;right:-4px;background:#00c853;color:#000;font-size:8px;font-weight:900;padding:1px 4px;border-radius:8px;display:none;min-width:14px;text-align:center;line-height:14px;"></span>
           </button>
-          <!-- Nút Chỉ số khối u sẽ được chèn vào đây bởi brain3d_ui_controls_simplified.js -->
-          <button class="ctrl-btn" id="btnSliceBrain3D" title="Slice Brain 3D - Atlas View (B)">🧬</button>
+         
 
           <button class="ctrl-btn" id="btnReset" title="Reset view (ESC)">↺</button>
         </div>
@@ -107,7 +107,7 @@
         </div>
         <!-- Loading indicator for 3D model -->
         <div class="model-loading" id="modelLoading" style="display:flex;">
-          <div class="model-spinner"></div>
+          <div class="model-spinner"></div> 
           <span>Đang tải mô hình não 3D...</span>
         </div>
       </div>
@@ -372,7 +372,26 @@
 
   <!-- ===== INFO TAB (hidden by default) ===== -->
   <div class="info-panel" id="infoPanel" style="display:none;">
-    <div class="info-content">
+    <div class="info-content" style="position: relative;">
+      <!-- Nút Trở Về Màn Hình Chính -->
+      <button onclick="window.App && window.App.switchTab('scan')" style="
+        background: #f8f9fa;
+        color: #495057;
+        border: 1px solid #ced4da;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 20px;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+      " onmouseover="this.style.background='#e9ecef'; this.style.borderColor='#adb5bd'; this.style.color='#212529';" onmouseout="this.style.background='#f8f9fa'; this.style.borderColor='#ced4da'; this.style.color='#495057';">
+        <span style="font-size: 16px;">⬅</span> Trở về Màn Hình Chính
+      </button>
+
       <h2>Giới Thiệu NeuroScan AI</h2>
       <p>Hệ thống phát hiện u não MRI hoàn toàn dựa trên phần mềm, kết hợp phân đoạn CNN U-Net với
         tạo báo cáo y tế bằng Groq AI và trực quan hóa não 3D tương tác.</p>
@@ -608,7 +627,7 @@
   <!-- ===== APPLICATION SCRIPTS ===== -->
 
   <!-- Brain 3D Engine -->
-  <script src="brain3d_new.js"></script>
+  <script src="brain3d_new.js?v=6"></script>
 
   <!-- XAI & Similar UI -->
   <script src="xai_similar_ui.js"></script>
@@ -620,16 +639,16 @@
   <script src="brain3d_atlas_viewer_complete.js"></script>
 
   <!-- Main App -->
-  <script src="app.js"></script>
+  <script src="app.js?v=2"></script>
 
   <!-- UI Controls -->
   <script src="brain3d_ui_controls.js"></script>
 
-  <!-- Integration Patch -->
+  <!-- Integration Patch -->  
   <script src="brain3d_integration_patch.js"></script>
 
   <!-- Atlas 4-Panel Viewer (EBRAINS-style) -->
-  <script src="atlas_4panel_viewer.js"></script>
+  <script src="atlas_4panel_viewer.js?v=2"></script>
 
   <!-- ===== VERIFICATION ===== -->
   <script>

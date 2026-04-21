@@ -52,13 +52,13 @@
      BRAIN REGION MAP (simplified — for hover label simulation)
   ══════════════════════════════════════════════════════════════════════════ */
   const REGION_MAP = [
-    { zone: [0.1, 0.1, 0.45, 0.45], name: 'Left Frontal Lobe', fn: 'Motor / Executive' },
-    { zone: [0.55, 0.1, 0.9, 0.45], name: 'Right Frontal Lobe', fn: 'Motor / Executive' },
-    { zone: [0.1, 0.55, 0.45, 0.9], name: 'Left Temporal Lobe', fn: 'Language / Memory' },
-    { zone: [0.55, 0.55, 0.9, 0.9], name: 'Right Temporal Lobe', fn: 'Language / Memory' },
-    { zone: [0.3, 0.3, 0.7, 0.7], name: 'Parietal Lobe', fn: 'Sensory Integration' },
-    { zone: [0.35, 0.6, 0.65, 0.9], name: 'Occipital Lobe', fn: 'Visual Processing' },
-    { zone: [0.4, 0.4, 0.6, 0.6], name: 'Corpus Callosum', fn: 'Interhemispheric' },
+    { zone: [0.1, 0.1, 0.45, 0.45], name: 'Thùy Trán Trái', fn: 'Vận động / Xử lý' },
+    { zone: [0.55, 0.1, 0.9, 0.45], name: 'Thùy Trán Phải', fn: 'Vận động / Xử lý' },
+    { zone: [0.1, 0.55, 0.45, 0.9], name: 'Thùy Thái Dương Trái', fn: 'Ngôn ngữ / Trí nhớ' },
+    { zone: [0.55, 0.55, 0.9, 0.9], name: 'Thùy Thái Dương Phải', fn: 'Ngôn ngữ / Trí nhớ' },
+    { zone: [0.3, 0.3, 0.7, 0.7], name: 'Thùy Đỉnh', fn: 'Tích hợp cảm giác' },
+    { zone: [0.35, 0.6, 0.65, 0.9], name: 'Thùy Chẩm', fn: 'Xử lý thị giác' },
+    { zone: [0.4, 0.4, 0.6, 0.6], name: 'Thể Chai', fn: 'Bán cầu não liên kết' },
   ];
 
   function getRegionAt(cx, cy) {
@@ -67,7 +67,7 @@
         return r;
       }
     }
-    return { name: 'White Matter / CSF', fn: 'Support tissue' };
+    return { name: 'Chất trắng / Dịch não tủy', fn: 'Mô hỗ trợ' };
   }
 
   /* ═══════════════════════════════════════════════════════════════════════════
@@ -502,7 +502,8 @@
       const cat      = dd.depth_metrics?.depth_category?.category || 'INTERMEDIATE';
       const area     = dd.prediction?.tumor_area_percent;
       const conf     = Math.round((dd.prediction?.confidence || 0) * 100);
-      const loc      = dd.prediction?.location_hint || '';
+      let loc      = dd.prediction?.location_hint || '';
+      if (window.translateLocationToVi) loc = window.translateLocationToVi(loc);
 
       const DCOL = {
         OUTSIDE:'#ff0000', SUPERFICIAL:'#ff5252', SHALLOW:'#ffb74d',
