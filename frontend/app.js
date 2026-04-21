@@ -80,6 +80,121 @@
   let lastSimilarData = null;
   let isProcessingDiagnosis = false;
 
+  // ===== LOCALSTORAGE KEYS =====
+  const LS_KEY_DIAGNOSIS  = 'neuroscan_last_diagnosis';
+  const LS_KEY_IMAGE      = 'neuroscan_last_image';     // base64 DataURL
+  const LS_KEY_MASK_B64   = 'neuroscan_last_mask_b64';  // base64 PNG of mask canvas
+  const LS_KEY_SIMILAR    = 'neuroscan_last_similar';
+  const LS_KEY_TAB        = 'neuroscan_last_tab';
+
+  // ===== SAVE STATE TO LOCALSTORAGE =====
+  function _saveStateToLS(diagnosisResult, imageDataURL, maskB64, similarData) {
+    try {
+      // Clamp size: strip the raw mask array (large) before saving
+      const toSave = JSON.parse(JSON.stringify(diagnosisResult));
+      delete toSave.mask; // Remove raw 256×256 array — we save rendered PNG instead
+      localStorage.setItem(LS_KEY_DIAGNOSIS, JSON.stringify(toSave));
+
+      if (imageDataURL) localStorage.setItem(LS_KEY_IMAGE, imageDataURL);
+      if (maskB64)      localStorage.setItem(LS_KEY_MASK_B64, maskB64);
+      if (similarData)  localStorage.setItem(LS_KEY_SIMILAR, JSON.stringify(similarData));
+
+      console.log('[App] 💾 Diagnosis state saved to localStorage');
+    } catch (e) {
+      console.warn('[App] ⚠️  Could not save to localStorage (quota?):', e);
+    }
+  }
+
+  // ===== CLEAR LOCALSTORAGE STATE =====
+  function _clearLS() {
+    [LS_KEY_DIAGNOSIS, LS_KEY_IMAGE, LS_KEY_MASK_B64, LS_KEY_SIMILAR, LS_KEY_TAB].forEach(k => localStorage.removeItem(k));
+    console.log('[App] 🗑️  localStorage cleared');
+  }
+
+  // ===== RENDER MASK FROM BASE64 PNG =====
+  function _restoreMaskFromB64(b64) {
+    if (!b64) return;
+    const img = new Image();
+    img.onload = () => {
+      if (maskOverlayCanvas) maskOverlayCanvas.remove();
+      const canvas = document.createElement('canvas');
+      canvas.width = 256; canvas.height = 256;
+      canvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;border-radius:10px;';
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      previewWrap.appendChild(canvas);
+      maskOverlayCanvas = canvas;
+    };
+    img.src = b64;
+  }
+
+  // ===== RESTORE STATE FROM LOCALSTORAGE =====
+  function _restoreFromLS() {
+    try {
+      const rawDiag  = localStorage.getItem(LS_KEY_DIAGNOSIS);
+      const imageURL = localStorage.getItem(LS_KEY_IMAGE);
+      const maskB64  = localStorage.getItem(LS_KEY_MASK_B64);
+      const rawSim   = localStorage.getItem(LS_KEY_SIMILAR);
+
+      if (!rawDiag) return; // Nothing saved
+
+      const diagnosisResult = JSON.parse(rawDiag);
+      console.log('[App] 🔄 Restoring previous diagnosis from localStorage...');
+
+      // ── 1. Restore image preview ──
+      if (imageURL) {
+        previewWrap.style.display = 'block';
+        const ctx = previewCanvas.getContext('2d');
+        previewCanvas.width = 256; previewCanvas.height = 256;
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, 256, 256);
+          // Restore mask overlay after image drawn
+          _restoreMaskFromB64(maskB64);
+        };
+        img.src = imageURL;
+        // Mark file pseudo-available so btnDiagnose works (can re-diagnose)
+        btnDiagnose.disabled = false;
+      }
+
+      // ── 2. Restore in-memory state ──
+      lastPredictionData = diagnosisResult.prediction;
+      window.lastDiagnosisData = diagnosisResult;
+
+      if (diagnosisResult.xai && !diagnosisResult.xai.error) {
+        lastXAIData = diagnosisResult.xai;
+        window.lastXAIData = diagnosisResult.xai;
+      }
+
+      if (rawSim) {
+        lastSimilarData = JSON.parse(rawSim);
+        window.lastSimilarData = lastSimilarData;
+        _showCompareButton(lastSimilarData);
+      }
+
+      // ── 3. Re-render report UI ──
+      displayReport(diagnosisResult);
+      showState('report');
+
+      // ── 4. Re-render 3D brain ──
+      update3DBrain(diagnosisResult);
+
+      // ── 5. Reload Atlas 4-Panel if available ──
+      if (window.Atlas4PanelViewer) {
+        window.Atlas4PanelViewer.loadDiagnosis(diagnosisResult);
+      }
+
+      // ── 6. Restore last active tab ──
+      const lastTab = localStorage.getItem(LS_KEY_TAB);
+      if (lastTab) {
+        setTimeout(() => switchTab(lastTab), 300);
+      }
+
+      console.log('[App] ✅ Previous diagnosis restored from localStorage');
+    } catch (e) {
+      console.warn('[App] ⚠️  Could not restore from localStorage:', e);
+    }
+  }
+
   // ===== HEALTH CHECK =====
   async function checkHealth() {
     try {
@@ -286,7 +401,6 @@
         console.log('[App] 🧠 Atlas4Panel loaded with diagnosis data');
       }
 
-
       // 4️⃣ Display metrics panel
       // displayMetricsPanel(diagnosisResult);
 
@@ -294,9 +408,10 @@
       update3DBrain(diagnosisResult);
 
       // 6️⃣ Fetch Similar cases (optional, separate call)
+      let similarData = null;
       if (currentImageFile && window.XAISimilarUI?.fetchSimilarCases) {
         try {
-          const similarData = await window.XAISimilarUI.fetchSimilarCases(currentImageFile);
+          similarData = await window.XAISimilarUI.fetchSimilarCases(currentImageFile);
           lastSimilarData = similarData;
           window.lastSimilarData = similarData;
           console.log('[App] ✅ Similar cases received');
@@ -307,6 +422,15 @@
           console.warn('[App] ⚠️  Similar fetch failed:', err);
         }
       }
+
+      // 7️⃣ 💾 SAVE TO LOCALSTORAGE for persistence across reloads
+      const imageDataURL = (() => {
+        try { return previewCanvas.toDataURL('image/jpeg', 0.85); } catch(e) { return null; }
+      })();
+      const maskB64 = (() => {
+        try { return maskOverlayCanvas ? maskOverlayCanvas.toDataURL('image/png') : null; } catch(e) { return null; }
+      })();
+      _saveStateToLS(diagnosisResult, imageDataURL, maskB64, similarData);
 
       // Show report
       showState('report');
@@ -1141,6 +1265,9 @@
     // Update active pill
     pills.forEach(p => p.classList.remove('active'));
     document.querySelector(`.pill[data-tab="${tabName}"]`)?.classList.add('active');
+
+    // 💾 Persist last active tab
+    try { localStorage.setItem(LS_KEY_TAB, tabName); } catch(e) {}
   }
 
   // Attach tab click handlers
@@ -1293,11 +1420,17 @@
     // Set rotate button active by default
     if (btnRotate) btnRotate.classList.add('active');
 
+    // ✅ 💾 RESTORE previous diagnosis from localStorage (if any)
+    // Wait slightly for 3D viewer and other modules to be ready
+    setTimeout(() => {
+      _restoreFromLS();
+    }, 500);
+
     console.log('%c[App] ✅ All systems ready!', 'color: #00c853; font-weight: bold; font-size: 14px;');
   });
 
-  // ===== EXPOSE displayMetricsPanel TO GLOBAL =====
-  window.updateTumorMetrics = displayMetricsPanel;
+  // ===== NOTE: window.updateTumorMetrics is defined in brain3d_new.js =====
+  // Do NOT override it here — brain3d_new.js has the full Detail Analysis renderer.
 
   // ===== WINDOW EXPORTS (for external scripts) ===== 
   window.App = {
@@ -1305,7 +1438,8 @@
     lastPredictionData: () => lastPredictionData,
     lastXAIData: () => lastXAIData,
     lastSimilarData: () => lastSimilarData,
-    getCurrentFile: () => currentFile
+    getCurrentFile: () => currentFile,
+    clearDiagnosisCache: _clearLS  // Allow external clear if needed
   };
 
 })();

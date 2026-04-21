@@ -91,10 +91,10 @@
       </div>
       <!-- 4-Mode Switcher -->
       <div class="atlas-mode-switcher" id="atlasModeSwitcher">
-        <button class="atlas-mode-btn" data-mode="gray"    title="Ảnh MRI gốc đen trắng">⬜ <span>Ảnh Xám</span></button>
-        <button class="atlas-mode-btn active" data-mode="tumor"   title="Phủ Khối U — vùng được phân đoạn">🔴 <span>Phủ U</span></button>
-        <button class="atlas-mode-btn" data-mode="heatmap" title="Bản Đồ Nhiệt AI — mức độ tập trung Grad-CAM">🌡 <span>Bản Đồ Nhiệt</span></button>
-        <button class="atlas-mode-btn" data-mode="region"  title="Bản đồ màu các vùng não">🎨 <span>Vùng Não</span></button>
+        <button class="atlas-mode-btn" data-mode="gray"    title="Ảnh MRI gốc đen trắng"><span>Ảnh Xám</span></button>
+        <button class="atlas-mode-btn active" data-mode="tumor"   title="Phủ Khối U — vùng được phân đoạn"><span>Phủ U</span></button>
+        <button class="atlas-mode-btn" data-mode="heatmap" title="Bản Đồ Nhiệt AI — mức độ tập trung Grad-CAM"><span>Bản Đồ Nhiệt</span></button>
+        <button class="atlas-mode-btn" data-mode="region"  title="Bản đồ màu các vùng não"><span>Vùng Não</span></button>
         <span class="atlas-mode-badge" id="atlasModeBadge">Phủ U</span>
       </div>
 
@@ -187,7 +187,7 @@
           </div>
           <!-- Depth Legend Overlay -->
           <div class="atlas-depth-legend" id="atlasDepthLegend">
-            <div class="atlas-depth-legend-title">🎨 Độ Sâu Khối U</div>
+            <div class="atlas-depth-legend-title">Độ Sâu Khối U</div>
             <div class="atlas-depth-gradient-bar"></div>
             <div class="atlas-depth-ticks">
               <span>Bề Mặt</span><span>15mm</span><span>30mm</span><span>45mm+</span>
@@ -511,9 +511,9 @@
       const dcol = DCOL[cat] || '#ffe57a';
 
       const lines = [
-        { label: '📏 Sâu', val: depth != null ? depth.toFixed(1)+' mm' : 'N/A', valCol: dcol },
-        { label: '📐 D/Tích',  val: area  != null ? area.toFixed(2)+'%' : 'N/A',  valCol: '#ff9100' },
-        { label: '🎯 T/cậy',  val: conf + '%', valCol: '#00e5ff' },
+        { label: 'Sâu', val: depth != null ? depth.toFixed(1)+' mm' : 'N/A', valCol: dcol },
+        { label: 'D/Tích',  val: area  != null ? area.toFixed(2)+'%' : 'N/A',  valCol: '#ff9100' },
+        { label: 'T/cậy',  val: conf + '%', valCol: '#00e5ff' },
       ];
 
       const lineH = 14, bw = 135, bh = lines.length * lineH + 22;

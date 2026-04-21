@@ -335,217 +335,329 @@
     }
   }
 
-  // ===== TUMOR METRICS PANEL (NEW) =====
+  // ===== TUMOR METRICS PANEL (DETAIL ANALYSIS) =====
   function createMetricsPanel() {
     const panelHTML = `
     <div id="tumorMetricsPanel" style="
       position: fixed;
-      right: 20px;
-      top: 80px;
-      width: 320px;
-      max-height: 600px;
-      background: rgba(10, 14, 26, 0.95);
-      border: 2px solid #00e5ff;
-      border-radius: 12px;
-      padding: 16px;
+      right: 0;
+      top: 64px;
+      width: 300px;
+      height: calc(100vh - 64px);
+      background: #ffffff;
+      border-left: 0.5px solid #e2e8f0;
+      padding: 0;
       z-index: 15;
-      font-family: 'Consolas', monospace;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 12px;
-      color: #c1cfe8;
-      box-shadow: 0 0 20px rgba(0, 229, 255, 0.3);
+      color: #1a202c;
+      box-shadow: -4px 0 24px rgba(0,0,0,0.08);
       display: none;
-      overflow-y: auto;
+      flex-direction: column;
+      overflow: hidden;
     ">
+      <!-- Header cố định -->
       <div style="
         display: flex;
-        justify-content: space-between;
         align-items: center;
-        margin-bottom: 12px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid #1e3a52;
+        justify-content: space-between;
+        padding: 12px 14px;
+        background: #f8fafc;
+        border-bottom: 0.5px solid #e2e8f0;
+        flex-shrink: 0;
       ">
-        <h3 style="
-          color: #00e5ff;
-          margin: 0;
-          font-size: 14px;
-          font-weight: bold;
-        ">📊 Chỉ Số Khối U</h3>
-        <button onclick="document.getElementById('tumorMetricsPanel').style.display='none'" 
-          style="
-          background: none;
-          border: none;
-          color: #5a7a99;
-          font-size: 16px;
-          cursor: pointer;
-        ">✕</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:#3b82f6;flex-shrink:0;"></div>
+          <div>
+            <div id="metricsTitle" style="font-size:13px;font-weight:600;color:#0f172a;">Phân Tích Chi Tiết</div>
+            <div style="color:#94a3b8;font-size:10px;margin-top:1px;">NeuroScan AI · U-Net v1.0</div>
+          </div>
+        </div>
+        <button onclick="document.getElementById('tumorMetricsPanel').style.display='none';document.getElementById('tumorMetricsPanel').style.flexDirection='column';var b=document.getElementById('btnMetrics');if(b)b.classList.remove('active');"
+          style="background:transparent;border:0.5px solid #e2e8f0;color:#94a3b8;font-size:16px;cursor:pointer;
+          width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+          flex-shrink:0;transition:all 0.15s;"
+          onmouseover="this.style.background='#fee2e2';this.style.color='#ef4444';this.style.borderColor='#fca5a5';"
+          onmouseout="this.style.background='transparent';this.style.color='#94a3b8';this.style.borderColor='#e2e8f0';">✕</button>
       </div>
-      
-      <div id="metricsContent" style="display: flex; flex-direction: column; gap: 10px;">
-        <!-- Content sẽ được inject bằng JS -->
+
+      <!-- Vùng cuộn -->
+      <div id="metricsContent" style="
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+      ">
+        <div style="padding:40px 20px;text-align:center;color:#94a3b8;">
+          <div style="font-size:32px;margin-bottom:8px;">🔬</div>
+          <div style="font-size:12px;">Chạy chẩn đoán để xem phân tích chi tiết</div>
+        </div>
       </div>
     </div>
   `;
-
     document.body.insertAdjacentHTML('beforeend', panelHTML);
   }
-
   // Gọi hàm này trong initBrainViewer():
   createMetricsPanel();
 
-  // ===== UPDATE METRICS DISPLAY =====
+  // ===== UPDATE METRICS DISPLAY — DETAIL ANALYSIS =====
   window.updateTumorMetrics = function (diagnosisData) {
     const panel = document.getElementById('tumorMetricsPanel');
-    if (!panel) return;
+    const content = document.getElementById('metricsContent');
+    if (!panel || !content) return;
 
-    const metrics = diagnosisData.detailed_metrics || {};
-    const depthMetrics = diagnosisData.depth_metrics || {};
-    const pred = diagnosisData.prediction || {};
+    const data = diagnosisData || window.lastDiagnosisData;
+    if (!data) return;
 
-    console.log('[Brain3D] 📊 Updating tumor metrics:', metrics);
+    const pred = data.prediction || {};
+    const dm = data.depth_metrics || {};
+    const metrics = data.detailed_metrics || {};
+    const depth = dm.tumor_depth_mm;
+    const cat = dm.depth_category || {};
+    const conf = Math.round((pred.confidence || 0) * 100);
+    const area = pred.tumor_area_percent;
+    const distCortex = metrics.distance_to_cortex_mm ?? dm.tumor_depth_mm ?? 0;
 
-    const html = `
-   <!-- DEPTH METRICS SECTION (NEW) -->
-    <div style="
-      padding: 12px;
-      background: ${getDepthCategoryColor(depthMetrics.depth_category?.category).bg};
-      border-left: 3px solid ${getDepthCategoryColor(depthMetrics.depth_category?.category).border};
-      border-radius: 4px;
-      margin-bottom: 12px;
-    ">
-      <div style="color: #5a7a99; font-size: 10px; text-transform: uppercase; margin-bottom: 6px;">
-        ${depthMetrics.depth_category?.emoji || '📏'} Độ Sâu Khối U
-      </div>
-      <div style="color: ${getDepthCategoryColor(depthMetrics.depth_category?.category).text}; font-size: 18px; font-weight: bold; margin-bottom: 4px;">
-        ${depthMetrics.tumor_depth_mm !== undefined ? depthMetrics.tumor_depth_mm.toFixed(1) : 'N/A'} mm
-      </div>
-      <div style="color: ${getDepthCategoryColor(depthMetrics.depth_category?.category).text}; font-size: 11px; margin-bottom: 8px;">
-        ${depthMetrics.depth_category?.label || 'N/A'}
-      </div>
-      
-      <!-- Depth Visualization Bar -->
-      <div style="width: 100%; height: 24px; background: rgba(0,0,0,0.3); border-radius: 4px; overflow: hidden; position: relative; margin-bottom: 8px;">
-        ${createDepthVisualizationBar(depthMetrics.tumor_depth_mm)}
-      </div>
-      
-      <!-- Distance from center -->
-      <div style="font-size: 10px; color: #5a7a99; margin-bottom: 4px;">
-        📍 Khoảng cách từ tâm não: <span style="color: #00e5ff;">${depthMetrics.distance_from_center_mm?.toFixed(1) || 'N/A'}</span> mm
-      </div>
-      
-      <!-- Nearest cortex point -->
-      <div style="font-size: 10px; color: #5a7a99;">
-        🎯 Điểm gần vỏ: <span style="color: #00e5ff;">
-          (${depthMetrics.nearest_cortex_point?.[0]?.toFixed(1)}, 
-          ${depthMetrics.nearest_cortex_point?.[1]?.toFixed(1)}, 
-          ${depthMetrics.nearest_cortex_point?.[2]?.toFixed(1)})
+    const riskMap = {
+      OUTSIDE: { label: 'Nguy Kịch', bg: '#fef2f2', text: '#991b1b', border: '#fca5a5', dot: '#ef4444', stars: 5 },
+      SUPERFICIAL: { label: 'Nghiêm Trọng', bg: '#fef2f2', text: '#991b1b', border: '#fca5a5', dot: '#ef4444', stars: 5 },
+      SHALLOW: { label: 'Rủi Ro Cao', bg: '#fff7ed', text: '#9a3412', border: '#fdba74', dot: '#f97316', stars: 4 },
+      INTERMEDIATE: { label: 'Trung Bình', bg: '#fefce8', text: '#854d0e', border: '#fde047', dot: '#eab308', stars: 3 },
+      DEEP: { label: 'Rủi Ro Thấp', bg: '#f0fdf4', text: '#166534', border: '#86efac', dot: '#22c55e', stars: 2 },
+      VERY_DEEP: { label: 'Tối Thiểu', bg: '#eff6ff', text: '#1e40af', border: '#93c5fd', dot: '#3b82f6', stars: 1 }
+    };
+    const risk = riskMap[cat.category] || riskMap['INTERMEDIATE'];
+    const riskStars = '★'.repeat(risk.stars) + '☆'.repeat(5 - risk.stars);
+
+    const depthPct = Math.min(100, ((depth || 0) / 55) * 100).toFixed(1);
+    const depthBarColor = !depth || depth < 5 ? '#ef4444' : depth < 15 ? '#f97316' : depth < 30 ? '#eab308' : depth < 45 ? '#22c55e' : '#3b82f6';
+
+    const marginSafe = distCortex > 10 ? 'An Toàn' : distCortex > 5 ? 'Thận Trọng' : 'Nguy Hiểm';
+    const marginStyle = distCortex > 10
+      ? 'background:#f0fdf4;color:#166534;border:0.5px solid #86efac;'
+      : distCortex > 5
+        ? 'background:#fff7ed;color:#9a3412;border:0.5px solid #fdba74;'
+        : 'background:#fef2f2;color:#991b1b;border:0.5px solid #fca5a5;';
+
+    const lobeMap = {
+      frontal: { fn: 'Kiểm soát vận động, chức năng nhận thức', color: '#f97316' },
+      temporal: { fn: 'Trí nhớ, ngôn ngữ (vùng Wernicke)', color: '#3b82f6' },
+      parietal: { fn: 'Tích hợp cảm giác, nhận thức không gian', color: '#8b5cf6' },
+      occipital: { fn: 'Xử lý thị giác vỏ não', color: '#ef4444' },
+      central: { fn: 'Vùng ranh giới vận động/cảm giác', color: '#eab308' }
+    };
+    const locStr = (pred.location_hint || '').toLowerCase();
+    const lobeKey = Object.keys(lobeMap).find(k => locStr.includes(k)) || '';
+    const lobe = lobeMap[lobeKey] || { fn: 'Vùng vỏ não', color: '#3b82f6' };
+    const bboxText = window._bboxLabelText || '—';
+
+    const confCirc = ((conf / 100) * 113).toFixed(1);
+    const confColor = conf >= 85 ? '#22c55e' : conf >= 60 ? '#eab308' : '#ef4444';
+
+    // SVG Risk gauge
+    const _r = 26, _cx = 34, _cy = 34;
+    const gaugePct = Math.min(100, (risk.stars / 5) * 100);
+    const gaugeAng = (gaugePct / 100) * 180;
+    const _toRad = a => (a - 180) * Math.PI / 180;
+    const _gx = (_cx + _r * Math.cos(_toRad(gaugeAng))).toFixed(1);
+    const _gy = (_cy + _r * Math.sin(_toRad(gaugeAng))).toFixed(1);
+
+    const clinicalNotes = {
+      OUTSIDE: '⚠️ Khối u có thể vượt qua ranh giới vỏ não. Cần đánh giá chuyên khoa ngay lập tức.',
+      SUPERFICIAL: '⚠️ Dưới 5mm từ vỏ não — nguy cơ xâm lấn cao. Tư vấn phẫu thuật thần kinh khẩn cấp.',
+      SHALLOW: '⚠️ 5–15mm từ vỏ não — nguy cơ trung bình. Cần lên kế hoạch phẫu thuật cẩn thận.',
+      INTERMEDIATE: '✓ 15–30mm — nguy cơ thấp với vỏ não. Theo dõi theo quy trình chuẩn.',
+      DEEP: '✓ 30–45mm — nguy cơ tối thiểu. Có thể xem xét sinh thiết định vị lập thể.',
+      VERY_DEEP: '✓ Trên 45mm — không đe dọa vỏ não. Vùng quanh não thất hoặc chất trắng sâu.'
+    };
+    const note = clinicalNotes[cat.category] || `Khối u ở độ sâu ${depth != null ? depth.toFixed(1) : '?'}mm từ vỏ não.`;
+
+    const catLabelVi = {
+      OUTSIDE: 'Ngoài vỏ não',
+      SUPERFICIAL: 'Rất nông — nguy hiểm',
+      SHALLOW: 'Nông — gần vỏ não',
+      INTERMEDIATE: 'Trung bình',
+      DEEP: 'Sâu đáng kể',
+      VERY_DEEP: 'Rất sâu, ít rủi ro'
+    };
+    const catLabel = catLabelVi[cat.category] || cat.label || '—';
+
+    // Helpers
+    const sec = (title, body) => `
+      <div style="padding:10px 14px;border-bottom:0.5px solid #f1f5f9;">
+        <div style="font-size:9px;font-weight:600;color:#94a3b8;text-transform:uppercase;
+          letter-spacing:0.6px;margin-bottom:8px;">${title}</div>
+        ${body}
+      </div>`;
+
+    const metricCard = (label, value, unit, color) => `
+      <div style="background:#f8fafc;border-radius:8px;padding:8px 6px;
+        text-align:center;border:0.5px solid #e2e8f0;">
+        <div style="font-size:9px;color:#94a3b8;margin-bottom:3px;">${label}</div>
+        <div style="font-size:14px;font-weight:600;color:${color};">${value}</div>
+        <div style="font-size:9px;color:#cbd5e1;">${unit}</div>
+      </div>`;
+
+    const axisCard = (axis, value, color) => `
+      <div style="background:#f8fafc;border-radius:6px;padding:7px 6px;
+        text-align:center;border:0.5px solid #e2e8f0;">
+        <div style="font-size:9px;color:#94a3b8;margin-bottom:2px;">Trục ${axis}</div>
+        <div style="font-size:13px;font-weight:600;color:${color};">${value}</div>
+      </div>`;
+
+    content.innerHTML = `
+      <!-- 1. Mức Rủi Ro -->
+      ${sec('Mức Rủi Ro', `
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;
+            border-radius:20px;font-size:11px;font-weight:600;
+            background:${risk.bg};color:${risk.text};border:0.5px solid ${risk.border};">
+            <span style="width:7px;height:7px;border-radius:50%;background:${risk.dot};
+              display:inline-block;flex-shrink:0;"></span>
+            ${risk.label}
+          </span>
+          <span style="color:${risk.dot};font-size:14px;letter-spacing:2px;">${riskStars}</span>
+        </div>
+      `)}
+
+      <!-- 2. Thang Rủi Ro Phẫu Thuật + Độ Tin Cậy AI -->
+      ${sec('Thang Rủi Ro Phẫu Thuật &nbsp;·&nbsp; Độ Tin Cậy AI', `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <div style="flex:1;">
+            <svg width="68" height="48" viewBox="0 0 68 48" style="overflow:visible;display:block;">
+              <path d="M6,38 A28,28 0 0,1 62,38" fill="none" stroke="#e2e8f0" stroke-width="5" stroke-linecap="round"/>
+              <path d="M6,38 A28,28 0 0,1 ${_gx},${_gy}" fill="none" stroke="${risk.dot}" stroke-width="5" stroke-linecap="round"/>
+              <circle cx="${_gx}" cy="${_gy}" r="4" fill="${risk.dot}"/>
+              <text x="34" y="47" text-anchor="middle" fill="${risk.text}"
+                font-size="9" font-weight="600" font-family="sans-serif">${risk.label}</text>
+            </svg>
+          </div>
+          <div style="text-align:center;flex-shrink:0;">
+            <div style="font-size:9px;color:#94a3b8;margin-bottom:5px;">Tin cậy</div>
+            <div style="position:relative;width:50px;height:50px;">
+              <svg width="50" height="50" viewBox="0 0 50 50">
+                <circle cx="25" cy="25" r="18" fill="none" stroke="#e2e8f0" stroke-width="5"/>
+                <circle cx="25" cy="25" r="18" fill="none" stroke="${confColor}" stroke-width="5"
+                  stroke-dasharray="${confCirc} 113" stroke-linecap="round" transform="rotate(-90 25 25)"/>
+              </svg>
+              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+                color:${confColor};font-size:11px;font-weight:600;">${conf}%</div>
+            </div>
+          </div>
+        </div>
+      `)}
+
+      <!-- 3. Độ Sâu Từ Vỏ Não -->
+      ${sec('Độ Sâu Từ Vỏ Não', `
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+          <span style="font-size:10px;color:#64748b;">Khoảng cách tới bề mặt vỏ não</span>
+          <span>
+            <span style="font-size:22px;font-weight:600;color:#0f172a;">${depth != null ? depth.toFixed(1) : '—'}</span>
+            <span style="font-size:11px;color:#94a3b8;margin-left:2px;">mm</span>
+          </span>
+        </div>
+        <div style="height:7px;background:#f1f5f9;border-radius:4px;overflow:hidden;margin-bottom:5px;">
+          <div style="height:100%;width:${depthPct}%;
+            background:linear-gradient(90deg,#ef4444 0%,#f97316 25%,#eab308 55%,${depthBarColor} 100%);
+            border-radius:4px;transition:width 0.6s ease;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:#cbd5e1;margin-bottom:7px;">
+          <span>0</span><span>15mm</span><span>30mm</span><span>45mm</span><span>55mm</span>
+        </div>
+        <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;
+          border-radius:12px;background:${risk.bg};border:0.5px solid ${risk.border};">
+          <span style="width:6px;height:6px;border-radius:50%;background:${risk.dot};
+            display:inline-block;"></span>
+          <span style="font-size:10px;font-weight:500;color:${risk.text};">${catLabel}</span>
         </span>
-      </div>
-    </div>
-    <!-- Thể Tích -->
-    <div style="
-      padding: 10px;
-      background: rgba(0, 229, 255, 0.08);
-      border-left: 3px solid #00e5ff;
-      border-radius: 4px;
-    ">
-      <div style="color: #5a7a99; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">
-        📦 Thể Tích
-      </div>
-      <div style="color: #00e5ff; font-size: 16px; font-weight: bold;">
-        ${metrics.volume_cm3 !== undefined ? metrics.volume_cm3.toFixed(2) : 'N/A'}
-      </div>
-      <div style="color: #5a7a99; font-size: 9px;">cm³</div>
-    </div>
-    
-    <!-- Diện Tích -->
-    <div style="
-      padding: 10px;
-      background: rgba(255, 145, 0, 0.08);
-      border-left: 3px solid #ff9100;
-      border-radius: 4px;
-    ">
-      <div style="color: #5a7a99; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">
-        📐 Diện Tích
-      </div>
-      <div style="color: #ff9100; font-size: 16px; font-weight: bold;">
-        ${metrics.area_mm2 !== undefined ? metrics.area_mm2.toFixed(1) : 'N/A'}
-      </div>
-      <div style="color: #5a7a99; font-size: 9px;">mm²</div>
-    </div>
-    
-    <!-- Tỷ Lệ U/Não -->
-    <div style="
-      padding: 10px;
-      background: rgba(255, 82, 82, 0.08);
-      border-left: 3px solid #ff5252;
-      border-radius: 4px;
-    ">
-      <div style="color: #5a7a99; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">
-        📊 Tỷ Lệ U/Não
-      </div>
-      <div style="color: #ff5252; font-size: 16px; font-weight: bold;">
-        ${metrics.tumor_brain_ratio !== undefined ? metrics.tumor_brain_ratio.toFixed(4) : 'N/A'}
-      </div>
-      <div style="color: #5a7a99; font-size: 9px;">%</div>
-    </div>
-    
-    <!-- Tọa Độ Tâm -->
-    <div style="
-      padding: 10px;
-      background: rgba(0, 200, 83, 0.08);
-      border-left: 3px solid #00c853;
-      border-radius: 4px;
-    ">
-      <div style="color: #5a7a99; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">
-        🎯 Tâm Khối U
-      </div>
-      <div style="color: #00c853; font-family: 'Courier New'; font-size: 11px; line-height: 1.4;">
-        <div>X: ${metrics.centroid_mm ? metrics.centroid_mm[0] : 'N/A'} mm</div>
-        <div>Y: ${metrics.centroid_mm ? metrics.centroid_mm[1] : 'N/A'} mm</div>
-        <div>Z: ${metrics.centroid_mm ? metrics.centroid_mm[2] : 'N/A'} mm</div>
-      </div>
-    </div>
-    
-    <!-- Khoảng Cách Vỏ Não -->
-    <div style="
-      padding: 10px;
-      background: rgba(156, 39, 176, 0.08);
-      border-left: 3px solid #9c27b0;
-      border-radius: 4px;
-    ">
-      <div style="color: #5a7a99; font-size: 10px; text-transform: uppercase; margin-bottom: 4px;">
-        📏 Khoảng Cách Vỏ Não
-      </div>
-      <div style="color: #9c27b0; font-size: 14px; font-weight: bold;">
-        ${metrics.distance_to_cortex_mm !== undefined ? metrics.distance_to_cortex_mm.toFixed(2) : 'N/A'} mm
-      </div>
-      <div style="color: #5a7a99; font-size: 9px;">
-        ${metrics.cortex_proximity || ''}
-      </div>
-    </div>
-    
-    <!-- Divider -->
-    <div style="height: 1px; background: #1e3a52; margin: 8px 0;"></div>
-    
-    <!-- Chỉ Số Khác -->
-    <div style="color: #5a7a99; font-size: 10px;">
-      <div style="margin-bottom: 6px;">
-        <strong>Độ Tin Cậy:</strong> ${(pred.confidence * 100).toFixed(1)}%
-      </div>
-      <div style="margin-bottom: 6px;">
-        <strong>Vị Trí:</strong> ${pred.location_hint || 'N/A'}
-      </div>
-      <div>
-        <strong>Mô Hình:</strong> U-Net CNN v1.0
-      </div>
-    </div>
-  `;
+      `)}
 
-    document.getElementById('metricsContent').innerHTML = html;
-    panel.style.display = 'block';
+      <!-- 4. Biên An Toàn Phẫu Thuật -->
+      ${sec('Biên An Toàn Phẫu Thuật', `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <span style="font-size:10px;color:#64748b;">Đánh giá mức độ tiếp cận</span>
+          <span style="padding:3px 11px;border-radius:12px;font-size:10px;
+            font-weight:600;${marginStyle}">${marginSafe}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <div style="background:#f8fafc;border-radius:8px;padding:8px 10px;border:0.5px solid #e2e8f0;">
+            <div style="font-size:9px;color:#94a3b8;margin-bottom:3px;">Tới vỏ não</div>
+            <div style="font-size:16px;font-weight:600;color:#0f172a;">
+              ${distCortex.toFixed(1)}<span style="font-size:10px;color:#94a3b8;font-weight:400;"> mm</span>
+            </div>
+          </div>
+          <div style="background:#f8fafc;border-radius:8px;padding:8px 10px;border:0.5px solid #e2e8f0;">
+            <div style="font-size:9px;color:#94a3b8;margin-bottom:3px;">Kích thước u</div>
+            <div style="font-size:13px;font-weight:600;color:#0f172a;">${bboxText}</div>
+          </div>
+        </div>
+      `)}
 
-    console.log('[Brain3D] ✅ Metrics panel updated');
+      <!-- 5. Vùng Giải Phẫu -->
+      ${sec('Vùng Giải Phẫu', `
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:40px;height:40px;border-radius:50%;background:#eff6ff;
+            display:flex;align-items:center;justify-content:center;flex-shrink:0;
+            border:0.5px solid #bfdbfe;">
+            <svg width="22" height="18" viewBox="0 0 22 18">
+              <ellipse cx="11" cy="10" rx="10" ry="7.5" fill="none" stroke="#93c5fd" stroke-width="1.2"/>
+              <ellipse cx="8" cy="7" rx="4.5" ry="3.5" fill="${lobe.color}25" stroke="${lobe.color}" stroke-width="0.9"/>
+              <circle cx="8" cy="7" r="2" fill="${lobe.color}"/>
+            </svg>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:600;color:#0f172a;margin-bottom:3px;
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              ${pred.location_hint || '—'}
+            </div>
+            <div style="font-size:10px;color:${lobe.color};padding-left:7px;
+              border-left:2px solid ${lobe.color}66;line-height:1.5;">
+              ${lobe.fn}
+            </div>
+          </div>
+        </div>
+      `)}
+
+      <!-- 6. Chỉ Số Đo Lường -->
+      ${sec('Chỉ Số Đo Lường', `
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+          ${metricCard('Thể Tích', metrics.volume_cm3 != null ? metrics.volume_cm3.toFixed(2) : '—', 'cm³', '#3b82f6')}
+          ${metricCard('Diện Tích', metrics.area_mm2 != null ? metrics.area_mm2.toFixed(0) : (area != null ? (area / 100 * 256 * 256 * 0.25).toFixed(0) : '—'), 'mm²', '#f97316')}
+          ${metricCard('Lát Cắt', area != null ? area.toFixed(1) : '—', '%', '#ef4444')}
+        </div>
+      `)}
+
+      <!-- 7. Tâm Khối U 3D -->
+      ${sec('Tọa Độ Tâm Khối U (mm)', `
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+          ${axisCard('X', (dm.centroid_3d?.[0] ?? metrics.centroid_mm?.[0] ?? 0).toFixed(1), '#ef4444')}
+          ${axisCard('Y', (dm.centroid_3d?.[1] ?? metrics.centroid_mm?.[1] ?? 0).toFixed(1), '#3b82f6')}
+          ${axisCard('Z', (dm.centroid_3d?.[2] ?? metrics.centroid_mm?.[2] ?? 0).toFixed(1), '#22c55e')}
+        </div>
+      `)}
+
+      <!-- 8. Ghi Chú Lâm Sàng -->
+      <div style="padding:10px 14px 16px;">
+        <div style="font-size:9px;font-weight:600;color:#94a3b8;text-transform:uppercase;
+          letter-spacing:0.6px;margin-bottom:7px;">Ghi Chú Lâm Sàng</div>
+        <div style="font-size:10px;color:#475569;line-height:1.65;padding:9px 11px;
+          background:${risk.bg};border-radius:8px;border-left:3px solid ${risk.dot};">
+          ${note}
+        </div>
+        <div style="margin-top:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;
+          border:0.5px solid #e2e8f0;font-size:9px;color:#94a3b8;line-height:1.6;text-align:center;">
+          ⚕️ Kết quả chỉ mang tính hỗ trợ.<br>Cần xác nhận từ bác sĩ chuyên khoa thần kinh.
+        </div>
+      </div>
+    `;
+
+    // Kích hoạt hiển thị dạng flex để scroll hoạt động
+    panel.style.display = 'flex';
+    panel.style.flexDirection = 'column';
+
+    console.log('[Brain3D] ✅ Bảng phân tích chi tiết (tiếng Việt) đã cập nhật');
   };
+
 
   // =========== NEW UPDATE 
   function createDepthVisualizationBar(depth) {
@@ -1716,6 +1828,15 @@
       try { renderer.render(scene, camera); return renderer.domElement.toDataURL('image/png'); }
       catch (e) { return null; }
     };
+
+    // ✅ Auto-update Detail Analysis right panel
+    if (window.updateTumorMetrics && window.lastDiagnosisData) {
+      try {
+        window.updateTumorMetrics(window.lastDiagnosisData);
+      } catch (e) {
+        console.warn('[Brain3D] ⚠️  updateTumorMetrics failed:', e);
+      }
+    }
   };
 
   // ════════════════════════════════════════════════════════════
@@ -2174,7 +2295,7 @@
       box-shadow:0 0 14px rgba(0,229,255,0.35);
       display:none;
     `;
-    lbl.innerHTML = `<span style="color:#5a7a99;font-size:8px;">📍 LOCATION</span><br>${loc}`;
+    lbl.innerHTML = `<span style="color:#5a7a99;font-size:8px;">LOCATION</span><br>${loc}`;
     document.body.appendChild(lbl);
 
     console.log('[Brain3D] ✅ Anatomical annotation built for:', loc);
@@ -2237,7 +2358,6 @@
     const indicator = document.getElementById('sliceIndicator');
     if (indicator) indicator.style.display = isDetailView ? 'block' : 'none';
 
-    // Update button visual
     const btnSlice = document.getElementById('btnSlice');
     if (btnSlice) {
       btnSlice.style.background = isDetailView ? 'rgba(0,229,255,0.20)' : '';
@@ -2247,10 +2367,8 @@
     }
 
     if (isDetailView) {
-      console.log('%c[Brain3D] 🔍 Detail View ENABLED', 'color: #00ffff; font-weight: bold;');
       switchBrainModel('detail');
-      _showDetailInfoPanel();
-      // Build extra 3D overlays for detail mode
+      // _showDetailInfoPanel();   ← đã tắt
       if (currentTumorPoints && currentTumorPoints.length > 0) {
         const dm = window.lastDepthMetrics;
         const pred = window.lastDiagnosisData?.prediction;
@@ -2259,10 +2377,8 @@
         buildAnatomicalAnnotation(dm, pred);
       }
     } else {
-      console.log('%c[Brain3D] 🔍 Detail View DISABLED', 'color: #00ffff; font-weight: bold;');
       switchBrainModel('normal');
-      _hideDetailInfoPanel();
-      // Remove detail-only overlays
+      // _hideDetailInfoPanel();   ← đã tắt (panel không còn được tạo)
       if (window._tumorBBoxGroup) { scene.remove(window._tumorBBoxGroup); window._tumorBBoxGroup = null; }
       if (window._tumorShellGroup) { scene.remove(window._tumorShellGroup); window._tumorShellGroup = null; }
       if (window._anatAnnotGroup) { scene.remove(window._anatAnnotGroup); window._anatAnnotGroup = null; }
@@ -2272,7 +2388,6 @@
 
     return isDetailView;
   };
-
   // Keep old function name for compatibility
   window.toggleSliceView = function () {
     return window.toggleDetailView();
@@ -2614,15 +2729,13 @@
     camera.position.set(0, 0.8, 5.0);
     camera.lookAt(0, 0, 0);
 
-    // Clean up zone labels
     document.querySelectorAll('.depthZoneLabel').forEach(l => l.remove());
     window._depthZoneMarkers = [];
 
-    // If detail view is active, turn it off
     if (isDetailView) {
       isDetailView = false;
       switchBrainModel('normal');
-      _hideDetailInfoPanel();
+      // _hideDetailInfoPanel();  ← bỏ dòng này
 
       const indicator = document.getElementById('sliceIndicator');
       if (indicator) indicator.style.display = 'none';
@@ -2881,7 +2994,7 @@
     <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 28px;
       border-bottom:1px solid #1e3a52;background:rgba(0,229,255,0.04);flex-shrink:0;">
       <div>
-        <div style="color:#00e5ff;font-size:18px;font-weight:bold;margin-bottom:4px;">⚖️ Chọn Ca Bệnh Tương Tự Để So Sánh 3D</div>
+        <div style="color:#00e5ff;font-size:18px;font-weight:bold;margin-bottom:4px;">Chọn Ca Bệnh Tương Tự Để So Sánh 3D</div>
         <div style="color:#5a7a99;font-size:12px;">Tìm thấy ${cases.length} ca bệnh — click để mở so sánh trực quan song song</div>
       </div>
       <button onclick="document.getElementById('comparePicker').remove()" style="
@@ -3221,7 +3334,7 @@
       <!-- ══ RIGHT: Ca tương tự ══ -->
       <div class="d3-col">
         <div class="d3-label" style="background:rgba(170,68,255,0.06);color:#aa44ff;">
-          🔎 CA TƯƠNG TỰ #${caseItem.rank || '?'} <span style="font-weight:normal;color:#5a7a99;">· ${caseItem.source || 'Database'}</span>
+          CA TƯƠNG TỰ #${caseItem.rank || '?'} <span style="font-weight:normal;color:#5a7a99;">· ${caseItem.source || 'Database'}</span>
         </div>
         <div class="d3-canvas-wrap" style="height:52vh;">
           <canvas id="dual3DRight" style="width:100%;height:100%;display:block;cursor:grab;"></canvas>

@@ -257,7 +257,7 @@
           
           <!-- Header -->
           <div class="xai-header" style="${this.styles.header}">
-            <h2 style="${this.styles.title}">🔍 Phân Tích AI Có Giải Thích</h2>
+            <h2 style="${this.styles.title}">Phân Tích AI Có Giải Thích</h2>
             <p style="${this.styles.subtitle}">Phân tích đa phương pháp để hiểu quyết định của AI</p>
           </div>
           
@@ -342,7 +342,7 @@
           <!-- Technical Details -->
           <div style="${this.styles.infoBox}; margin-bottom: 12px;">
             <h4 style="color: #4a5568; margin: 0 0 8px 0; font-size: 11px; text-transform: uppercase;">
-              ⚙️ Chi Tiết Kỹ Thuật
+              Chi Tiết Kỹ Thuật
             </h4>
             <ul style="margin: 0; padding-left: 16px; list-style: none; font-size: 10px; color: #4a5568;">
               <li style="margin-bottom: 4px;">
@@ -504,7 +504,7 @@
       let cardHTML = `
         <div class="xai-card" style="${this.styles.card}">
           <div style="${this.styles.cardHeader}">
-            <h3 style="${this.styles.cardTitle}">📊 Phân Tích Thống Kê</h3>
+            <h3 style="${this.styles.cardTitle}">Phân Tích Thống Kê</h3>
             <span style="${this.styles.badge}">QUY TẮC</span>
           </div>
           
@@ -597,7 +597,7 @@
             margin-bottom: 12px;
           ">
             <div style="color: #4a5568; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; font-weight: bold;">
-              📏 Vector Độ Sâu
+              Vector Độ Sâu
             </div>
             
             <!-- Depth Value -->

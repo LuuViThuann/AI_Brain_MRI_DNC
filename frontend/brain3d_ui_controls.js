@@ -10,7 +10,7 @@
 
   // ===== KHỞI TẠO =====
   function init() {
-    console.log('[UI Controls] 📊 Khởi tạo nút Chỉ số khối u...');
+    console.log('[UI Controls] 🔍 Khởi tạo nút Detail Analysis...');
 
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', setup);
@@ -47,8 +47,8 @@
     const btn = document.createElement('button');
     btn.id = 'btnMetrics';
     btn.className = 'ctrl-btn';
-    btn.title = 'Hiển thị/Ẩn chỉ số khối u (M)';
-    btn.innerHTML = '📊'; // Icon biểu đồ
+    btn.title = 'Hiển thị/Ẩn Detail Analysis (M)';
+    btn.innerHTML = '🔍'; // Icon kính lúp
 
     // Thêm sự kiện click
     btn.addEventListener('click', toggleMetricsPanel);
@@ -61,7 +61,7 @@
       viewerControls.appendChild(btn);
     }
 
-    console.log('[UI Controls] ✅ Đã tạo nút Chỉ số khối u');
+    console.log('[UI Controls] ✅ Đã tạo nút Detail Analysis');
   }
 
   // ===== TOGGLE BẢNG CHỈ SỐ =====

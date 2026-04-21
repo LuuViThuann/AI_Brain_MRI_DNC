@@ -23,6 +23,19 @@ Cosine SimilarityĐo góc giữa 2 vector đặc trưng → cho ra similarity_sc
 
 + Fix chỉnh màu sáng giao diện 
 + Ngôn ngữ 
+
+-----
 + Tổng hợp các thông tin trọng tâm , không trùng lặp lại 
 + Chưa hiển thị tiếng việt khi xem trong atlas 
-+ Điều chỉnh hiển thị lại bảng phân tích chi tiết sang nút chỉ số khối U
++ Chỉnh lại 
+
+
+
+
+-------------------------------------
+* Note ============================
+Model nên dùng:
+nnU-Net
+MONAI
+Swin UNETR
+3D U-Net custom
