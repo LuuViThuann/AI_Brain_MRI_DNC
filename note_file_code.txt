@@ -1,0 +1,34 @@
+
+ -------------------
+1. diagnosis.py (Trung tâm chẩn đoán)
+Đây là file quan trọng nhất trong hệ thống routes.
+
+Nhiệm vụ: Xử lý yêu cầu chẩn đoán chính khi người dùng tải ảnh MRI lên.
+Luồng hoạt động: Tiếp nhận ảnh -> Chạy mô hình CNN (U-Net) -> Gọi Groq AI tạo báo cáo -> Chạy các phân tích XAI -> Phản hồi toàn bộ kết quả chẩn đoán về Frontend.
+Endpoint chính: POST /api/diagnose
+2. similar_cases.py (Tìm kiếm ca tương tự)
+File này quản lý tính năng so sánh đối chiếu với các ca bệnh lịch sử.
+
+Nhiệm vụ: Tìm kiếm các hình ảnh MRI trong cơ sở dữ liệu có đặc điểm thị giác giống với ảnh đang chẩn đoán.
+Công nghệ: Sử dụng thư viện FAISS để tìm kiếm vector đặc trưng (embeddings) cực nhanh.
+Endpoint chính: POST /api/similar/find
+3. brain3d.py (Dữ liệu mô hình 3D)
+File này cung cấp dữ liệu cần thiết để dựng hình ảnh khối u lên não bộ 3D.
+
+Nhiệm vụ: Tính toán vị trí không gian (tọa độ X, Y, Z) và kích thước của khối u dựa trên kết quả phân đoạn từ CNN.
+Vai trò: Giúp Frontend (Three.js) biết chính xác cần vẽ khối u ở đâu và độ lớn bao nhiêu trên mô hình não chuẩn.
+Endpoint chính: GET /api/brain3d
+4. xai_explain.py (Giải thích AI)
+Tập trung vào các tính năng "AI giải thích được" (Explainable AI).
+
+Nhiệm vụ: Cung cấp các thông tin chi tiết về lý do tại sao AI lại đưa ra kết quả như vậy.
+Thành phần: Xử lý các yêu cầu riêng biệt về Grad-CAM (Heatmap), SHAP values và các phân tích dựa trên quy tắc y tế (Rule-based).
+Endpoint chính: GET /api/xai/explain
+5. atlas_api.py (Tương tác bản đồ não)
+Quản lý việc ánh xạ kết quả vào các tập dữ liệu giải phẫu não chuẩn.
+
+Nhiệm vụ: Liên kết vị trí khối u với các vùng chức năng trong Julich Atlas hoặc MNI Atlas.
+Vai trò: Cho phép bác sĩ biết khối u đang xâm lấn vào vùng chức năng nào (ví dụ: Vùng vận động, vùng ngôn ngữ Broca...).
+Endpoint chính: GET /api/atlas/region
+
+---------------

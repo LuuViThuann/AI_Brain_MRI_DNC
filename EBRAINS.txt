@@ -40,3 +40,29 @@ nnU-Net
 MONAI
 Swin UNETR
 3D U-Net custom
+
+
+-----
+* Note chức năng lưu lịch sử : 
+Nhóm 2: Các File Cần Chỉnh Sửa (Modified Files)
+Đây là nơi bạn tích hợp tính năng vào luồng hoạt động hiện tại:
+
+backend/app.py:
+Import và đăng ký history_router.
+Lệnh khởi tạo bảng: Base.metadata.create_all(bind=engine).
+
+backend/routes/diagnosis.py:
+Import db (Session) và DiagnosisRecord (Model).
+Thêm code lưu dữ liệu vào DB ngay sau khi AI trả về kết quả thành công.
+
+frontend/index.html:
+Thêm Tab/Nút "Lịch sử" vào thanh điều hướng (Nav).
+Thêm một <section> để chứa danh sách lịch sử.
+Khai báo file <script src="history_ui.js"></script>.
+
+frontend/app.js:
+Cập nhật hàm switchTab để hỗ trợ hiển thị tab Lịch sử.
+Gọi hàm tải dữ liệu lịch sử khi người dùng nhấn vào tab đó.
+
+frontend/styles.css:
+Thiết kế giao diện cho danh sách lịch sử (Bảng dữ liệu hoặc danh sách các thẻ kết quả).

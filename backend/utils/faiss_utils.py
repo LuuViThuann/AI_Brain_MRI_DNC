@@ -431,14 +431,16 @@ class FAISSSearcher:
                     "distance": float(dist),
                     "has_tumor": case_meta.get('has_tumor', False),
                     "source": case_meta.get('source', ''),
-                    "patient_id": case_meta.get('patient_id', '')
+                    "patient_id": case_meta.get('patient_id', ''),
+                    "tumor_location": case_meta.get('location', 'N/A'),
+                    "tumor_size": case_meta.get('tumor_size', 0)
                 })
             
             search_time = (time.time() - start_time) * 1000
             
             return {
                 "similar_cases": similar_cases,
-                "search_time_ms": round(search_time, 2),
+                "search_time_ms": round(search_time, 2), 
                 "total_cases": self.index.ntotal
             }
         

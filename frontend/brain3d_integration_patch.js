@@ -28,44 +28,7 @@
       });
     }
   
-    // ===== CẤU HÌNH BẢNG CHỈ SỐ =====
-    function configureMetricsPanel() {
-      console.log('[Patch] 🎛️ Đang cấu hình bảng chỉ số...');
-      
-      const checkPanel = setInterval(() => {
-        const panel = document.getElementById('tumorMetricsPanel');
-        if (panel) {
-          clearInterval(checkPanel);
-  
-          // Bắt đầu ở trạng thái ẩn (trừ khi state lưu là hiển thị)
-          if (!window.Brain3DUIControls || !window.Brain3DUIControls.isMetricsVisible()) {
-            panel.style.display = 'none';
-          }
-  
-          // Xóa nút đóng mặc định
-          const existingClose = panel.querySelector('.close-btn');
-          if (existingClose) {
-            existingClose.remove();
-            console.log('[Patch] 🗑️ Đã xóa nút đóng mặc định');
-          }
-  
-          // Đảm bảo panel có z-index cao
-          panel.style.zIndex = '1000';
-          
-          // Đảm bảo panel có position fixed
-          if (!panel.style.position) {
-            panel.style.position = 'fixed';
-          }
-  
-          console.log('[Patch] ✅ Đã cấu hình bảng chỉ số');
-        }
-      }, 500);
-  
-      // Dừng kiểm tra sau 10 giây
-      setTimeout(() => {
-        clearInterval(checkPanel);
-      }, 10000);
-    }
+    // (Metrics panel configuration now handled by brain3d_ui_controls.js)
   
     // ===== ẨN DEPTH VECTOR MẶC ĐỊNH =====
     function hideDepthVectorByDefault() {
@@ -149,7 +112,6 @@
       
       await waitForBrain3D();
   
-      configureMetricsPanel();
       hideDepthVectorByDefault();
       hideDepthTooltips();
       disableDepthVisualization();

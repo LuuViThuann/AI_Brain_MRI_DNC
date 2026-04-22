@@ -135,7 +135,7 @@ def get_image_url(filename: str) -> str:
     # Remove any path prefixes
     filename = os.path.basename(filename)
     
-    # Return URL that matches static file mount
+    # Return URL that matches static file mount 
     return f"/data/images/{filename}"
 
 # ===== ENDPOINTS =====
@@ -143,7 +143,7 @@ def get_image_url(filename: str) -> str:
 @router.post("/find")
 async def find_similar_cases(
     file: UploadFile = File(...),
-    k: int = Query(default=20, ge=1, le=100, description="Number of similar cases to return"),
+    k: int = Query(default=50, ge=1, le=500, description="Number of similar cases to return"),
     include_thumbnails: bool = Query(default=True, description="Include base64 thumbnails"),
     min_similarity: float = Query(default=0.0, ge=0.0, le=1.0, description="Minimum similarity score")
 ):

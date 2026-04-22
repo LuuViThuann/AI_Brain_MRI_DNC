@@ -21,6 +21,21 @@
 
 <body>
 
+  <!-- ===== IMMEDIATE UI ENFORCEMENT ===== -->
+  <script>
+    (function() {
+      // Hide the panel as soon as it's added to DOM, before scripts finish loading
+      const observer = new MutationObserver((mutations) => {
+        const panel = document.getElementById('tumorMetricsPanel');
+        if (panel && panel.style.display !== 'none') {
+          panel.style.setProperty('display', 'none', 'important');
+          console.log('[Init] 🛡️ Immediate enforcement: Panel hidden');
+        }
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+    })();
+  </script>
+
   <!-- ===== HEADER ===== -->
   <header class="header">
     <div class="header-inner">
@@ -627,7 +642,7 @@
   <!-- ===== APPLICATION SCRIPTS ===== -->
 
   <!-- Brain 3D Engine -->
-  <script src="brain3d_new.js?v=6"></script>
+  <script src="brain3d_new.js?v=7"></script>
 
   <!-- XAI & Similar UI -->
   <script src="xai_similar_ui.js"></script>
@@ -639,13 +654,13 @@
   <script src="brain3d_atlas_viewer_complete.js"></script>
 
   <!-- Main App -->
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
 
   <!-- UI Controls -->
-  <script src="brain3d_ui_controls.js"></script>
+  <script src="brain3d_ui_controls.js?v=2"></script>
 
   <!-- Integration Patch -->  
-  <script src="brain3d_integration_patch.js"></script>
+  <script src="brain3d_integration_patch.js?v=2"></script>
 
   <!-- Atlas 4-Panel Viewer (EBRAINS-style) -->
   <script src="atlas_4panel_viewer.js?v=2"></script>

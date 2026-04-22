@@ -921,12 +921,18 @@ body::before {
   box-shadow: 0 0 40px rgba(255, 0, 64, 0.7);
 }
 #tumorMetricsPanel {
-  width: 360px !important;        /* Tăng từ 320px → 500px */
-  max-height: 90vh !important;    /* Tăng từ 80vh → 90vh */
-  min-height: 690px !important;   /* Thêm chiều cao tối thiểu */
-  display: flex !important;
+  display: none !important;            /* ẨN TUYỆT ĐỐI mặc định */
+  width: 360px;
+  max-height: 90vh;
+  min-height: 690px;
+  flex-direction: column;
+}
+
+#tumorMetricsPanel.metrics-open {
+  display: flex !important;            /* CHỈ HIỆN khi có class metrics-open */
   flex-direction: column !important;
 }
+ 
 
 /* ============================================================
    ATLAS INDICATOR

@@ -27,12 +27,12 @@
  */
 
 (function App() {
- 
+
   const API_BASE = 'http://127.0.0.1:8000/api';
 
   window.lastDiagnosisData = null;
 
-  window.translateLocationToVi = function(loc) {
+  window.translateLocationToVi = function (loc) {
     if (!loc || loc === '—') return loc || '—';
     let l = loc.toLowerCase();
     let lobe = '';
@@ -43,11 +43,11 @@
     else if (l.includes('cerebellum') || l.includes('cerebellar')) lobe = 'Tiểu não';
     else if (l.includes('stem')) lobe = 'Thân não';
     else return loc; // fallback
-    
+
     let side = '';
     if (l.includes('left')) side = 'trái';
     if (l.includes('right')) side = 'phải';
-    
+
     let pos = '';
     if (l.includes('inferior')) pos = 'dưới';
     if (l.includes('superior')) pos = 'trên';
@@ -55,7 +55,7 @@
     if (l.includes('posterior')) pos = 'sau';
     if (l.includes('medial')) pos = 'giữa';
     if (l.includes('lateral')) pos = 'bên';
-    
+
     let res = lobe;
     if (side) res += ' ' + side;
     if (pos) res += ' ' + pos;
@@ -111,11 +111,11 @@
   let isProcessingDiagnosis = false;
 
   // ===== LOCALSTORAGE KEYS =====
-  const LS_KEY_DIAGNOSIS  = 'neuroscan_last_diagnosis';
-  const LS_KEY_IMAGE      = 'neuroscan_last_image';     // base64 DataURL
-  const LS_KEY_MASK_B64   = 'neuroscan_last_mask_b64';  // base64 PNG of mask canvas
-  const LS_KEY_SIMILAR    = 'neuroscan_last_similar';
-  const LS_KEY_TAB        = 'neuroscan_last_tab';
+  const LS_KEY_DIAGNOSIS = 'neuroscan_last_diagnosis';
+  const LS_KEY_IMAGE = 'neuroscan_last_image';     // base64 DataURL
+  const LS_KEY_MASK_B64 = 'neuroscan_last_mask_b64';  // base64 PNG of mask canvas
+  const LS_KEY_SIMILAR = 'neuroscan_last_similar';
+  const LS_KEY_TAB = 'neuroscan_last_tab';
 
   // ===== SAVE STATE TO LOCALSTORAGE =====
   function _saveStateToLS(diagnosisResult, imageDataURL, maskB64, similarData) {
@@ -126,8 +126,8 @@
       localStorage.setItem(LS_KEY_DIAGNOSIS, JSON.stringify(toSave));
 
       if (imageDataURL) localStorage.setItem(LS_KEY_IMAGE, imageDataURL);
-      if (maskB64)      localStorage.setItem(LS_KEY_MASK_B64, maskB64);
-      if (similarData)  localStorage.setItem(LS_KEY_SIMILAR, JSON.stringify(similarData));
+      if (maskB64) localStorage.setItem(LS_KEY_MASK_B64, maskB64);
+      if (similarData) localStorage.setItem(LS_KEY_SIMILAR, JSON.stringify(similarData));
 
       console.log('[App] 💾 Diagnosis state saved to localStorage');
     } catch (e) {
@@ -160,10 +160,10 @@
   // ===== RESTORE STATE FROM LOCALSTORAGE =====
   function _restoreFromLS() {
     try {
-      const rawDiag  = localStorage.getItem(LS_KEY_DIAGNOSIS);
+      const rawDiag = localStorage.getItem(LS_KEY_DIAGNOSIS);
       const imageURL = localStorage.getItem(LS_KEY_IMAGE);
-      const maskB64  = localStorage.getItem(LS_KEY_MASK_B64);
-      const rawSim   = localStorage.getItem(LS_KEY_SIMILAR);
+      const maskB64 = localStorage.getItem(LS_KEY_MASK_B64);
+      const rawSim = localStorage.getItem(LS_KEY_SIMILAR);
 
       if (!rawDiag) return; // Nothing saved
 
@@ -198,6 +198,12 @@
       if (rawSim) {
         lastSimilarData = JSON.parse(rawSim);
         window.lastSimilarData = lastSimilarData;
+        
+        // ✅ CRITICAL: Restore global variable used by brain3d_new.js comparison picker
+        if (lastSimilarData.similar_cases) {
+          window._similarCasesData = lastSimilarData.similar_cases;
+        }
+        
         _showCompareButton(lastSimilarData);
       }
 
@@ -207,6 +213,11 @@
 
       // ── 4. Re-render 3D brain ──
       update3DBrain(diagnosisResult);
+
+      // ✅ NEW: Unlock the "Phân Tích Chi Tiết" button after restoration
+      if (window.Brain3DUIControls?.onDiagnosisReady) {
+        window.Brain3DUIControls.onDiagnosisReady();
+      }
 
       // ── 5. Reload Atlas 4-Panel if available ──
       if (window.Atlas4PanelViewer) {
@@ -278,50 +289,39 @@
 
   function handleFile(file) {
     if (!file) return;
-
     if (!['image/png', 'image/jpeg'].includes(file.type)) {
       alert('❌ Vui lòng tải lên hình ảnh định dạng PNG hoặc JPG.');
       return;
     }
 
-    console.log('[App] 📂 File selected:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)} MB)`);
-
     currentFile = file;
     currentImageFile = file;
-    // ✅ Store blob for Atlas4Panel slice re-fetch
     window._lastUploadedBlob = file;
     renderPreview(file);
     btnDiagnose.disabled = false;
-  }
 
+    // ✅ PATCH: Reset panel khi upload ảnh mới
+    if (window.Brain3DUIControls?.reset) {
+      window.Brain3DUIControls.reset();
+    }
+  }
   // ===== RENDER PREVIEW CANVAS =====
   function renderPreview(file) {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        console.log('[App] 🖼️ Rendering preview...');
-
-        // Show preview container
         previewWrap.style.display = 'block';
-
-        // Draw on canvas
         const ctx = previewCanvas.getContext('2d');
         previewCanvas.width = 256;
         previewCanvas.height = 256;
         ctx.drawImage(img, 0, 0, 256, 256);
-
-        // Remove old mask overlay if exists
         if (maskOverlayCanvas) {
           maskOverlayCanvas.remove();
           maskOverlayCanvas = null;
         }
-
-        console.log('[App] ✅ Preview rendered');
       };
-      img.onerror = () => {
-        alert('❌ Lỗi không tải được ảnh');
-      };
+      img.onerror = () => alert('❌ Lỗi không tải được ảnh');
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
@@ -329,12 +329,7 @@
 
   // ===== RENDER MASK OVERLAY =====
   function renderMaskOverlay(mask) {
-    // mask is 256×256 array of 0/1 values
-    console.log('[App] 🎨 Rendering mask overlay...');
-
-    if (maskOverlayCanvas) {
-      maskOverlayCanvas.remove();
-    }
+    if (maskOverlayCanvas) maskOverlayCanvas.remove();
 
     const canvas = document.createElement('canvas');
     canvas.width = 256;
@@ -354,15 +349,13 @@
       for (let x = 0; x < 256; x++) {
         const idx = (y * 256 + x) * 4;
         const val = mask[y][x];
-
         if (val > 0.5) {
-          // Red tumor overlay with alpha
-          imageData.data[idx] = 255;   // R
-          imageData.data[idx + 1] = 82;    // G
-          imageData.data[idx + 2] = 82;    // B
-          imageData.data[idx + 3] = 140;   // A (semi-transparent)
+          imageData.data[idx] = 255;
+          imageData.data[idx + 1] = 82;
+          imageData.data[idx + 2] = 82;
+          imageData.data[idx + 3] = 140;
         } else {
-          imageData.data[idx + 3] = 0;     // transparent
+          imageData.data[idx + 3] = 0;
         }
       }
     }
@@ -370,8 +363,6 @@
     ctx.putImageData(imageData, 0, 0);
     previewWrap.appendChild(canvas);
     maskOverlayCanvas = canvas;
-
-    console.log('[App] ✅ Mask overlay rendered');
   }
 
   // ===== RUN DIAGNOSIS =====
@@ -379,17 +370,15 @@
     if (!currentFile || isProcessingDiagnosis) return;
 
     isProcessingDiagnosis = true;
-    console.log('%c[App] 🚀 Starting diagnosis...', 'color: #00e5ff; font-weight: bold;');
+    console.log('%c[App] 🚀 Bắt đầu chẩn đoán...', 'color: #00e5ff; font-weight: bold;');
 
     showState('loading');
     btnDiagnose.disabled = true;
 
     try {
-      // 1️⃣ Call main diagnosis API
       const formData = new FormData();
       formData.append('file', currentFile);
 
-      console.log('[App] 📡 Sending to /api/diagnose...');
       const res = await fetch(`${API_BASE}/diagnose`, {
         method: 'POST',
         body: formData
@@ -399,74 +388,61 @@
         const err = await res.json();
         throw new Error(err.detail || 'Diagnosis failed');
       }
-
+ 
       const diagnosisResult = await res.json();
-      console.log('[App] ✅ Diagnosis complete:', diagnosisResult);
-
-      // Store prediction
+      window.lastDiagnosisData = diagnosisResult; // ✅ Set globally for all features
       lastPredictionData = diagnosisResult.prediction;
 
-      // ✅ Store XAI data (already included in response)
       if (diagnosisResult.xai && !diagnosisResult.xai.error) {
         lastXAIData = diagnosisResult.xai;
         window.lastXAIData = diagnosisResult.xai;
-        console.log('[App] ✅ XAI data stored:', lastXAIData);
       } else {
-        console.warn('[App] ⚠️  XAI data not available');
         lastXAIData = null;
         window.lastXAIData = null;
       }
 
-      // 2️⃣ Render mask overlay
-      if (diagnosisResult.mask) {
-        renderMaskOverlay(diagnosisResult.mask);
-      }
+      if (diagnosisResult.mask) renderMaskOverlay(diagnosisResult.mask);
 
-      // 3️⃣ Display report
       displayReport(diagnosisResult);
 
-      // ✅ 3b: Load Atlas 4-Panel Viewer (EBRAINS-style) with diagnosis data
       if (window.Atlas4PanelViewer) {
         window.Atlas4PanelViewer.loadDiagnosis(diagnosisResult);
-        console.log('[App] 🧠 Atlas4Panel loaded with diagnosis data');
       }
 
-      // 4️⃣ Display metrics panel
+      // ❌ KHÔNG gọi displayMetricsPanel ở đây (đã tắt)
       // displayMetricsPanel(diagnosisResult);
 
-      // 5️⃣ Update 3D brain
       update3DBrain(diagnosisResult);
 
-      // 6️⃣ Fetch Similar cases (optional, separate call)
       let similarData = null;
       if (currentImageFile && window.XAISimilarUI?.fetchSimilarCases) {
         try {
           similarData = await window.XAISimilarUI.fetchSimilarCases(currentImageFile);
           lastSimilarData = similarData;
           window.lastSimilarData = similarData;
-          console.log('[App] ✅ Similar cases received');
-
-          // ✅ Hiện nút Compare và cập nhật badge
           _showCompareButton(similarData);
         } catch (err) {
-          console.warn('[App] ⚠️  Similar fetch failed:', err);
+          console.warn('[App] ⚠️  Lấy ca tương tự thất bại:', err);
         }
       }
 
-      // 7️⃣ 💾 SAVE TO LOCALSTORAGE for persistence across reloads
       const imageDataURL = (() => {
-        try { return previewCanvas.toDataURL('image/jpeg', 0.85); } catch(e) { return null; }
+        try { return previewCanvas.toDataURL('image/jpeg', 0.85); } catch (e) { return null; }
       })();
       const maskB64 = (() => {
-        try { return maskOverlayCanvas ? maskOverlayCanvas.toDataURL('image/png') : null; } catch(e) { return null; }
+        try { return maskOverlayCanvas ? maskOverlayCanvas.toDataURL('image/png') : null; } catch (e) { return null; }
       })();
       _saveStateToLS(diagnosisResult, imageDataURL, maskB64, similarData);
 
-      // Show report
       showState('report');
 
+      // ✅ PATCH: Mở khóa nút Phân Tích Chi Tiết — NHƯNG KHÔNG tự mở panel
+      if (window.Brain3DUIControls?.onDiagnosisReady) {
+        window.Brain3DUIControls.onDiagnosisReady();
+      }
+
     } catch (err) {
-      console.error('[App] ❌ Diagnosis error:', err);
+      console.error('[App] ❌ Lỗi chẩn đoán:', err);
       alert('❌ Lỗi: ' + err.message);
       showState('placeholder');
     } finally {
@@ -487,37 +463,23 @@
       btn.style.alignItems = 'center';
       btn.style.justifyContent = 'center';
       btn.title = `So sánh 3D ca bệnh tương tự (${count} ca)`;
-
-      // Pulse animation để thu hút sự chú ý
       btn.style.animation = 'none';
-      btn.offsetHeight; // reflow
+      btn.offsetHeight;
       btn.style.animation = 'compareBtnPulse 0.6s ease 3';
+      if (badge) { badge.textContent = count; badge.style.display = 'block'; }
 
-      // Badge count
-      if (badge) {
-        badge.textContent = count;
-        badge.style.display = 'block';
-      }
-
-      // Inject CSS nếu chưa có
       if (!document.getElementById('compareBtnCSS')) {
         const style = document.createElement('style');
         style.id = 'compareBtnCSS';
         style.textContent = `
           @keyframes compareBtnPulse {
-            0%,100% { box-shadow: 0 0 0 0 rgba(0,229,255,0); background: ''; }
+            0%,100% { box-shadow: 0 0 0 0 rgba(0,229,255,0); }
             50% { box-shadow: 0 0 0 6px rgba(0,229,255,0.25); background: rgba(0,229,255,0.15); }
           }
-          #btnCompare:hover {
-            background: rgba(0,229,255,0.18) !important;
-            border-color: #00e5ff !important;
-            color: #00e5ff !important;
-          }
+          #btnCompare:hover { background: rgba(0,229,255,0.18) !important; border-color: #00e5ff !important; color: #00e5ff !important; }
         `;
         document.head.appendChild(style);
       }
-
-      console.log(`[App] ✅ Compare button shown (${count} cases)`);
     } else {
       btn.style.display = 'none';
       if (badge) badge.style.display = 'none';
@@ -798,6 +760,11 @@
             data.detailed_metrics,        // metrics từ diagnosis
             data.depth_metrics            // ✅ MỚI: depth metrics từ diagnosis
           );
+
+          // Cập nhật nội dung sidebar (không tự mở nếu user đã đóng)
+          if (window.updateTumorMetrics) {
+            window.updateTumorMetrics(data);
+          }
         }
       })
       .catch(err => {
@@ -805,301 +772,7 @@
       });
   }
 
-  // ===== ✅ DISPLAY METRICS PANEL - FIXED TỶ LỆ U/NÃO =====
-  function displayMetricsPanel(diagnosisData) {
-    const panel = document.getElementById('tumorMetricsPanel');
-    if (!panel) {
-      console.warn('[App] ⚠️  Metrics panel not found');
-      return;
-    }
-
-    const metrics = diagnosisData.detailed_metrics || {};
-    const depthMetrics = diagnosisData.depth_metrics || {};
-    const pred = diagnosisData.prediction || {};
-
-    console.log('[App] 📊 Displaying metrics panel with depth info');
-    console.log('  Raw tumor_brain_ratio:', metrics.tumor_brain_ratio);
-    console.log('  Depth:', depthMetrics.tumor_depth_mm, 'mm');
-    console.log('  Category:', depthMetrics.depth_category?.category);
-
-    // ✅ FIX: Chuyển đổi tỷ lệ u/não CHÍNH XÁC
-    // Backend trả về giá trị ĐÃ NHÂN 100 (ví dụ: 0.0674 = 0.0674%)
-    // Frontend chỉ cần format và hiển thị rõ ràng
-    let tumorBrainRatioPercent = 'N/A';
-
-    if (metrics.tumor_brain_ratio !== undefined && metrics.tumor_brain_ratio !== null) {
-      const rawValue = parseFloat(metrics.tumor_brain_ratio);
-
-      // Làm tròn 2 chữ số thập phân để hiển thị rõ ràng
-      // 0.0674 → "0.07%"
-      // 64.5 → "64.50%"
-      tumorBrainRatioPercent = rawValue.toFixed(2) + '%';
-    }
-
-    console.log('  Formatted tumor_brain_ratio:', tumorBrainRatioPercent);
-
-    // Build HTML
-    let html = `
-      
-      <div style="
-        padding: 14px;
-        background: ${getDepthCategoryColor(depthMetrics.depth_category?.category).bg};
-        border-left: 3px solid ${getDepthCategoryColor(depthMetrics.depth_category?.category).border};
-        border-radius: 6px;
-        margin-bottom: 14px;
-      ">
-        <!-- Header -->
-        <div style="
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 10px;
-          padding-bottom: 8px;
-          border-bottom: 1px solid rgba(255,255,255,0.1);
-        ">
-          <div style="
-            color: var(--text-sec);
-            font-size: 11px;
-            text-transform: uppercase;
-            font-weight: bold;
-            letter-spacing: 1px;
-          ">
-            ${depthMetrics.depth_category?.emoji || '📏'} DEPTH FROM CORTICAL SURFACE
-          </div>
-        </div>
-        
-        <!-- ✅ Main Depth Value (RÕ RÀNG HƠN) -->
-        <div style="
-          display: flex;
-          justify-content: space-between;
-          align-items: baseline;
-          margin-bottom: 10px;
-        ">
-          <div style="color: var(--text-sec); font-size: 11px;">Khoảng cách tới mặt ngoài vỏ não</div>
-          <div style="
-            color: ${getDepthCategoryColor(depthMetrics.depth_category?.category).text};
-            font-size: 24px;
-            font-weight: bold;
-            font-family: 'Consolas', monospace;
-          ">
-            ${depthMetrics.tumor_depth_mm !== undefined ? depthMetrics.tumor_depth_mm.toFixed(1) : 'Không có'} <span style="font-size: 14px;">mm</span>
-          </div>
-        </div>
-  
-        <!-- ✅ Safety Status Badge (DIỄN ĐẠT Y KHOA) -->
-        <div style="
-          padding: 10px 12px;
-          background: ${getDepthCategoryColor(depthMetrics.depth_category?.category).bg};
-          border: 1px solid ${getDepthCategoryColor(depthMetrics.depth_category?.category).border};
-          border-radius: 6px;
-          margin-bottom: 10px;
-        ">
-          <div style="
-            color: ${getDepthCategoryColor(depthMetrics.depth_category?.category).text};
-            font-size: 12px;
-            font-weight: bold;
-            margin-bottom: 4px;
-          ">
-            Mức Cảnh Báo An Toàn: ${getCorticalSafetyLevel(depthMetrics.tumor_depth_mm)}
-          </div>
-          <div style="
-            color: var(--text-sec);
-            font-size: 10px;
-            line-height: 1.4;
-          ">
-            ${getCorticalRiskDescription(depthMetrics.tumor_depth_mm)}
-          </div>
-        </div>
-        
-        <!-- Depth Visualization Bar -->
-        <div style="
-          width: 100%;
-          height: 28px;
-          background: rgba(0,0,0,0.35);
-          border-radius: 6px;
-          overflow: hidden;
-          margin-bottom: 10px;
-          border: 1px solid rgba(255,255,255,0.1);
-        ">
-          ${createDepthBar(depthMetrics.tumor_depth_mm)}
-        </div>
-        
-        <!-- Technical Details (Collapsible) -->
-        <details style="margin-top: 8px;">
-          <summary style="
-            color: var(--text-sec);
-            font-size: 10px;
-            cursor: pointer;
-            user-select: none;
-            padding: 4px 0;
-          ">
-            📋 Technical Coordinates
-          </summary>
-          <div style="
-            background: rgba(10, 14, 26, 0.05);
-            padding: 10px;
-            border-radius: 4px;
-            font-family: 'Courier New', monospace;
-            font-size: 9px;
-            color: var(--text-sec);
-            margin-top: 6px;
-            line-height: 1.6;
-          ">
-            <div style="margin-bottom: 6px;">
-              <strong style="color: var(--cyan);">Tumor Center:</strong>
-              <div style="margin-left: 8px; color: #66bb6a;">
-                X: ${depthMetrics.centroid_3d?.[0]?.toFixed(1) || 'N/A'} mm<br/>
-                Y: ${depthMetrics.centroid_3d?.[1]?.toFixed(1) || 'N/A'} mm<br/>
-                Z: ${depthMetrics.centroid_3d?.[2]?.toFixed(1) || 'N/A'} mm
-              </div>
-            </div>
-            <div>
-              <strong style="color: #00e5ff;">Nearest Cortex Point:</strong>
-              <div style="margin-left: 8px; color: #ffb74d;">
-                X: ${depthMetrics.nearest_cortex_point?.[0]?.toFixed(1) || 'N/A'} mm<br/>
-                Y: ${depthMetrics.nearest_cortex_point?.[1]?.toFixed(1) || 'N/A'} mm<br/>
-                Z: ${depthMetrics.nearest_cortex_point?.[2]?.toFixed(1) || 'N/A'} mm
-              </div>
-            </div>
-            <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.1);">
-              <strong style="color: #00e5ff;">Khoảng Cách Từ Tâm Não:</strong>
-              <span style="color: #9c27b0; margin-left: 4px;">
-                ${depthMetrics.distance_from_center_mm?.toFixed(1) || 'Không Tồn Tại'} mm
-              </span>
-            </div>
-          </div>
-        </details>
-      </div>
-  
-      <!-- ===== VOLUME ===== -->
-      <div style="
-        padding: 12px;
-        background: rgba(0, 229, 255, 0.08);
-        border-left: 3px solid #00e5ff;
-        border-radius: 6px;
-        margin-bottom: 10px;
-      ">
-        <div style="color: #5a7a99; font-size: 10px; text-transform: uppercase; margin-bottom: 6px;">
-          📦 THỂ TÍCH KHỐI U
-        </div>
-        <div style="color: #00e5ff; font-size: 18px; font-weight: bold; font-family: 'Consolas', monospace;">
-          ${metrics.volume_cm3 !== undefined ? metrics.volume_cm3.toFixed(2) : 'Không Tồn Tại'} <span style="font-size: 12px;">cm³</span>
-        </div>
-        <div style="color: #5a7a99; font-size: 9px; margin-top: 2px;">
-          = ${metrics.volume_mm3 !== undefined ? metrics.volume_mm3.toFixed(0) : 'Không Tồn Tại'} mm³
-        </div>
-      </div>
-      
-      <!-- ===== AREA ===== -->
-      <div style="
-        padding: 12px;
-        background: rgba(255, 145, 0, 0.08);
-        border-left: 3px solid #ff9100;
-        border-radius: 6px;
-        margin-bottom: 10px;
-      ">
-        <div style="color: #5a7a99; font-size: 10px; text-transform: uppercase; margin-bottom: 6px;">
-          📐 DIỆN TÍCH MẶT CẮT
-        </div>
-        <div style="color: #ff9100; font-size: 18px; font-weight: bold; font-family: 'Consolas', monospace;">
-          ${metrics.area_mm2 !== undefined ? metrics.area_mm2.toFixed(1) : 'Không Rõ'} <span style="font-size: 12px;">mm²</span>
-        </div>
-        <div style="color: #5a7a99; font-size: 9px; margin-top: 2px;">
-          Kích thước mặt phẳng dọc lát cắt đơn
-        </div>
-      </div>
-      
-      <!-- ===== ✅ TỶ LỆ U/NÃO - FIXED HIỂN THỊ RÕ RÀNG ===== -->
-      <div style="
-        padding: 12px;
-        background: rgba(255, 82, 82, 0.08);
-        border-left: 3px solid #ff5252;
-        border-radius: 6px;
-        margin-bottom: 10px;
-      ">
-        <div style="color: #5a7a99; font-size: 10px; text-transform: uppercase; margin-bottom: 6px;">
-          📊 TỶ LỆ KÍCH THƯỚC U / NÃO
-        </div>
-        <div style="color: #ff5252; font-size: 18px; font-weight: bold; font-family: 'Consolas', monospace;">
-          ${tumorBrainRatioPercent}
-        </div>
-        <div style="color: #5a7a99; font-size: 9px; margin-top: 2px;">
-          Dựa trên thể tích trung bình của bộ não trưởng thành (khoảng 1400 cm³)
-        </div>
-      </div>
-      
-      <!-- ===== TÂM KHỐI U ===== -->
-      <div style="
-        padding: 12px;
-        background: rgba(0, 200, 83, 0.08);
-        border-left: 3px solid #00c853;
-        border-radius: 6px;
-        margin-bottom: 10px;
-      ">
-        <div style="color: #5a7a99; font-size: 10px; text-transform: uppercase; margin-bottom: 6px;">
-          🎯 HIỆU CHỈNH TRỤC TỌA ĐỘ U (3D)
-        </div>
-        <div style="
-          color: #00c853;
-          font-family: 'Courier New', monospace;
-          font-size: 11px;
-          line-height: 1.6;
-        ">
-          <div>Trục X: ${metrics.centroid_mm?.[0]?.toFixed(1) || '0.0'} mm</div>
-          <div>Trục Y: ${metrics.centroid_mm?.[1]?.toFixed(1) || '0.0'} mm</div>
-          <div>Trục Z: ${metrics.centroid_mm?.[2]?.toFixed(1) || '0.0'} mm</div>
-        </div>
-        <div style="color: #5a7a99; font-size: 9px; margin-top: 4px;">
-          Tương đối so với trung tâm của mô hình
-        </div>
-      </div>
-      
-      <!-- ===== KHOẢNG CÁCH VỎ NÃO (LEGACY - Simple Estimation) ===== -->
-      <div style="
-        padding: 12px;
-        background: rgba(156, 39, 176, 0.08);
-        border-left: 3px solid #9c27b0;
-        border-radius: 6px;
-        margin-bottom: 10px;
-      ">
-        <div style="color: #5a7a99; font-size: 10px; text-transform: uppercase; margin-bottom: 6px;">
-          📏 KHOẢNG CÁCH TỚI MẶT VỎ NÃO KHÁI TOÁN MỞ RỘNG
-        </div>
-        <div style="color: #9c27b0; font-size: 16px; font-weight: bold; font-family: 'Consolas', monospace;">
-          ${metrics.distance_to_cortex_mm !== undefined ? metrics.distance_to_cortex_mm.toFixed(2) : 'Không Tồn Tại'} <span style="font-size: 12px;">mm</span>
-        </div>
-        <div style="color: #5a7a99; font-size: 9px; margin-top: 4px;">
-          ${metrics.cortex_proximity || 'Ước tính dạng cấu trúc hình cầu'}
-        </div>
-      </div>
-      
-      <!-- ===== DIVIDER ===== -->
-      <div style="height: 1px; background: #1e3a52; margin: 14px 0;"></div>
-      
-      <!-- ===== PREDICTION METADATA ===== -->
-      <div style="color: #5a7a99; font-size: 10px; line-height: 1.8;">
-        <div style="margin-bottom: 6px;">
-          <strong style="color: #00e5ff;">Mức Tin Cậy Của Mô Hình CNN:</strong>
-          <span style="color: #00c853; font-weight: bold; margin-left: 4px;">
-            ${(pred.confidence * 100).toFixed(1)}%
-          </span>
-        </div>
-        <div style="margin-bottom: 6px;">
-          <strong style="color: #00e5ff;">Khu Vực Phỏng Đoán:</strong>
-          <span style="color: #ffb74d; margin-left: 4px;">${pred.location_hint || 'Không Rõ'}</span>
-        </div>
-        <div>
-          <strong style="color: #00e5ff;">Vi Kiến Trúc Nhận Dạng Cốt Lõi:</strong>
-          <span style="color: #8899b0; margin-left: 4px;">U-Net CNN v1.0</span>
-        </div>
-      </div>
-    `;
-
-    document.getElementById('metricsContent').innerHTML = html;
-    panel.style.display = 'flex';
-
-    console.log('[App] ✅ Metrics panel displayed (FIXED: depth + ratio correctly formatted)');
-  }
+  // (Legacy displayMetricsPanel removed — Logic now handled by window.updateTumorMetrics in brain3d_new.js)
 
   // ===== ✅ HELPER FUNCTIONS - DIỄN ĐẠT Y KHOA RÕ RÀNG =====
   function getCorticalSafetyLevel(depth) {
@@ -1315,7 +988,7 @@
     }
 
     // 💾 Persist last active tab
-    try { localStorage.setItem(LS_KEY_TAB, tabName); } catch(e) {}
+    try { localStorage.setItem(LS_KEY_TAB, tabName); } catch (e) { }
   }
 
   // Attach tab click handlers

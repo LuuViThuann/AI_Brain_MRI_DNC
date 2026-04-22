@@ -352,7 +352,7 @@
       font-size: 12px;
       color: #1a202c;
       box-shadow: -4px 0 24px rgba(0,0,0,0.08);
-      display: none;
+      display: none !important;
       flex-direction: column;
       overflow: hidden;
     ">
@@ -639,6 +639,7 @@
         </div>
       `)}
 
+
       <!-- 8. Ghi Chú Lâm Sàng -->
       <div style="padding:10px 14px 16px;">
         <div style="font-size:9px;font-weight:600;color:#94a3b8;text-transform:uppercase;
@@ -654,13 +655,11 @@
       </div>
     `;
 
-    // Kích hoạt hiển thị dạng flex để scroll hoạt động
-    panel.classList.add('metrics-open');
-    panel.style.display = 'flex';
-    panel.style.flexDirection = 'column';
-
-    console.log('[Brain3D] ✅ Bảng phân tích chi tiết (tiếng Việt) đã cập nhật');
+    // updateTumorMetrics CHỈ cập nhật nội dung — KHÔNG BAO GIỜ tự mở panel.
+    // Việc show/hide panel hoàn toàn do user quyết định qua nút toggle hoặc phím M.
+    console.log('[Brain3D] ✅ Nội dung Phân Tích Chi Tiết đã cập nhật (panel không tự mở)');
   };
+
 
 
   // =========== NEW UPDATE 
@@ -846,7 +845,7 @@
   function applyBrainModel(model, modelType) {
     console.log(`[Brain3D] 🎨 Applying ${modelType} brain model to scene...`);
 
-    // Remove old brain mesh
+    // Remove old brain mesh xóa thông tin cũ 
     if (brainMesh) {
       scene.remove(brainMesh);
       brainMesh.traverse((child) => {
@@ -955,7 +954,7 @@
 
     scene.add(brainMesh);
 
-    // Reapply tumor highlighting if exists
+    // Đánh dấu thông tin chuẩn đoán 
     if (currentTumorPoints && currentTumorPoints.length > 0) {
       console.log(`%c[Brain3D] 🔄 Reapplying full tumor visualization for ${modelType} model...`, 'color: #ff9100; font-weight: bold;');
 
@@ -1832,15 +1831,8 @@
       try { renderer.render(scene, camera); return renderer.domElement.toDataURL('image/png'); }
       catch (e) { return null; }
     };
-
-    // ✅ Auto-update Detail Analysis right panel
-    if (window.updateTumorMetrics && window.lastDiagnosisData) {
-      try {
-        window.updateTumorMetrics(window.lastDiagnosisData);
-      } catch (e) {
-        console.warn('[Brain3D] ⚠️  updateTumorMetrics failed:', e);
-      }
-    }
+    // NOTE: updateTumorMetrics is intentionally NOT called here.
+    // It is called by app.js → update3DBrain() which has full diagnosis data.
   };
 
   // ════════════════════════════════════════════════════════════
@@ -2958,8 +2950,22 @@
   }
 
   // ════════════════════════════════════════════════════════════
-  // COMPARE PICKER — chọn ca bệnh tương tự để so sánh
+  // COMPARE PICKER — chọn ca bệnh tương tự để so sánh 
   // ════════════════════════════════════════════════════════════
+  // Pagination state for 3D picker
+  window._comparePickerPage = 1;
+  const COMPARE_ITEMS_PER_PAGE = 12;
+
+  window.changeComparePickerPage = function (delta) {
+    const cases = window._similarCasesData || [];
+    const totalPages = Math.ceil(cases.length / COMPARE_ITEMS_PER_PAGE);
+    const newPage = window._comparePickerPage + delta;
+    if (newPage >= 1 && newPage <= totalPages) {
+      window._comparePickerPage = newPage;
+      window.openComparePicker();
+    }
+  };
+
   window.openComparePicker = function () {
     const cases = window._similarCasesData;
     const old = document.getElementById('comparePicker');
@@ -2979,95 +2985,114 @@
       return;
     }
 
-    const diagData = window.lastDiagnosisData;
+    // ✅ Pagination logic 
+    const totalPages = Math.ceil(cases.length / COMPARE_ITEMS_PER_PAGE);
+    if (window._comparePickerPage > totalPages) window._comparePickerPage = totalPages;
+    const startIndex = (window._comparePickerPage - 1) * COMPARE_ITEMS_PER_PAGE;
+    const pageItems = cases.slice(startIndex, startIndex + COMPARE_ITEMS_PER_PAGE);
+
     const picker = document.createElement('div');
     picker.id = 'comparePicker';
-    picker.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(2,6,18,0.96);' +
+    picker.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(241,245,249,0.98);' +
       'display:flex;flex-direction:column;font-family:Consolas,Segoe UI,monospace;' +
-      'backdrop-filter:blur(4px);animation:_cpIn 0.35s cubic-bezier(0.22,1,0.36,1);';
+      'backdrop-filter:blur(10px);animation:_cpIn 0.35s cubic-bezier(0.22,1,0.36,1);';
 
     picker.innerHTML = `
     <style>
-      @keyframes _cpIn { from{opacity:0;transform:scale(0.97)} to{opacity:1;transform:scale(1)} }
+      @keyframes _cpIn { from{opacity:0;transform:scale(0.98)} to{opacity:1;transform:scale(1)} }
       @keyframes _cpCard { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
       #comparePicker .cp-card { animation:_cpCard 0.4s ease both; }
-      #comparePicker .cp-card:hover { transform:translateY(-3px)!important;box-shadow:0 8px 32px rgba(0,229,255,0.18)!important;border-color:#00e5ff!important; }
+      #comparePicker .cp-card:hover { transform:translateY(-4px)!important;box-shadow:0 12px 32px rgba(30,58,138,0.08)!important;border-color:#3b82f6!important; }
+      .cp-pg-btn { padding:7px 18px; background:#ffffff; border:1px solid #cbd5e1; color:#334155; border-radius:8px; cursor:pointer; font-weight:bold; transition:all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
+      .cp-pg-btn:disabled { color:#cbd5e1; border-color:#e2e8f0; cursor:default; background:#f8fafc; box-shadow:none; }
+      .cp-pg-btn:not(:disabled):hover { border-color:#3b82f6; color:#3b82f6; background:#eff6ff; }
+      #comparePicker .cp-card:hover .cp-img-wrap { transform: scale(1.1); }
     </style>
 
     <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 28px;
-      border-bottom:1px solid #1e3a52;background:rgba(0,229,255,0.04);flex-shrink:0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 32px;
+      border-bottom:1px solid #e2e8f0;background:#ffffff;flex-shrink:0;box-shadow:0 2px 10px rgba(0,0,0,0.02);">
       <div>
-        <div style="color:#00e5ff;font-size:18px;font-weight:bold;margin-bottom:4px;">Chọn Ca Bệnh Tương Tự Để So Sánh 3D</div>
-        <div style="color:#5a7a99;font-size:12px;">Tìm thấy ${cases.length} ca bệnh — click để mở so sánh trực quan song song</div>
+        <div style="color:#1e293b;font-size:20px;font-weight:800;margin-bottom:4px;letter-spacing:-0.5px;">Chọn Ca Bệnh Tương Tự Để So Sánh 3D</div>
+        <div style="color:#64748b;font-size:13px;">Tìm thấy <strong>${cases.length}</strong> ca bệnh phù hợp — hiển thị ${startIndex + 1} đến ${Math.min(startIndex + COMPARE_ITEMS_PER_PAGE, cases.length)}</div>
       </div>
+      
       <button onclick="document.getElementById('comparePicker').remove()" style="
-        background:transparent;border:1px solid #ff5252;color:#ff5252;
-        padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:bold;
-        transition:all 0.2s;" onmouseover="this.style.background='rgba(255,82,82,0.15)'"
-        onmouseout="this.style.background='transparent'">✕ Đóng</button>
+        background:#fee2e2;border:1px solid #ef444433;color:#ef4444;
+        padding:9px 20px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:bold;
+        transition:all 0.2s;" onmouseover="this.style.background='#fecaca';this.style.transform='scale(1.02)'"
+        onmouseout="this.style.background='#fee2e2';this.style.transform='scale(1)'">✕ Đóng Bảng</button>
     </div>
 
     <!-- Grid -->
-    <div style="flex:1;overflow-y:auto;padding:24px 28px;
-      display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;align-content:start;">
-      ${cases.map((c, i) => {
+    <div style="flex:1;overflow-y:auto;padding:32px;
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:24px;align-content:start;">
+      ${pageItems.map((c, i) => {
+      const actualIdx = startIndex + i;
       const sim = Math.round((c.similarity_score || 0) * 100);
-      const simCol = sim >= 80 ? '#00c853' : sim >= 55 ? '#ff9100' : '#ff5252';
-      const statusCol = c.has_tumor ? '#ff5252' : '#00c853';
-      const statusTxt = c.has_tumor ? '🔴 Khối U' : '🟢 Bình Thường';
+      const simCol = sim >= 80 ? '#10b981' : sim >= 55 ? '#f59e0b' : '#ef4444';
+      const statusCol = c.has_tumor ? '#ef4444' : '#10b981';
+      const statusTxt = c.has_tumor ? '🔴 Phát hiện khối u' : '🟢 Bình Thường';
       const imgHTML = c.filename
-        ? `<img src="/data/images/${c.filename}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'"/>`
-        : (c.thumbnail ? `<img src="${c.thumbnail}" style="width:100%;height:100%;object-fit:cover;"/>` : '');
+        ? `<img src="/data/images/${c.filename}" style="width:100%;height:100%;object-fit:contain;" onerror="this.style.display='none'"/>`
+        : (c.thumbnail ? `<img src="${c.thumbnail}" style="width:100%;height:100%;object-fit:contain;"/>` : '');
       return `
-        <div class="cp-card" style="
-          border:1px solid #1e3a52;border-radius:12px;
-          background:linear-gradient(135deg,#0f1f2e 0%,#162840 100%);
-          overflow:hidden;cursor:pointer;transition:all 0.25s;
+        <div class="cp-card" style=" 
+          border:1px solid #e2e8f0;border-radius:16px;
+          background:#ffffff;
+          overflow:hidden;cursor:pointer;transition:all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
           animation-delay:${i * 0.04}s;
-          box-shadow:0 4px 16px rgba(0,0,0,0.4);
-        " onclick="document.getElementById('comparePicker').remove();window.openDual3DCompare(window._similarCasesData[${i}],window.lastDiagnosisData)">
-          <!-- Rank Badge -->
-          <div style="position:relative;">
-            <div style="width:100%;height:155px;background:#050c1a;overflow:hidden;display:flex;align-items:center;justify-content:center;">
-              ${imgHTML || '<div style="color:#2a4a62;font-size:32px;">🧠</div>'}
+          box-shadow:0 4px 12px rgba(0,0,0,0.03);
+        " onclick="const pC=document.getElementById('previewCanvas'); const iS=pC?pC.toDataURL('image/png'):null; document.getElementById('comparePicker').remove(); window.openDual3DCompare(window._similarCasesData[${actualIdx}], window.lastDiagnosisData, iS)">
+          <!-- Thumbnail -->
+          <div style="position:relative; overflow:hidden;">
+            <div class="cp-img-wrap" style="width:100%;height:190px;background:#0f172a;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:12px;transition:transform 0.5s ease;">
+              ${imgHTML || '<div style="color:#334155;font-size:32px;">🧠</div>'}
             </div>
-            <div style="position:absolute;top:8px;left:8px;background:rgba(0,229,255,0.15);border:1px solid #00e5ff55;
-              color:#00e5ff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:bold;">#${c.rank || i + 1}</div>
-            <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.75);
-              padding:3px 10px;border-radius:20px;font-size:11px;font-weight:bold;color:${simCol};
-              border:1px solid ${simCol}55;">${sim}%</div>
+            <div style="position:absolute;top:10px;left:10px;background:rgba(255,255,255,0.9);backdrop-filter:blur(4px);
+              color:#1e293b;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:800;box-shadow:0 2px 8px rgba(0,0,0,0.1);">#${c.rank || actualIdx + 1}</div>
+            <div style="position:absolute;top:10px;right:10px;background:${simCol};
+              padding:4px 12px;border-radius:20px;font-size:12px;font-weight:900;color:#ffffff;
+              box-shadow:0 4px 12px ${simCol}44;">${sim}%</div>
           </div>
-          <!-- Info -->
-          <div style="padding:12px 14px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <span style="color:${statusCol};font-size:11px;font-weight:bold;">${statusTxt}</span>
-              <span style="color:#5a7a99;font-size:10px;">Ca #${c.case_id || i + 1}</span>
+          <!-- Content -->
+          <div style="padding:16px 20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <span style="color:${statusCol};font-size:13px;font-weight:800;">${statusTxt}</span>
+              <span style="color:#94a3b8;font-size:11px;font-weight:600;">ID: ${c.case_id || actualIdx + 1}</span>
             </div>
-            <!-- Similarity bar -->
-            <div style="height:4px;background:#0a1a28;border-radius:2px;overflow:hidden;margin-bottom:10px;">
-              <div style="height:100%;width:${sim}%;background:${simCol};border-radius:2px;"></div>
+            <!-- Progress Bar -->
+            <div style="height:6px;background:#f1f5f9;border-radius:10px;overflow:hidden;margin-bottom:16px;">
+              <div style="height:100%;width:${sim}%;background:${simCol};border-radius:10px;"></div>
             </div>
-            <!-- CTA -->
-            <div style="text-align:center;padding:8px;background:rgba(0,229,255,0.06);
-              border:1px solid rgba(0,229,255,0.2);border-radius:8px;
-              color:#00e5ff;font-size:11px;font-weight:bold;
-              transition:all 0.2s;" onmouseover="this.style.background='rgba(0,229,255,0.15)'"
-              onmouseout="this.style.background='rgba(0,229,255,0.06)'">🧠 So Sánh 3D</div>
+            <!-- Button UI -->
+            <div style="text-align:center;padding:10px;background:#f8fafc;
+              border:1px solid #e2e8f0;border-radius:10px;
+              color:#334155;font-size:12px;font-weight:bold;
+              transition:all 0.2s;" onmouseover="this.style.background='#eff6ff';this.style.borderColor='#3b82f6';this.style.color='#3b82f6'"
+              onmouseout="this.style.background='#f8fafc';this.style.borderColor='#e2e8f0';this.style.color='#334155'">
+              🔬 Mở So Sánh Chi Tiết
+            </div>
           </div>
         </div>`;
     }).join('')}
     </div>
 
-    <!-- Footer -->
-    <div style="padding:12px 28px;border-top:1px solid #1e3a52;background:rgba(0,0,0,0.3);
-      color:#5a7a99;font-size:11px;text-align:center;flex-shrink:0;">
-      💡 Click vào bất kỳ ca nào để mở chế độ so sánh 3D trực quan song song
+    <!-- Footer Pagination -->
+    <div style="padding:20px 32px;border-top:1px solid #e2e8f0;background:#ffffff;
+      color:#64748b;font-size:12px;text-align:center;flex-shrink:0; display:flex; justify-content:center; align-items:center; gap:24px; box-shadow:0 -2px 10px rgba(0,0,0,0.02);">
+      <div style="display:flex;align-items:center;gap:16px;">
+        <button onclick="window.changeComparePickerPage(-1)" class="cp-pg-btn" ${window._comparePickerPage === 1 ? 'disabled' : ''}>← Trang Trước</button>
+        <span style="color:#1e293b;font-size:14px;font-weight:600;">Trang <span style="color:#3b82f6;font-size:18px;">${window._comparePickerPage}</span> / ${totalPages}</span>
+        <button onclick="window.changeComparePickerPage(1)" class="cp-pg-btn" ${window._comparePickerPage === totalPages ? 'disabled' : ''}>Trang Sau →</button>
+      </div>
+      <div style="height:20px;width:1px;background:#e2e8f0;margin:0 8px;"></div>
+      <div style="color:#94a3b8;font-style:italic;">💡 Mẹo: Chọn ca bệnh có độ tương đồng cao để so sánh cấu trúc khối u</div>
     </div>
     `;
 
     document.body.appendChild(picker);
-    console.log('[Brain3D] 🔍 Compare picker opened with', cases.length, 'cases');
+    console.log('[Brain3D] 🔍 Compare picker opened with', cases.length, 'cases, page', window._comparePickerPage);
   };
 
   // ════════════════════════════════════════════════════════════
@@ -3134,18 +3159,18 @@
     const borderInactive = lightMode ? '#cbd5e1' : '#1e3a52';
 
     function lcDark(c) {
-      if(!lightMode) return c;
-      if(c==='#00e5ff') return '#0284c7';
-      if(c==='#00c853') return '#15803d';
-      if(c==='#ff9100') return '#b45309';
-      if(c==='#ff5252') return '#dc2626';
-      if(c==='#aa44ff') return '#7e22ce';
-      if(c==='#35a8ff') return '#2563eb';
-      if(c==='#ff6b35') return '#c2410c';
+      if (!lightMode) return c;
+      if (c === '#00e5ff') return '#0284c7';
+      if (c === '#00c853') return '#15803d';
+      if (c === '#ff9100') return '#b45309';
+      if (c === '#ff5252') return '#dc2626';
+      if (c === '#aa44ff') return '#7e22ce';
+      if (c === '#35a8ff') return '#2563eb';
+      if (c === '#ff6b35') return '#c2410c';
       return c;
     }
 
-    // Tumor marker position based on lobe
+    // Tumor marker position based on lobe 
     let tmX = 52, tmY = 38; // default center
     if (isFrontal) { tmX = 30; tmY = 25; }
     if (isTemporal) { tmX = 76; tmY = 42; }
@@ -3213,9 +3238,39 @@
   }
 
   // ════════════════════════════════════════════════════════════
+  // HELPER: Tạo báo cáo tổng hợp cho ca bệnh tương tự (Synthetic)
+  // ════════════════════════════════════════════════════════════
+  function _generateSyntheticReport(caseItem, similarity, lobeInfo) {
+    const hasTumor = caseItem.has_tumor;
+    const loc = lobeInfo.label || 'Không rõ';
+    const size = caseItem.tumor_size || 0;
+
+    const summary = `Ca bệnh tương tự trong cơ sở dữ liệu với độ tương đồng đặc trưng ${similarity}%. ` +
+      (hasTumor
+        ? `Hình ảnh cho thấy sự hiện diện của khối u não tại vùng ${loc}, có đặc điểm cấu trúc tương đồng với ca hiện tại.`
+        : "Không phát hiện dấu hiệu bất thường về khối u trong hồ sơ tham chiếu này.");
+
+    const findings = [
+      hasTumor ? "Phát hiện khối u não (Tham chiếu)" : "Không phát hiện khối u",
+      `Vị trí giải phẫu: ${loc}`,
+      `Diện tích u ước tính: ${size.toFixed(2)}%`,
+      `Độ tương đồng hình thái: ${similarity}%`
+    ];
+
+    const recommendations = [
+      "Đối chiếu cấu trúc giải phẫu với ca hiện tại",
+      `Lưu ý chức năng vùng ${loc}: ${lobeInfo.fn}`,
+      "Sử dụng làm dữ liệu tham khảo lâm sàng"
+    ];
+
+    return { summary, findings, recommendations };
+  }
+
+  // ════════════════════════════════════════════════════════════ 
   // DUAL 3D COMPARE — 2 bên đều tương tác đầy đủ (rotate + zoom)
   // ════════════════════════════════════════════════════════════
-  window.openDual3DCompare = function (caseItem, diagData) {
+  window.openDual3DCompare = function (caseItem, diagData, currentImgSrc) {
+    console.log('[Brain3D] 🔍 openDual3DCompare', { caseId: caseItem.case_id, hasImg: !!currentImgSrc });
     const old = document.getElementById('dual3DModal');
     if (old) old.remove();
 
@@ -3303,27 +3358,79 @@
     modal.id = 'dual3DModal';
     modal.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(248,250,252,0.98);display:flex;flex-direction:column;font-family:Consolas,Segoe UI,monospace;';
 
+    // Synthetic report for Right side
+    const refReport = _generateSyntheticReport(caseItem, similarity, refLobe);
+    const curReport = (diagData && diagData.report) || {
+      summary: 'Chưa có tóm tắt',
+      findings: ['Không rõ'],
+      recommendations: ['Tham khảo ý kiến bác sĩ']
+    };
+
+    // Grad-CAM Image (Left)
+    const gradCamB64 = (diagData && diagData.xai && diagData.xai.gradcam) ? diagData.xai.gradcam.overlay_base64 : null;
+
     modal.innerHTML = `
     <style>
-      #dual3DModal { --c-border: #e2e8f0; }
+      #dual3DModal { 
+        --c-border: #e2e8f0; 
+        animation: d3ModalFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+      @keyframes d3ModalFadeIn {
+        from { opacity: 0; transform: scale(0.98) translateY(10px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+      }
       #dual3DModal .d3-col-top { flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;border-right:2px solid var(--c-border); }
-      #dual3DModal .d3-col-bot { flex:1;display:flex;flex-direction:column;min-width:0;overflow-y:auto;padding:16px;background:#f8fafc;border-right:2px solid var(--c-border); }
+      #dual3DModal .d3-col-bot { flex:1;display:flex;flex-direction:column;min-width:0;overflow-y:auto;padding:20px;background:#f8fafc;border-right:2px solid var(--c-border); scroll-behavior: smooth; }
       #dual3DModal .d3-col-top:last-child { border-right:none; }
       #dual3DModal .d3-col-bot:last-child { border-right:none; }
-      #dual3DModal .d3-label { padding:10px 16px;font-size:12px;font-weight:bold;letter-spacing:0.8px;border-bottom:1px solid var(--c-border);flex-shrink:0; }
+      #dual3DModal .d3-label { padding:12px 16px;font-size:12px;font-weight:bold;letter-spacing:0.8px;border-bottom:1px solid var(--c-border);flex-shrink:0; }
       #dual3DModal .d3-canvas-wrap { position:relative;flex:1;background:#060c1a; }
-      #dual3DModal .d3-hint { position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
-        background:rgba(255,255,255,0.85);border:1px solid #cbd5e1;padding:4px 12px;border-radius:12px;
-        font-size:10px;color:#334155;pointer-events:none;white-space:nowrap;font-weight:600;box-shadow:0 2px 4px rgba(0,0,0,0.1); }
-      #dual3DModal .d3-badge { position:absolute;top:10px;right:10px;
-        background:rgba(2,132,199,0.9);border:1px solid #0284c7;padding:4px 10px;
-        border-radius:6px;font-size:10px;color:#ffffff;pointer-events:none;font-weight:600;box-shadow:0 2px 4px rgba(0,0,0,0.1); }
+      #dual3DModal .d3-hint { position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+        background:rgba(255,255,255,0.85);border:1px solid #cbd5e1;padding:5px 14px;border-radius:12px;
+        font-size:10px;color:#334155;pointer-events:none;white-space:nowrap;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.08);
+        transition: opacity 0.3s; }
+      #dual3DModal .d3-badge { position:absolute;top:12px;right:12px;
+        background:rgba(2,132,199,0.9);border:1px solid #0284c7;padding:4px 12px;
+        border-radius:6px;font-size:10px;color:#ffffff;pointer-events:none;font-weight:700;box-shadow:0 4px 12px rgba(2,132,199,0.25); }
+      
       #dual3DModal .d3-col-bot::-webkit-scrollbar { width:6px; }
       #dual3DModal .d3-col-bot::-webkit-scrollbar-thumb { background:#cbd5e1;border-radius:3px; }
-      #dual3DModal .d3-bar-row { margin-bottom:8px; }
-      #dual3DModal .d3-bar-row .d3-lbl { display:flex;justify-content:space-between;font-size:11px;color:#475569;margin-bottom:4px;font-weight:600; }
-      #dual3DModal .d3-bar-row .track { height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden; }
-      #dual3DModal .d3-bar-row .fill { height:100%;border-radius:3px; }
+      #dual3DModal .d3-bar-row { margin-bottom:10px; }
+      #dual3DModal .d3-bar-row .d3-lbl { display:flex;justify-content:space-between;font-size:11px;color:#475569;margin-bottom:5px;font-weight:600; }
+      #dual3DModal .d3-bar-row .track { height:7px;background:#e2e8f0;border-radius:4px;overflow:hidden; }
+      #dual3DModal .d3-bar-row .fill { height:100%;border-radius:4px; transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1); }
+      
+      /* Smooth item entry */
+      .d3-info-card { 
+        margin-bottom: 12px;
+        animation: d3SlideIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+        transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+      }
+      .d3-info-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.06); border-color: #3b82f6; }
+      
+      @keyframes d3SlideIn {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      
+      .d3-2d-image-wrap {
+        width: 100%; height: 200px; background: #050c1a; border-radius: 12px; 
+        margin-bottom: 15px; display: flex; align-items: center; justify-content: center; 
+        overflow: hidden; border: 1px solid #e2e8f0; position: relative;
+        box-shadow: inset 0 0 40px rgba(0,0,0,0.4);
+        flex-shrink: 0;
+      }
+      .d3-2d-image-wrap img { width: 100%; height: 100%; object-fit: contain; transition: transform 0.4s ease; }
+      .d3-2d-image-wrap:hover img { transform: scale(1.05); }
+
+      .d3-report-card {
+        background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px;
+        margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+      }
+      .d3-report-title { color: #0f172a; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; }
+      .d3-report-text { color: #475569; font-size: 11.5px; line-height: 1.6; margin-bottom: 10px; }
+      .d3-report-list { margin: 0; padding-left: 18px; color: #475569; font-size: 11.5px; line-height: 1.6; }
+      .d3-report-list li { margin-bottom: 4px; }
     </style>
 
     <!-- ── Header ── -->
@@ -3343,7 +3450,7 @@
     </div>
 
     <!-- ── Body: Top Row (3D Views) ── -->
-    <div id="dual3DTopRow" style="display:flex; height:52vh; flex-shrink:0;">
+    <div id="dual3DTopRow" style="display:flex; height:38vh; min-height:100px; flex-shrink:0;">
       <!-- LEFT TOP -->
       <div class="d3-col-top">
         <div class="d3-label" style="background:#f0f9ff;color:#0284c7;">
@@ -3377,46 +3484,142 @@
     <div style="display:flex; flex:1; overflow:hidden;">
       <!-- LEFT INFO -->
       <div class="d3-col-bot">
-        ${_buildBrainLobeSVG(curLocKey, stL === '#ff5252' ? '#ef4444' : '#22c55e', 'Ca Hiện Tại', true)}
-        ${ZONE_STRIP}
-        ${mBox('Kết Quả', pred.tumor_detected ? '🔴 PHÁT HIỆN KHỐI U' : '🟢 KHÔNG CÓ KHỐI U', stL)}
-        ${mBox('Vị Trí Giải Phẫu', curLobe.label + (curLocHint ? ' · ' + curLocHint : ''), curLobe.color)}
-        ${mBox('Chức Năng Vùng', curLobe.fn, '#8899b0')}
-        ${mBox('Độ Sâu (mm)', depth != null ? depth.toFixed(1) + ' mm · ' + (cat.label || '') : 'N/A', dHex)}
-        ${mBox('Diện Tích U', pred.tumor_area_percent != null ? pred.tumor_area_percent.toFixed(2) + '%' : 'N/A', '#ff9100')}
-        ${mBox('Confidence', pred.confidence != null ? (pred.confidence * 100).toFixed(1) + '%' : 'N/A', '#00e5ff')}
+        <!-- 📸 2D Image Section -->
+        <div style="display:flex; gap:12px; margin-bottom:15px;">
+          <div class="d3-2d-image-wrap" style="flex:1; background:#0a0e1a; border:1px solid #3b82f6; margin-bottom:0; box-shadow:0 4px 15px rgba(0,0,0,0.3);">
+            ${currentImgSrc ? `<img src="${currentImgSrc}" alt="Current MRI"/>` : '<div style="color:#94a3b8; font-size:11px; padding:20px; text-align:center;">⚠️ MRI</div>'}
+            <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.6); color:#fff; font-size:8px; padding:3px; text-align:center; backdrop-filter:blur(4px); font-weight:bold;">ẢNH GỐC (2D)</div>
+          </div>
+          ${gradCamB64 ? `
+          <div class="d3-2d-image-wrap" style="flex:1; background:#0a0e1a; border:1px solid #00e5ff; margin-bottom:0; box-shadow:0 4px 15px rgba(0,229,255,0.15);">
+            <img src="${gradCamB64}" alt="Grad-CAM Overlay"/>
+            <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,151,180,0.7); color:#fff; font-size:8px; padding:3px; text-align:center; backdrop-filter:blur(4px); font-weight:bold;">PHÂN TÍCH XAI</div>
+          </div>` : ''}
+        </div>
+
+        <!-- 📄 AI Report Section (Current) -->
+        <div class="d3-report-card d3-info-card" style="border-left:4px solid #3b82f6;">
+          <div class="d3-report-title">TÓM TẮT AI (CA HIỆN TẠI)</div>
+          <p class="d3-report-text">${curReport.summary}</p>
+          <div class="d3-report-title" style="border:none; margin-top:10px;">PHÁT HIỆN</div>
+          <ul class="d3-report-list">
+            ${(curReport.findings || []).map(f => `<li>✓ ${f}</li>`).join('')}
+          </ul>
+          <div class="d3-report-title" style="border:none; margin-top:10px;">KHUYẾN NGHỊ</div>
+          <ul class="d3-report-list">
+            ${(curReport.recommendations || []).map(r => `<li>→ ${r}</li>`).join('')}
+          </ul>
+        </div>
+
+        <div class="d3-info-card" style="animation-delay: 0.2s; flex-shrink:0;">
+          ${_buildBrainLobeSVG(curLocKey, stL === '#ff5252' ? '#ef4444' : '#22c55e', 'Ca Hiện Tại', true)}
+        </div>
+        
+        <div class="d3-info-card" style="animation-delay: 0.3s;">
+          ${ZONE_STRIP}
+        </div>
+
+        <div style="animation-delay: 0.4s;" class="d3-info-card">
+          ${mBox('Kết Quả', pred.tumor_detected ? '🔴 PHÁT HIỆN KHỐI U' : '🟢 KHÔNG CÓ KHỐI U', stL)}
+        </div>
+        <div style="animation-delay: 0.5s;" class="d3-info-card">
+          ${mBox('Vị Trí Giải Phẫu', curLobe.label + (curLocHint ? ' · ' + curLocHint : ''), curLobe.color)}
+        </div>
+        <div style="animation-delay: 0.6s;" class="d3-info-card">
+          ${mBox('Chức Năng Vùng', curLobe.fn, '#8899b0')}
+        </div>
+        <div style="animation-delay: 0.7s;" class="d3-info-card">
+          ${mBox('Độ Sâu (mm)', depth != null ? depth.toFixed(1) + ' mm · ' + (cat.label || '') : 'N/A', dHex)}
+        </div>
+        <div style="animation-delay: 0.8s;" class="d3-info-card">
+          ${mBox('Diện Tích U', pred.tumor_area_percent != null ? pred.tumor_area_percent.toFixed(2) + '%' : 'N/A', '#ff9100')}
+        </div>
+        <div style="animation-delay: 0.9s;" class="d3-info-card">
+          ${mBox('Confidence', pred.confidence != null ? (pred.confidence * 100).toFixed(1) + '%' : 'N/A', '#00e5ff')}
+        </div>
       </div>
       <!-- RIGHT INFO -->
       <div class="d3-col-bot">
-        ${_buildBrainLobeSVG(refLocKey, '#aa44ff', 'Ca Tương Tự', true)}
-        ${LOC_COMPARE}
+        <!-- 📸 2D Image Section -->
+        <div class="d3-2d-image-wrap" style="background:#0a0e1a; border:1px solid #7e22ce; margin-bottom:15px; box-shadow:0 4px 15px rgba(0,0,0,0.3);">
+          ${caseItem.filename ? `<img src="/data/images/${caseItem.filename}" alt="Similar MRI" onerror="this.src=''; this.parentElement.querySelector('.err-msg').style.display='block';"/>` : (caseItem.thumbnail ? `<img src="${caseItem.thumbnail}" alt="Similar MRI"/>` : '')}
+          <div class="err-msg" style="display:none; color:#94a3b8; font-size:11px; padding:20px; text-align:center;">⚠️ Không tìm thấy tệp ảnh MRI</div>
+          ${(!caseItem.filename && !caseItem.thumbnail) ? '<div style="color:#94a3b8; font-size:11px; padding:20px; text-align:center;">⚠️ Không có dữ liệu ảnh</div>' : ''}
+          <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.6); color:#fff; font-size:8px; padding:3px; text-align:center; backdrop-filter:blur(4px); font-weight:bold;">ẢNH THAM CHIẾU (2D)</div>
+        </div>
+
+        <!-- 📄 AI Report Section (Reference) -->
+        <div class="d3-report-card d3-info-card" style="border-left:4px solid #7e22ce;">
+          <div class="d3-report-title">TÓM TẮT AI (CA TƯƠNG TỰ)</div>
+          <p class="d3-report-text">${refReport.summary}</p>
+          <div class="d3-report-title" style="border:none; margin-top:10px;">PHÁT HIỆN</div>
+          <ul class="d3-report-list">
+            ${(refReport.findings || []).map(f => `<li>✓ ${f}</li>`).join('')}
+          </ul>
+          <div class="d3-report-title" style="border:none; margin-top:10px;">KHUYẾN NGHỊ</div>
+          <ul class="d3-report-list">
+            ${(refReport.recommendations || []).map(r => `<li>→ ${r}</li>`).join('')}
+          </ul>
+        </div>
+
+        <div class="d3-info-card" style="animation-delay: 0.25s; flex-shrink:0;">
+          ${_buildBrainLobeSVG(refLocKey, '#aa44ff', 'Ca Tương Tự', true)}
+        </div>
+        
+        <div class="d3-info-card" style="animation-delay: 0.35s;">
+          ${LOC_COMPARE}
+        </div>
+
         <!-- Feature similarity bars -->
-        <div style="margin-bottom:12px;padding:12px;border-radius:8px;background:#ffffff;border:1px solid #e2e8f0;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+        <div class="d3-info-card" style="animation-delay: 0.45s; margin-bottom:12px;padding:12px;border-radius:8px;background:#ffffff;border:1px solid #e2e8f0;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
           <div style="color:#64748b;font-size:10px;margin-bottom:10px;letter-spacing:0.5px;font-weight:600;text-transform:uppercase;">📊 PHÂN TÍCH ĐẶC TRƯNG TƯƠNG ĐỒNG</div>
           ${[
-      ['Hình Dạng Khối U', similarity * 0.95],
-      ['Vùng Não Khớp', locMatch ? similarity : Math.max(40, similarity * 0.65)],
-      ['Kích Thước Tương Đối', similarity * (0.82 + Math.abs(Math.sin(similarity * 0.19)) * 0.15)],
-      ['Cường Độ Tín chuyên sâu', similarity * (0.78 + Math.abs(Math.cos(similarity * 0.23)) * 0.18)]
-    ].map(([label, rawV]) => {
-      const v = Math.min(100, Math.round(rawV));
-      const c = v >= 75 ? '#15803d' : v >= 50 ? '#b45309' : '#dc2626';
-      return `<div class="d3-bar-row">
+        ['Hình Dạng Khối U', similarity * 0.95],
+        ['Vùng Não Khớp', locMatch ? similarity : Math.max(40, similarity * 0.65)],
+        ['Kích Thước Tương Đối', similarity * (0.82 + Math.abs(Math.sin(similarity * 0.19)) * 0.15)],
+        ['Cường Độ Tín chuyên sâu', similarity * (0.78 + Math.abs(Math.cos(similarity * 0.23)) * 0.18)]
+      ].map(([label, rawV], idx) => {
+        const v = Math.min(100, Math.round(rawV));
+        const c = v >= 75 ? '#15803d' : v >= 50 ? '#b45309' : '#dc2626';
+        return `<div class="d3-bar-row">
               <div class="d3-lbl"><span>${label}</span><span style="color:${c};">${v}%</span></div>
-              <div class="track"><div class="fill" style="width:${v}%;background:${c};"></div></div>
+              <div class="track"><div class="fill" style="width:0%; background:${c};" data-v="${v}"></div></div>
             </div>`;
-    }).join('')}
+      }).join('')}
         </div>
-        ${mBox('Kết Quả', caseItem.has_tumor ? '🔴 PHÁT HIỆN KHỐI U' : '🟢 KHÔNG CÓ KHỐI U', stR)}
-        ${mBox('Vị Trí Ước Tính', refLobe.label + ' · ' + refLocKey.replace(/_/g, ' '), refLobe.color)}
-        ${mBox('Chức Năng Vùng', refLobe.fn, '#8899b0')}
-        ${mBox('Độ Tương Đồng', similarity + '%', simColor)}
-        ${mBox('Khoảng Cách Feature', (caseItem.distance || 0).toFixed(4), '#8899b0')}
-        ${mBox('Mã Ca Bệnh / Bệnh Nhân', (caseItem.case_id || '?') + ' · ' + (caseItem.patient_id || 'N/A'), '#5a7a99')}
+        
+        <div style="animation-delay: 0.55s;" class="d3-info-card">
+          ${mBox('Kết Quả', caseItem.has_tumor ? '🔴 PHÁT HIỆN KHỐI U' : '🟢 KHÔNG CÓ KHỐI U', stR)}
+        </div>
+        <div style="animation-delay: 0.65s;" class="d3-info-card">
+          ${mBox('Vị Trí Ước Tính', refLobe.label + ' · ' + refLocKey.replace(/_/g, ' '), refLobe.color)}
+        </div>
+        <div style="animation-delay: 0.75s;" class="d3-info-card">
+          ${mBox('Chức Năng Vùng', refLobe.fn, '#8899b0')}
+        </div>
+        <div style="animation-delay: 0.85s;" class="d3-info-card">
+          ${mBox('Độ Tương Đồng', similarity + '%', simColor)}
+        </div>
+        <div style="animation-delay: 0.95s;" class="d3-info-card">
+          ${mBox('Khoảng Cách Feature', (caseItem.distance || 0).toFixed(4), '#8899b0')}
+        </div>
+        <div style="animation-delay: 1.05s;" class="d3-info-card">
+          ${mBox('Mã Ca Bệnh / Bệnh Nhân', (caseItem.case_id || '?') + ' · ' + (caseItem.patient_id || 'N/A'), '#5a7a99')}
+        </div>
       </div>
     </div>`;
 
     document.body.appendChild(modal);
+
+    // ✅ Trigger bar animations after appending (Added)
+    setTimeout(() => {
+      modal.querySelectorAll('.fill').forEach((el, idx) => {
+        const v = el.getAttribute('data-v');
+        setTimeout(() => {
+          el.style.width = v + '%';
+        }, 100 + (idx * 150));
+      });
+    }, 200);
 
     // ── Resizer logic ──
     let isResizing = false;
@@ -3434,8 +3637,8 @@
       if (!isResizing) return;
       // Trừ ~52px header
       let newHeight = e.clientY - 52;
-      if (newHeight < 150) newHeight = 150;
-      if (newHeight > window.innerHeight - 150) newHeight = window.innerHeight - 150;
+      if (newHeight < 80) newHeight = 80;
+      if (newHeight > window.innerHeight - 100) newHeight = window.innerHeight - 100;
       topRow.style.height = newHeight + 'px';
     });
 

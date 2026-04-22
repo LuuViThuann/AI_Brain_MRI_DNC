@@ -90,13 +90,16 @@
     }
   }
 
-  // ===== MAIN UI CONTROLLER =====
+  // ===== MAIN UI CONTROLLER ===== 
   window.XAISimilarUI = {
 
     // State management
     state: {
       currentXAIData: null,
       currentSimilarData: null,
+      filteredSimilarCases: [], // ✅ For tumor-only filtering
+      currentPage: 1,           // ✅ Pagination
+      itemsPerPage: 8,          // ✅ Cards per page
       isInitialized: false
     },
 
@@ -179,7 +182,7 @@
       try {
         const formData = new FormData();
         formData.append('file', imageFile);
-        formData.append('k', 5);
+        formData.append('k', 200); // ✅ Increase k to 200 for better filtering pool
 
         log('📤 Sending request to /api/similar/find');
 
@@ -786,7 +789,7 @@
       return cardHTML;
     },
 
-    // ===== RENDER SIMILAR CASES =====
+    // ===== RENDER SIMILAR CASES ===== 
     renderSimilarCases: function (similarData) {
       const panel = document.getElementById('similarPanel');
 
@@ -796,55 +799,149 @@
       }
 
       log('📊 Rendering Similar Cases', similarData);
+      
+      // ✅ FIX: Update internal state so pagination works after reload
+      this.state.currentSimilarData = similarData;
 
       if (!similarData || !similarData.similar_cases || similarData.similar_cases.length === 0) {
         this.showSimilarPlaceholder('no-results');
         return;
       }
 
+      // ✅ 1. FILTER: Only show cases with tumor (Be robust with types)
+      const filtered = similarData.similar_cases.filter(c => 
+        c.has_tumor === true || c.has_tumor === 1 || c.has_tumor === "true"
+      );
+      this.state.filteredSimilarCases = filtered;
+      
+      if (filtered.length === 0) {
+        log('⚠️ No tumor cases found after filtering');
+        this.showSimilarPlaceholder('no-results');
+        return;
+      }
+
+      // ✅ 2. PAGINATION CALCULATIONS
+      const totalItems = filtered.length;
+      const totalPages = Math.ceil(totalItems / this.state.itemsPerPage);
+      const currentPage = Math.min(this.state.currentPage, totalPages);
+      
+      const startIndex = (currentPage - 1) * this.state.itemsPerPage;
+      const endIndex = Math.min(startIndex + this.state.itemsPerPage, totalItems);
+      const pageItems = filtered.slice(startIndex, endIndex);
+
+      log(`Pagination: Page ${currentPage}/${totalPages}, items ${startIndex}-${endIndex}`);
+
       const html = `
-        <div style="padding: 30px; background: transparent; border-radius: 12px; min-height: 100vh;">
+        <div style="padding: 20px 30px; background: transparent; border-radius: 12px;">
           
           <!-- Header -->
-          <div style="margin-bottom: 30px;">
-            <h2 style="color: #0097b4; margin: 0 0 10px 0; font-size: 24px; font-weight: bold;">
-              Các Ca Bệnh Tương Tự
-            </h2>
-            <p style="color: #4a5568; margin: 0; font-size: 13px;">
-              Tìm thấy ${similarData.similar_cases.length} ca bệnh tương tự trong ${similarData.search_time_ms.toFixed(1)}ms
-              ${similarData.total_cases ? ` (đã tìm ${similarData.total_cases} ca bệnh)` : ''}
-            </p>
+          <div style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end;">
+            <div>
+              <h2 style="color: #0097b4; margin: 0 0 10px 0; font-size: 24px; font-weight: bold;">
+                Các Ca Bệnh Tương Tự
+              </h2>
+              <p style="color: #4a5568; margin: 0; font-size: 13px;">
+                Tìm thấy <strong>${totalItems}</strong> ca bệnh tương tự (Chỉ hiển thị ca có khối u)
+                ${similarData.search_time_ms ? ` trong ${similarData.search_time_ms.toFixed(1)}ms` : ''}
+              </p>
+            </div>
+            
+            <!-- ✅ PAGINATION TOP RESTORED -->
+            ${this.renderPaginationUI(currentPage, totalPages)}
           </div>
           
           <!-- Grid -->
           <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;">
-            ${similarData.similar_cases.map((caseItem, caseIdx) => this.renderCaseCard(caseItem, caseIdx)).join('')}
+            ${pageItems.map((caseItem, idx) => {
+              // Find original index for 3D compare
+              const originalIdx = similarData.similar_cases.findIndex(c => c.case_id === caseItem.case_id);
+              return this.renderCaseCard(caseItem, originalIdx);
+            }).join('')}
+          </div>
+
+          <!-- ✅ PAGINATION BOTTOM -->
+          <div style="margin-top: 40px; display: flex; justify-content: center;">
+            ${this.renderPaginationUI(currentPage, totalPages)}
           </div>
           
           <!-- Footer Info -->
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #d1dde8; 
             text-align: center; color: #4a5568; font-size: 11px;">
-            ✅ Tìm kiếm hoàn tất | ${new Date().toLocaleTimeString('vi-VN')}
+            ✅ Hiển thị ${startIndex + 1}-${endIndex} / ${totalItems} ca bệnh | ${new Date().toLocaleTimeString('vi-VN')}
           </div>
         </div>
       `;
 
+      // Update global for 3D picker consistency
       window._similarCasesData = similarData.similar_cases;
+      
       panel.innerHTML = html;
       panel.style.display = 'block';
 
       log('✅ Similar cases rendered successfully');
     },
 
+    // ===== RENDER PAGINATION UI =====
+    renderPaginationUI: function(currentPage, totalPages) {
+      if (totalPages <= 1) return '';
+      
+      return `
+        <div style="display: flex; align-items: center; gap: 12px; font-family: Segoe UI, sans-serif;">
+          <button onclick="window.XAISimilarUI.goToPage(${currentPage - 1})" 
+            ${currentPage === 1 ? 'disabled' : ''}
+            style="padding: 6px 12px; background: ${currentPage === 1 ? '#e2e8f0' : '#ffffff'}; 
+            border: 1px solid #d1dde8; border-radius: 6px; cursor: ${currentPage === 1 ? 'default' : 'pointer'};
+            color: ${currentPage === 1 ? '#a0aec0' : '#0097b4'}; font-weight: bold; font-size: 12px; transition: all 0.2s;">
+            ← Trước
+          </button>
+          
+          <span style="color: #4a5568; font-size: 13px; font-weight: 500;">
+            Trang <strong style="color: #0097b4;">${currentPage}</strong> / ${totalPages}
+          </span>
+          
+          <button onclick="window.XAISimilarUI.goToPage(${currentPage + 1})" 
+            ${currentPage === totalPages ? 'disabled' : ''}
+            style="padding: 6px 12px; background: ${currentPage === totalPages ? '#e2e8f0' : '#ffffff'}; 
+            border: 1px solid #d1dde8; border-radius: 6px; cursor: ${currentPage === totalPages ? 'default' : 'pointer'};
+            color: ${currentPage === totalPages ? '#a0aec0' : '#0097b4'}; font-weight: bold; font-size: 12px; transition: all 0.2s;">
+            Sau →
+          </button>
+        </div>
+      `;
+    },
+
+    // ===== GO TO PAGE =====
+    goToPage: function(page) {
+      if (!this.state.currentSimilarData) return;
+      
+      const filtered = this.state.filteredSimilarCases;
+      const totalPages = Math.ceil(filtered.length / this.state.itemsPerPage);
+      
+      if (page < 1 || page > totalPages) return; 
+      
+      log(`🔄 Switching to page ${page}`);
+      this.state.currentPage = page;
+      this.renderSimilarCases(this.state.currentSimilarData);
+      
+      // ✅ Scroll ONLY the panel content, NOT the whole window
+      const panel = document.getElementById('similarPanel');
+      if (panel) panel.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+
     // ===== RENDER CASE CARD =====
     renderCaseCard: function (caseItem, caseIndex) {
-      const similarity = Math.round((caseItem.similarity_score || 0) * 100);
+      const similarity = Math.round((caseItem.similarity_score || 0) * 100); 
       const statusColor = caseItem.has_tumor ? '#ff5252' : '#00c853';
       const statusText = caseItem.has_tumor ? '🔴 Phát hiện khối u' : '🟢 Không có khối u';
 
       return `
-        <div style="padding: 20px; border: 1px solid #d1dde8; border-radius: 8px; 
-          background: #ffffff; position: relative;">
+        <div class="similar-case-card" style="padding: 20px; border: 1px solid #d1dde8; border-radius: 12px; 
+          background: #ffffff; position: relative; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer;
+          box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+          <style>
+            .similar-case-card:hover { transform: translateY(-8px); box-shadow: 0 20px 25px -5px rgba(0, 151, 180, 0.1), 0 10px 10px -5px rgba(0, 151, 180, 0.04); border-color: #0097b4; }
+            .similar-case-card:hover .case-image-container { transform: scale(1.05); border-color: #0097b4; }
+          </style>
           
           <!-- Rank Badge -->
           <div style="position: absolute; top: 16px; right: 16px; background: transparent; 
@@ -852,11 +949,11 @@
             font-weight: bold; box-shadow: 0 2px 8px rgba(0,229,255,0.3);">
             #${caseItem.rank || '?'}
           </div>
-          
+           
           <!-- Thumbnail -->
-          <div style="width: 100%; height: 180px; background: #e2e8f0; border-radius: 6px; 
+          <div class="case-image-container" style="width: 100%; height: 200px; background: #050c1a; border-radius: 6px; 
             display: flex; align-items: center; justify-content: center; margin-bottom: 16px; 
-            overflow: hidden; border: 1px solid #d1dde8;">
+            overflow: hidden; border: 1px solid #1e3a52; transition: all 0.4s ease;">
             ${this.renderThumbnail(caseItem)}
           </div>
           
@@ -935,16 +1032,7 @@
 
           <!-- Compare Buttons -->
           <div style="display:flex;gap:8px;margin-top:14px;">
-            <button id="cmp-btn-${caseIndex}" data-cmp-idx="${caseIndex}"
-              onclick="window.XAISimilarUI.openCompareModal(${caseIndex || 0})"
-              style="flex:1;padding:9px;
-              background:#ffffff;
-              border:1px solid #0097b4;border-radius:6px;color:#0097b4;
-              font-size:11px;font-weight:bold;cursor:pointer;transition:all 0.2s;box-shadow:0 2px 4px rgba(0,151,180,0.1);"
-              onmouseover="this.style.background='#0097b4'; this.style.color='#ffffff';"
-              onmouseout="this.style.background='#ffffff'; this.style.color='#0097b4';">
-              So Sánh 2D
-            </button>
+           
             <button id="cmp3d-btn-${caseIndex}" data-cmp-idx="${caseIndex}"
               onclick="window.XAISimilarUI.open3DCompare(${caseIndex})"
               style="flex:1;padding:9px;
@@ -964,20 +1052,20 @@
     renderThumbnail: function (caseItem) {
       if (caseItem.thumbnail) {
         return `<img src="${caseItem.thumbnail}" alt="Ca bệnh ${caseItem.case_id}" 
-          style="width: 100%; height: 100%; object-fit: cover;"/>`;
+          style="width: 100%; height: 100%; object-fit: contain;"/>`;
       }
 
       if (caseItem.filename) {
         const imgPath = `/data/images/${caseItem.filename}`;
         return `<img src="${imgPath}" alt="${caseItem.filename}" 
-          style="width: 100%; height: 100%; object-fit: cover;" 
+          style="width: 100%; height: 100%; object-fit: contain;" 
           onerror="this.parentElement.innerHTML='<div style=\\'color: #4a5568; font-size: 12px;\\'>Không có hình ảnh</div>'"/>`;
       }
 
       return `<div style="color: #4a5568; font-size: 12px;">📄 Không có hình ảnh</div>`;
     },
 
-    // ===== OPEN 3D COMPARE =====
+    // ===== OPEN 3D COMPARE ===== 
     open3DCompare: function (caseIndex) {
       var cases = window._similarCasesData;
       if (!cases || !cases[caseIndex]) {
@@ -986,8 +1074,13 @@
       }
       var caseItem = cases[caseIndex];
       var diagData = window.lastDiagnosisData;
+      
+      // ✅ Get current image from previewCanvas (like in 2D compare)
+      var previewC = document.getElementById('previewCanvas');
+      var imgSrc = previewC ? previewC.toDataURL('image/png') : null;
+
       if (typeof window.openDual3DCompare === 'function') {
-        window.openDual3DCompare(caseItem, diagData);
+        window.openDual3DCompare(caseItem, diagData, imgSrc);
       } else {
         // Fallback to 2D modal if 3D not loaded yet
         this.openCompareModal(caseIndex);
