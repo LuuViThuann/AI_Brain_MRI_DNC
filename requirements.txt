@@ -20,3 +20,8 @@ antspyx==0.3.8          # MNI registration
 nibabel==5.2.0          # NIfTI file handling
 nilearn==0.10.2         # Neuroimaging utilities
 xmltodict==0.13.0       # Parse Julich XML
+
+
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+python-dotenv>=1.0.0

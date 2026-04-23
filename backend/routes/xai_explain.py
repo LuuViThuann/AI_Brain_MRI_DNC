@@ -205,7 +205,7 @@ async def explain_rules(file: UploadFile = File(...)):
 
 def generate_combined_insights(gradcam, rules, shap) -> list:
     """
-    Generate combined insights from all xAI methods.
+    Generate combined insights from all xAI methods in Vietnamese.
     
     Returns:
         List of insight strings
@@ -213,33 +213,52 @@ def generate_combined_insights(gradcam, rules, shap) -> list:
     insights = []
     
     # Grad-CAM insights
-    if gradcam['attention_score'] > 0.7:
-        insights.append("🔍 CNN shows high confidence in identified tumor region")
-    elif gradcam['attention_score'] < 0.3:
-        insights.append("⚠ CNN attention is diffuse - prediction may be uncertain")
+    if gradcam and gradcam.get('attention_score', 0) > 0.7:
+        insights.append("Độ tin cậy: CNN cho thấy độ tin cậy cao đối với vùng u được xác định")
+    elif gradcam and gradcam.get('attention_score', 0) < 0.3:
+        insights.append("Cảnh báo: Sự tập trung của CNN bị phân tán - dự đoán có thể không chắc chắn")
     
     # Rule-based insights
-    risk = rules['risk_level']
-    if risk == 'High':
-        insights.append(f"⚠ High risk classification: {rules['tumor_area_mm2']}mm² tumor detected")
-    elif risk == 'Low':
-        insights.append(f"✓ Low risk classification: Small tumor ({rules['tumor_area_mm2']}mm²)")
+    if rules:
+        risk = rules.get('risk_level', 'Unknown')
+        if risk == 'High':
+            insights.append(f"Rủi ro: Phân loại rủi ro CAO: Phát hiện u kích thước {rules.get('tumor_area_mm2', 'không xác định')}mm²")
+        elif risk == 'Low':
+            insights.append(f"Thông tin: Phân loại rủi ro THẤP: Khối u nhỏ ({rules.get('tumor_area_mm2', 'không xác định')}mm²)")
     
-    # Location insights
-    if 'frontal' in rules['location'].lower():
-        insights.append("📍 Frontal lobe location may affect motor functions")
-    elif 'temporal' in rules['location'].lower():
-        insights.append("📍 Temporal lobe location may affect memory/language")
+        # Location insights
+        location = rules.get('location', '').lower()
+        if 'frontal' in location:
+            insights.append("Vị trí: Vị trí thùy trán có thể ảnh hưởng đến chức năng vận động")
+        elif 'temporal' in location:
+            insights.append("Vị trí: Vị trí thùy thái dương có thể ảnh hưởng đến trí nhớ/ngôn ngữ")
     
     # SHAP insights
-    top_feature = shap['top_features'][0] if shap['top_features'] else None
-    if top_feature:
-        importance = shap['feature_importance'][top_feature]
-        insights.append(f"📊 Most important feature: {top_feature} (importance: {importance:.3f})")
+    if shap:
+        top_feature = shap.get('top_features', [None])[0] if shap.get('top_features') else None
+        if top_feature:
+            importance = shap.get('feature_importance', {}).get(top_feature, 0)
+            # Map feature names to Vietnamese
+            feature_map = {
+                "tumor_area": "diện tích khối u",
+                "circularity": "độ tròn",
+                "solidity": "độ đặc",
+                "perimeter": "chu vi",
+                "mean_intensity": "cường độ trung bình"
+            }
+            top_feature_vn = feature_map.get(top_feature, top_feature)
+            insights.append(f"Đặc trưng: Đặc trưng quan trọng nhất: {top_feature_vn} (độ quan trọng: {importance:.3f})")
     
     # Warnings from rules
-    if rules['warnings']:
-        insights.extend(rules['warnings'][:2])  # Add first 2 warnings
+    if rules and rules.get('warnings'):
+        for w in rules['warnings'][:2]:
+            w_vn = w.replace("⚠ Very large tumor detected", "⚠ Phát hiện khối u rất lớn") \
+                    .replace("⚠ Extensive brain involvement", "⚠ Sự xâm lấn não diện rộng") \
+                    .replace("⚠ Frontal lobe involvement", "⚠ Liên quan thùy trán") \
+                    .replace("⚠ Temporal lobe involvement", "⚠ Liên quan thùy thái dương") \
+                    .replace("⚠ Highly irregular shape detected", "⚠ Phát hiện hình dạng không đều") \
+                    .replace("⚠ Irregular boundaries suggest infiltrative growth", "⚠ Ranh giới không đều gợi ý sự phát triển xâm lấn")
+            insights.append(w_vn)
     
     return insights
 

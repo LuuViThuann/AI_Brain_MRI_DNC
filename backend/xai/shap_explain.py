@@ -225,7 +225,7 @@ class SHAPExplainer:
         
         # Global feature importance (0-1 range)
         feature_importance = {
-            name: float(val)  # ✅ Returns 0-1 values
+            name: float(val) 
             for name, val in zip(feature_names, mean_abs_shap)
         }
         

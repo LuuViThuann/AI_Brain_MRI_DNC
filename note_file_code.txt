@@ -32,3 +32,4 @@ Vai trò: Cho phép bác sĩ biết khối u đang xâm lấn vào vùng chức 
 Endpoint chính: GET /api/atlas/region
 
 ---------------
+

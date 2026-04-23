@@ -9,6 +9,7 @@
   <!-- ===== STYLESHEETS ===== -->
   <link rel="stylesheet" href="styles.css?v=4" />
   <link rel="stylesheet" href="xai_similar_styles.css?v=3" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
   <script src="static/mni_registration.js"></script>
   <script src="static/atlas_renderer.js"></script>
@@ -40,7 +41,7 @@
   <header class="header">
     <div class="header-inner">
       <div class="logo">
-        <span class="logo-icon">⊕</span>
+        <span class="logo-icon"><i class="fa-solid fa-circle-nodes"></i></span>
         <span class="logo-text">NeuroScan<span class="logo-ai">AI</span></span>
       </div>
 
@@ -50,7 +51,7 @@
         <button class="pill" data-tab="atlas">Atlas</button>
         <button class="pill" data-tab="xai">Giải Thích AI</button>
         <button class="pill" data-tab="similar">Ca Tương Tự</button>
-  
+         <button class="pill" data-tab="history">Lịch Sử</button>
         <button class="pill" data-tab="info">Thông Tin</button>
       </nav>
 
@@ -72,7 +73,7 @@
       </div>
 
       <div class="upload-zone" id="uploadZone">
-        <div class="upload-icon">⬆</div>
+        <div class="upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
         <p class="upload-text">Thả ảnh MRI vào đây</p>
         <p class="upload-sub">hoặc nhấp để chọn file</p>
         <input type="file" id="fileInput" accept=".png,.jpg,.jpeg" />
@@ -83,8 +84,8 @@
         <div class="preview-overlay" id="maskOverlay"></div>
       </div>
 
-      <button class="btn-diagnose" id="btnDiagnose" disabled>
-        <span class="btn-icon">◉</span> Chạy Chẩn Đoán
+      <button class="btn-diagnose" id="btnDiagnose" disabled style="display:flex;align-items:center;justify-content:center;gap:10px;">
+        <i class="fa-solid fa-wand-magic-sparkles"></i> Chạy Chẩn Đoán
       </button>
     </section>
 
@@ -94,16 +95,16 @@
         <h2>Mô Hình Não 3D</h2>
         <div class="viewer-controls">
           <!-- ✅ Auto-rotate | Detail View | Compare Cases | Atlas | Reset -->
-          <button class="ctrl-btn" id="btnRotate" title="Auto-rotate (R)">↻</button>
-          <button class="ctrl-btn" id="btnSlice" title="Bật Detail Analysis (D)">⊘</button>
+          <button class="ctrl-btn" id="btnRotate" title="Auto-rotate (R)"><i class="fa-solid fa-rotate"></i></button>
+          <button class="ctrl-btn" id="btnSlice" title="Bật Detail Analysis (D)"><i class="fa-solid fa-chart-line"></i></button>
           <button class="ctrl-btn" id="btnCompare" title="So sánh ca bệnh tương tự"
-            style="display:none;position:relative;" onclick="window.openComparePicker && window.openComparePicker()">⚖
+            style="display:none;position:relative;" onclick="window.openComparePicker && window.openComparePicker()"><i class="fa-solid fa-scale-balanced"></i>
             <span id="compareBadge"
               style="position:absolute;top:-4px;right:-4px;background:#00c853;color:#000;font-size:8px;font-weight:900;padding:1px 4px;border-radius:8px;display:none;min-width:14px;text-align:center;line-height:14px;"></span>
           </button>
          
 
-          <button class="ctrl-btn" id="btnReset" title="Reset view (ESC)">↺</button>
+          <button class="ctrl-btn" id="btnReset" title="Reset view (ESC)"><i class="fa-solid fa-arrow-rotate-left"></i></button>
         </div>
       </div>
 
@@ -118,7 +119,7 @@
           <span>Xem Chi Tiết</span>
         </div>
         <div class="atlas-indicator" id="atlasIndicator" style="display:none;">
-          <span>📚 BigBrain Atlas (Isocortex)</span>
+          <span><i class="fa-solid fa-book-atlas" style="margin-right:6px;"></i> BigBrain Atlas (Isocortex)</span>
         </div>
         <!-- Loading indicator for 3D model -->
         <div class="model-loading" id="modelLoading" style="display:flex;">
@@ -170,7 +171,7 @@
 
       <!-- Default state -->
       <div class="report-placeholder" id="reportPlaceholder">
-        <div class="placeholder-icon">🔬</div>
+        <div class="placeholder-icon"><i class="fa-solid fa-microscope"></i></div>
         <p>Tải ảnh MRI lên và chạy chẩn đoán để xem báo cáo AI tại đây.</p>
       </div>
 
@@ -225,11 +226,10 @@
             <!-- Header row -->
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
               <div style="display:flex;align-items:center;gap:8px;">
-                <span id="depthEmoji" style="font-size:18px;">📏</span>
+                <span id="depthEmoji" style="font-size:18px;color:#ff5252;"><i class="fa-solid fa-ruler-vertical"></i></span>
                 <span
                   style="color:var(--text-sec);font-size:10px;text-transform:uppercase;letter-spacing:1.2px;font-weight:700;">Độ
-                  Sâu
-                  Khối U Từ Vỏ Não</span>
+                  Sâu Khối U Từ Vỏ Não</span>
               </div>
               <span id="depthBadge" style="
               padding:3px 10px;font-size:10px;font-weight:700;
@@ -309,7 +309,7 @@
 
         <!-- AI Methods Comparison -->
         <div class="report-section">
-          <div class="report-section-title">🔬 So Sánh Các Phương Pháp AI</div>
+          <div class="report-section-title"><i class="fa-solid fa-vials" style="margin-right:8px;"></i> So Sánh Các Phương Pháp AI</div>
           <div class="comparison-table">
             <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
               <thead>
@@ -331,7 +331,7 @@
         background: rgba(255, 152, 0, 0.1); border: 2px solid #ff9800; 
         border-radius: 8px;">
           <div style="display: flex; align-items: start; gap: 12px;">
-            <div style="font-size: 24px;">⚕️</div>
+            <div style="font-size: 24px; color: #ff9800;"><i class="fa-solid fa-staff-snake"></i></div>
             <div>
               <div style="color: var(--orange); font-size: 13px; font-weight: bold; margin-bottom: 8px;">
                 TUYÊN BỐ TỪ CHỐI TRÁCH NHIỆM Y TẾ QUAN TRỌNG
@@ -380,6 +380,7 @@
     <!-- Content will be dynamically inserted by xai_similar_ui.js -->
   </div>
 
+  <div id="historyPanel" style="display:none;"></div>
   <!-- ===== ATLAS 4-PANEL VIEW (EBRAINS-style) ===== -->
   <div id="atlasViewPanel">
     <!-- Content injected by atlas_4panel_viewer.js -->
@@ -404,7 +405,7 @@
         transition: all 0.2s ease;
         box-shadow: 0 2px 4px rgba(0,0,0,0.02);
       " onmouseover="this.style.background='#e9ecef'; this.style.borderColor='#adb5bd'; this.style.color='#212529';" onmouseout="this.style.background='#f8f9fa'; this.style.borderColor='#ced4da'; this.style.color='#495057';">
-        <span style="font-size: 16px;">⬅</span> Trở về Màn Hình Chính
+        <i class="fa-solid fa-arrow-left"></i> Trở về Màn Hình Chính
       </button>
 
       <h2>Giới Thiệu NeuroScan AI</h2>
@@ -664,6 +665,8 @@
 
   <!-- Atlas 4-Panel Viewer (EBRAINS-style) -->
   <script src="atlas_4panel_viewer.js?v=2"></script>
+
+  <script src="history_ui.js"></script>
 
   <!-- ===== VERIFICATION ===== -->
   <script>

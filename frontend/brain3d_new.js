@@ -613,8 +613,8 @@
               white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
               ${window.translateLocationToVi ? window.translateLocationToVi(pred.location_hint) : (pred.location_hint || '—')}
             </div>
-            <div style="font-size:10px;color:${lobe.color};padding-left:7px;
-              border-left:2px solid ${lobe.color}66;line-height:1.5;">
+            <div style="font-size:10px;color:${lobe.color};padding-top:5px;margin-top:5px;
+              border-top:1px solid ${lobe.color}44;line-height:1.5;">
               ${lobe.fn}
             </div>
           </div>
@@ -645,7 +645,7 @@
         <div style="font-size:9px;font-weight:600;color:#94a3b8;text-transform:uppercase;
           letter-spacing:0.6px;margin-bottom:7px;">Ghi Chú Lâm Sàng</div>
         <div style="font-size:10px;color:#475569;line-height:1.65;padding:9px 11px;
-          background:${risk.bg};border-radius:8px;border-left:3px solid ${risk.dot};">
+          background:${risk.bg};border-radius:8px;border:1px solid ${risk.dot}44;">
           ${note}
         </div>
         <div style="margin-top:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;
@@ -2472,8 +2472,7 @@
       top: 10px; left: 10px;
       width: 300px;
       background: rgba(4, 8, 22, 0.97);
-      border: 1px solid ${clr}44;
-      border-left: 3px solid ${clr};
+      border: 1px solid ${clr}66;
       border-radius: 12px;
       padding: 0;
       font-family: 'Consolas', 'Courier New', monospace;
@@ -2626,7 +2625,7 @@
           </svg>
           <div>
             <div style="color:#c1cfe8;font-size:10px;font-weight:700;margin-bottom:3px;">${pred.location_hint || '—'}</div>
-            <div style="color:${lobe.color};font-size:8.5px;line-height:1.5;border-left:2px solid ${lobe.color}55;padding-left:5px;">${lobe.fn}</div>
+            <div style="color:${lobe.color};font-size:8.5px;line-height:1.5;border-top:1px solid ${lobe.color}55;padding-top:5px;margin-top:5px;">${lobe.fn}</div>
           </div>
         </div>
       </div>
@@ -2673,7 +2672,7 @@
 
       <!-- ── CLINICAL NOTE ── -->
       <div class="dp2-s" style="background:rgba(${clrRgb},0.04);">
-        <div style="font-size:8.5px;color:#8899b0;line-height:1.6;border-left:2px solid ${clr}55;padding-left:8px;">
+        <div style="font-size:8.5px;color:#8899b0;line-height:1.6;border-top:1px solid ${clr}44;padding-top:6px;margin-top:4px;">
           ${_getClinicalNote(cat.category, depth)}
         </div>
       </div>
@@ -3223,7 +3222,7 @@
             <span style="font-size:13px;">${lobe.emoji}</span>
             <span style="color:${txt2};font-size:10px;font-weight:700;">${lobe.label}${side ? ' · ' + side : ''}</span>
           </div>
-          <div style="color:${lcDark(lobe.color)};font-size:8.5px;line-height:1.5;border-left:2px solid ${lcDark(lobe.color)}55;padding-left:6px;">${lobe.fn}</div>
+          <div style="color:${lcDark(lobe.color)};font-size:8.5px;line-height:1.5;border-top:1px solid ${lcDark(lobe.color)}55;padding-top:6px;margin-top:6px;">${lobe.fn}</div>
           <div style="margin-top:5px;display:flex;gap:4px;flex-wrap:wrap;">
             ${['F', 'P', 'T', 'O'].map((l, i) => {
       const nm = ['Frontal', 'Parietal', 'Temporal', 'Occipital'][i];
@@ -3356,7 +3355,7 @@
 
     const modal = document.createElement('div');
     modal.id = 'dual3DModal';
-    modal.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(248,250,252,0.98);display:flex;flex-direction:column;font-family:Consolas,Segoe UI,monospace;';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(248,250,252,0.98);display:flex;flex-direction:column;font-family:Inter, Segoe UI, Roboto, sans-serif;';
 
     // Synthetic report for Right side
     const refReport = _generateSyntheticReport(caseItem, similarity, refLobe);
@@ -3424,13 +3423,14 @@
       .d3-2d-image-wrap:hover img { transform: scale(1.05); }
 
       .d3-report-card {
-        background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px;
-        margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+        background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px;
+        margin-bottom: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);
       }
-      .d3-report-title { color: #0f172a; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; }
-      .d3-report-text { color: #475569; font-size: 11.5px; line-height: 1.6; margin-bottom: 10px; }
-      .d3-report-list { margin: 0; padding-left: 18px; color: #475569; font-size: 11.5px; line-height: 1.6; }
-      .d3-report-list li { margin-bottom: 4px; }
+      .d3-report-title { color: #1e293b; font-size: 14px; font-weight: 700; text-transform: none; letter-spacing: -0.2px; margin-bottom: 12px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+      .d3-report-text { color: #475569; font-size: 13px; line-height: 1.7; margin-bottom: 12px; }
+      .d3-report-list { margin: 0; padding-left: 0; color: #475569; font-size: 13px; line-height: 1.7; list-style: none; }
+      .d3-report-list li { margin-bottom: 6px; display: flex; align-items: flex-start; gap: 10px; }
+      .d3-report-list li i { margin-top: 3px; font-size: 12px; }
     </style>
 
     <!-- ── Header ── -->
@@ -3498,16 +3498,24 @@
         </div>
 
         <!-- 📄 AI Report Section (Current) -->
-        <div class="d3-report-card d3-info-card" style="border-left:4px solid #3b82f6;">
-          <div class="d3-report-title">TÓM TẮT AI (CA HIỆN TẠI)</div>
-          <p class="d3-report-text">${curReport.summary}</p>
-          <div class="d3-report-title" style="border:none; margin-top:10px;">PHÁT HIỆN</div>
+        <div class="d3-report-card d3-info-card" style="border-top: 4px solid #3b82f6;">
+          <div class="d3-report-title">
+            <span style="color:#3b82f6;"><i class="fa-solid fa-pen-to-square"></i></span> Tóm Tắt AI (CA HIỆN TẠI)
+          </div>
+          <p class="d3-report-text" style="font-style: italic;">"${curReport.summary}"</p>
+          
+          <div class="d3-report-title" style="border:none; margin-top:10px;">
+            <span style="color:#00c853;"><i class="fa-solid fa-magnifying-glass-chart"></i></span> PHÁT HIỆN
+          </div>
           <ul class="d3-report-list">
-            ${(curReport.findings || []).map(f => `<li>✓ ${f}</li>`).join('')}
+            ${(curReport.findings || []).map(f => `<li><i class="fa-solid fa-circle-check" style="color:#00c853;"></i> <span>${f}</span></li>`).join('')}
           </ul>
-          <div class="d3-report-title" style="border:none; margin-top:10px;">KHUYẾN NGHỊ</div>
+          
+          <div class="d3-report-title" style="border:none; margin-top:10px;">
+            <span style="color:#ff9100;"><i class="fa-solid fa-lightbulb"></i></span> KHUYẾN NGHỊ
+          </div>
           <ul class="d3-report-list">
-            ${(curReport.recommendations || []).map(r => `<li>→ ${r}</li>`).join('')}
+            ${(curReport.recommendations || []).map(r => `<li><i class="fa-solid fa-arrow-right-long" style="color:#ff9100;"></i> <span>${r}</span></li>`).join('')}
           </ul>
         </div>
 
@@ -3549,16 +3557,24 @@
         </div>
 
         <!-- 📄 AI Report Section (Reference) -->
-        <div class="d3-report-card d3-info-card" style="border-left:4px solid #7e22ce;">
-          <div class="d3-report-title">TÓM TẮT AI (CA TƯƠNG TỰ)</div>
-          <p class="d3-report-text">${refReport.summary}</p>
-          <div class="d3-report-title" style="border:none; margin-top:10px;">PHÁT HIỆN</div>
+        <div class="d3-report-card d3-info-card" style="border-top: 4px solid #7e22ce;">
+          <div class="d3-report-title">
+            <span style="color:#7e22ce;"><i class="fa-solid fa-pen-to-square"></i></span> Tóm Tắt AI (CA TƯƠNG TỰ)
+          </div>
+          <p class="d3-report-text" style="font-style: italic;">"${refReport.summary}"</p>
+          
+          <div class="d3-report-title" style="border:none; margin-top:10px;">
+            <span style="color:#00c853;"><i class="fa-solid fa-magnifying-glass-chart"></i></span> PHÁT HIỆN
+          </div>
           <ul class="d3-report-list">
-            ${(refReport.findings || []).map(f => `<li>✓ ${f}</li>`).join('')}
+            ${(refReport.findings || []).map(f => `<li><i class="fa-solid fa-circle-check" style="color:#00c853;"></i> <span>${f}</span></li>`).join('')}
           </ul>
-          <div class="d3-report-title" style="border:none; margin-top:10px;">KHUYẾN NGHỊ</div>
+          
+          <div class="d3-report-title" style="border:none; margin-top:10px;">
+            <span style="color:#ff9100;"><i class="fa-solid fa-lightbulb"></i></span> KHUYẾN NGHỊ
+          </div>
           <ul class="d3-report-list">
-            ${(refReport.recommendations || []).map(r => `<li>→ ${r}</li>`).join('')}
+            ${(refReport.recommendations || []).map(r => `<li><i class="fa-solid fa-arrow-right-long" style="color:#ff9100;"></i> <span>${r}</span></li>`).join('')}
           </ul>
         </div>
 

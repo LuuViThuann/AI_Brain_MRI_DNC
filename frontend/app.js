@@ -98,6 +98,7 @@
   const xaiPanel = document.getElementById('xaiPanel');
   const similarPanel = document.getElementById('similarPanel');
   const atlasPanel = document.getElementById('atlasViewPanel');
+  const historyPanel = document.getElementById('historyPanel');
   const mainLayout = document.querySelector('.main-layout');
 
 
@@ -364,6 +365,7 @@
     previewWrap.appendChild(canvas);
     maskOverlayCanvas = canvas;
   }
+  window.drawMaskOnCanvas = renderMaskOverlay;
 
   // ===== RUN DIAGNOSIS =====
   btnDiagnose.addEventListener('click', async () => {
@@ -390,8 +392,13 @@
       }
  
       const diagnosisResult = await res.json();
-      window.lastDiagnosisData = diagnosisResult; // ✅ Set globally for all features
+      window.lastDiagnosisData = diagnosisResult; // Set globally for all features
       lastPredictionData = diagnosisResult.prediction;
+
+      // PATCH 5: Notify history after save
+      if (diagnosisResult.history_id) {
+        window.HistoryUI && window.HistoryUI.onNewDiagnosis && window.HistoryUI.onNewDiagnosis();
+      }
 
       if (diagnosisResult.xai && !diagnosisResult.xai.error) {
         lastXAIData = diagnosisResult.xai;
@@ -409,7 +416,7 @@
         window.Atlas4PanelViewer.loadDiagnosis(diagnosisResult);
       }
 
-      // ❌ KHÔNG gọi displayMetricsPanel ở đây (đã tắt)
+      //  KHÔNG gọi displayMetricsPanel ở đây (đã tắt)
       // displayMetricsPanel(diagnosisResult);
 
       update3DBrain(diagnosisResult);
@@ -518,12 +525,12 @@
 
     // Findings
     findingsList.innerHTML = (report.findings || [])
-      .map(f => `<li>✓ ${f}</li>`)
+      .map(f => `<li><i class="fa-solid fa-check" style="color:var(--cyan);margin-right:8px;font-size:10px;"></i> ${f}</li>`)
       .join('');
 
     // Recommendations
     recommendationsList.innerHTML = (report.recommendations || [])
-      .map(r => `<li>→ ${r}</li>`)
+      .map(r => `<li><i class="fa-solid fa-arrow-right" style="color:var(--green);margin-right:8px;font-size:10px;"></i> ${r}</li>`)
       .join('');
 
     // Populate methods comparison table
@@ -565,8 +572,8 @@
     }
 
     // Disclaimer
-    disclaimer.textContent = report.disclaimer ||
-      '⚠️ Đây là báo cáo do AI sinh ra. Nó không thay thế lời khuyên y tế chuyên môn.';
+    disclaimer.innerHTML = report.disclaimer ? `<i class="fa-solid fa-triangle-exclamation" style="color:#ff9800;margin-right:6px;"></i> ${report.disclaimer}` :
+      '<i class="fa-solid fa-triangle-exclamation" style="color:#ff9800;margin-right:6px;"></i> Đây là báo cáo do AI sinh ra. Nó không thay thế lời khuyên y tế chuyên môn.';
 
     // ✅ Render Depth Status Card on main screen (right panel)
     renderDepthCard(data);
@@ -613,7 +620,7 @@
       'width:192px;z-index:8;pointer-events:none',
       `background:${S.bg}`,
       `border:1px solid ${S.border}40`,
-      `border-left:3px solid ${S.border}`,
+      `border:1px solid ${S.border}60`,
       'border-radius:8px;padding:9px 11px',
       'font-family:Consolas,monospace',
       'backdrop-filter:blur(6px)',
@@ -699,7 +706,6 @@
     card.style.display = 'block';
     inner.style.background = S.bg;
     inner.style.border = `1px solid ${S.border}40`;
-    inner.style.borderLeft = `4px solid ${S.border}`;
     if (glowBar) { glowBar.style.background = `linear-gradient(90deg,transparent,${S.glow},transparent)`; }
 
     if (emoji) emoji.textContent = S.emoji;
@@ -890,6 +896,7 @@
     if (xaiPanel) xaiPanel.style.display = 'none';
     if (similarPanel) similarPanel.style.display = 'none';
     if (infoPanel) infoPanel.style.display = 'none';
+    if (historyPanel) historyPanel.style.display = 'none';
     if (atlasPanel) atlasPanel.classList.remove('active');
 
     // Show based on tab
@@ -947,6 +954,11 @@
 
       case 'info':
         if (infoPanel) infoPanel.style.display = 'block';
+        break;
+
+      case 'history':
+        if (historyPanel) historyPanel.style.display = 'flex';
+        if (window.HistoryUI && window.HistoryUI.open) window.HistoryUI.open();
         break;
 
       case 'atlas':
@@ -1153,7 +1165,7 @@
     if (btnRotate) btnRotate.classList.add('active');
 
     // ✅ 💾 RESTORE previous diagnosis from localStorage (if any)
-    // Wait slightly for 3D viewer and other modules to be ready
+    // Wait slightly for 3D viewer and other modules to be ready  
     setTimeout(() => {
       _restoreFromLS();
     }, 500);
@@ -1164,6 +1176,21 @@
   // ===== NOTE: window.updateTumorMetrics is defined in brain3d_new.js =====
   // Do NOT override it here — brain3d_new.js has the full Detail Analysis renderer.
 
+  // ===== SYNC RESTORED DATA (for History UI) =====
+  function syncRestoredData(data) {
+    console.log('[App] 🔄 Syncing restored diagnosis data...');
+    window.lastDiagnosisData = data;
+    lastPredictionData = data.prediction;
+    
+    if (data.xai && !data.xai.error) {
+      lastXAIData = data.xai;
+      window.lastXAIData = data.xai;
+    } else {
+      lastXAIData = null;
+      window.lastXAIData = null;
+    }
+  }
+
   // ===== WINDOW EXPORTS (for external scripts) ===== 
   window.App = {
     switchTab,
@@ -1171,7 +1198,10 @@
     lastXAIData: () => lastXAIData,
     lastSimilarData: () => lastSimilarData,
     getCurrentFile: () => currentFile,
-    clearDiagnosisCache: _clearLS  // Allow external clear if needed
+    clearDiagnosisCache: _clearLS,  // Allow external clear if needed
+    displayReport: displayReport,
+    update3DBrain: update3DBrain,
+    syncRestoredData: syncRestoredData
   };
 
 })();

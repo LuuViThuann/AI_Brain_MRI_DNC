@@ -26,6 +26,10 @@ from routes.brain3d   import router as brain3d_router
 from routes.xai_explain import router as xai_router
 from routes.similar_cases import router as similar_router
 
+from database import engine
+from models import Base
+from routes.history import router as history_router  
+
 # ===== APP INITIALIZATION =====
 app = FastAPI(
     title="Brain MRI Diagnosis API",
@@ -181,11 +185,15 @@ async def test_images_directory():
     
     return result
 
+
+
 # ===== INCLUDE ROUTERS =====
 app.include_router(diagnosis_router, prefix="/api", tags=["Diagnosis"])
 app.include_router(brain3d_router,   prefix="/api", tags=["3D Brain"])
 app.include_router(xai_router, prefix="/api/xai", tags=["xAI"])
 app.include_router(similar_router, prefix="/api/similar", tags=["Similar Cases"])
+
+app.include_router(history_router, prefix="/api", tags=["History"])
 
 # ===== STATIC FILES (MUST BE LAST) =====
 
@@ -231,6 +239,13 @@ else:
 
 @app.on_event("startup")
 async def startup_event():
+    # Create all DB tables if they don't exist yet
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("✅ Database tables initialised")
+    except Exception as e:
+        print(f"❌ Failed to initialise database tables: {e}")
+
     """Run on server startup"""
     print("\n" + "=" * 70)
     print("  🧠 Brain MRI Diagnosis API - Server Started")

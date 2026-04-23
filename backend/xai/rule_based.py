@@ -206,17 +206,17 @@ class RuleBasedAnalyzer:
             return 90
     
     def _compare_to_dataset(self, area_mm2: float) -> str:
-        """Provide comparison narrative."""
+        """Provide comparison narrative in Vietnamese."""
         percentile = self._calculate_brats_percentile(area_mm2)
         
         if percentile <= 25:
-            return "Smaller than 75% of tumors in BraTS dataset"
+            return "Nhỏ hơn 75% các khối u trong tập dữ liệu BraTS"
         elif percentile <= 50:
-            return "Below median size in BraTS dataset"
+            return "Nhỏ hơn kích thước trung vị trong tập dữ liệu BraTS"
         elif percentile <= 75:
-            return "Above median, within typical range"
+            return "Trên mức trung vị, trong phạm vi điển hình"
         else:
-            return "Larger than 75% of tumors in BraTS dataset"
+            return "Lớn hơn 75% các khối u trong tập dữ liệu BraTS"
     
     def _assess_risk_enhanced(
         self,
@@ -238,24 +238,24 @@ class RuleBasedAnalyzer:
         
         # Rule 1: Size-based risk (with medical context)
         if area_mm2 < 100:
-            rules.append(f"Very small tumor (<100mm²) - {self._calculate_brats_percentile(area_mm2)}th percentile")
+            rules.append(f"Khối u rất nhỏ (<100mm²) - Phân vị thứ {self._calculate_brats_percentile(area_mm2)}")
             risk_score += 1
-            rationale_points.append("Tumor size is small relative to clinical significance")
+            rationale_points.append("Kích thước khối u nhỏ so với ý nghĩa lâm sàng")
         elif area_mm2 < 500:
-            rules.append(f"Small-medium tumor (100-500mm²) - {self._calculate_brats_percentile(area_mm2)}th percentile")
+            rules.append(f"Khối u nhỏ-vừa (100-500mm²) - Phân vị thứ {self._calculate_brats_percentile(area_mm2)}")
             risk_score += 2
-            rationale_points.append("Tumor size is moderate, requires monitoring")
+            rationale_points.append("Kích thước khối u ở mức trung bình, cần theo dõi")
         else:
-            rules.append(f"Large tumor (>500mm²) - {self._calculate_brats_percentile(area_mm2)}th percentile")
+            rules.append(f"Khối u lớn (>500mm²) - Phân vị thứ {self._calculate_brats_percentile(area_mm2)}")
             risk_score += 3
-            rationale_points.append("Tumor size exceeds typical low-grade glioma range")
+            rationale_points.append("Kích thước khối u vượt quá phạm vi u thần kinh đệm bậc thấp điển hình")
         
         # Rule 2: Brain coverage (with threshold reference)
         coverage_threshold = 0.05  # 5% - based on clinical significance
         if ratio > coverage_threshold:
-            rules.append(f"Significant brain coverage (>{coverage_threshold*100:.1f}% of slice)")
+            rules.append(f"Diện tích bao phủ não đáng kể (>{coverage_threshold*100:.1f}% lát cắt)")
             risk_score += 2
-            rationale_points.append(f"Tumor occupies >{coverage_threshold*100:.0f}% of brain slice - clinically significant")
+            rationale_points.append(f"Khối u chiếm >{coverage_threshold*100:.0f}% diện tích lát cắt não - có ý nghĩa lâm sàng")
         
         # Rule 3: Location risk (with functional region context)
         location_lower = location.lower()
@@ -263,21 +263,23 @@ class RuleBasedAnalyzer:
         for critical_loc in self.CRITICAL_LOCATIONS:
             if critical_loc in location_lower:
                 functional_impact = self._get_functional_impact(critical_loc)
-                rules.append(f"Critical location: {critical_loc} - {functional_impact}")
+                # Translate location names
+                loc_vn = {"frontal": "thùy trán", "temporal": "thùy thái dương", "brainstem": "thân não"}.get(critical_loc, critical_loc)
+                rules.append(f"Vị trí trọng yếu: {loc_vn} - {functional_impact}")
                 risk_score += 2
-                rationale_points.append(f"Location in {critical_loc} region may affect: {functional_impact}")
+                rationale_points.append(f"Vị trí ở vùng {loc_vn} có thể ảnh hưởng: {functional_impact}")
                 location_risk_added = True
                 break
         
         if not location_risk_added:
-            rationale_points.append("Location in non-eloquent cortex")
+            rationale_points.append("Vị trí nằm ở vùng vỏ não không trọng yếu")
         
         # Rule 4: Shape irregularity (growth pattern indicator)
         circularity = features.get('circularity', 1.0)
         if circularity < 0.5:
-            rules.append(f"Irregular shape (circularity: {circularity:.2f}) - suggests infiltrative growth")
+            rules.append(f"Hình dạng không đều (độ tròn: {circularity:.2f}) - gợi ý sự phát triển xâm lấn")
             risk_score += 1
-            rationale_points.append("Irregular borders suggest diffuse/infiltrative growth pattern")
+            rationale_points.append("Bờ không đều gợi ý kiểu phát triển lan tỏa/xâm lấn")
         
         # Determine final risk level
         if risk_score <= 2:
@@ -291,22 +293,22 @@ class RuleBasedAnalyzer:
             "risk_score": risk_score,
             "max_score": 9,
             "factors_considered": rationale_points,
-            "classification_method": "Additive risk scoring based on size, location, coverage, and morphology",
-            "interpretation": f"Risk score {risk_score}/9 classified as {risk_level} risk"
+            "classification_method": "Tính điểm rủi ro cộng dồn dựa trên kích thước, vị trí, độ bao phủ và hình thái",
+            "interpretation": f"Điểm rủi ro {risk_score}/9 được phân loại là rủi ro {risk_level}"
         }
         
         return risk_level, rules, rationale
     
     def _get_functional_impact(self, location: str) -> str:
-        """Get functional impact description for brain region."""
+        """Get functional impact description for brain region in Vietnamese."""
         impact_map = {
-            'frontal': 'Motor control, executive function, speech (Broca\'s area)',
-            'temporal': 'Memory formation, language comprehension (Wernicke\'s area), hearing',
-            'parietal': 'Sensory processing, spatial awareness, calculation',
-            'occipital': 'Visual processing',
-            'brainstem': 'Vital functions (breathing, heart rate, consciousness)'
+            'frontal': 'Kiểm soát vận động, chức năng điều hành, ngôn ngữ (vùng Broca)',
+            'temporal': 'Hình thành trí nhớ, hiểu ngôn ngữ (vùng Wernicke), thính giác',
+            'parietal': 'Xử lý cảm giác, nhận thức không gian, tính toán',
+            'occipital': 'Xử lý thị giác',
+            'brainstem': 'Các chức năng sinh tồn (hô hấp, nhịp tim, ý thức)'
         }
-        return impact_map.get(location, 'Various cognitive/motor functions')
+        return impact_map.get(location, 'Các chức năng nhận thức/vận động khác nhau')
 
     
     def _detect_location(self, mask: np.ndarray) -> str:
@@ -373,38 +375,39 @@ class RuleBasedAnalyzer:
         
         # Rule 1: Size-based risk
         if area_mm2 < self.RISK_THRESHOLDS['low']:
-            rules.append("Small tumor (<100mm²)")
+            rules.append("Khối u nhỏ (<100mm²)")
             risk_score += 1
         elif area_mm2 < self.RISK_THRESHOLDS['medium']:
-            rules.append("Medium tumor (100-500mm²)")
+            rules.append("Khối u trung bình (100-500mm²)")
             risk_score += 2
         else:
-            rules.append("Large tumor (>500mm²)")
+            rules.append("Khối u lớn (>500mm²)")
             risk_score += 3
         
         # Rule 2: Brain coverage ratio
         if ratio > 0.05:  # >5% of slice
-            rules.append("Significant brain coverage (>5%)")
+            rules.append("Diện tích bao phủ não đáng kể (>5%)")
             risk_score += 2
         
         # Rule 3: Location-based risk
         location_lower = location.lower()
         for critical_loc in self.CRITICAL_LOCATIONS:
             if critical_loc in location_lower:
-                rules.append(f"Near critical region: {critical_loc}")
+                loc_vn = {"frontal": "thùy trán", "temporal": "thùy thái dương", "brainstem": "thân não"}.get(critical_loc, critical_loc)
+                rules.append(f"Gần vùng trọng yếu: {loc_vn}")
                 risk_score += 2
                 break
         
         # Rule 4: Multiple tumor regions
         num_components = self._count_tumor_regions(mask)
         if num_components > 1:
-            rules.append(f"Multiple tumor regions ({num_components})")
+            rules.append(f"Nhiều vùng u ({num_components})")
             risk_score += 2
         
         # Rule 5: Irregular shape
         circularity = self._calculate_circularity(mask)
         if circularity < 0.5:
-            rules.append("Irregular tumor shape")
+            rules.append("Hình dạng khối u không đều")
             risk_score += 1
         
         # Determine final risk level
@@ -499,31 +502,31 @@ class RuleBasedAnalyzer:
         location: str,
         features: Dict
     ) -> List[str]:
-        """Generate clinical warnings based on findings."""
+        """Generate clinical warnings in Vietnamese based on findings."""
         warnings = []
         
         # Size warnings
         if area_mm2 > 1000:
-            warnings.append("⚠ Very large tumor detected (>1000mm²)")
+            warnings.append("⚠ Phát hiện khối u rất lớn (>1000mm²)")
         
         # Coverage warnings
         if ratio > 0.1:
-            warnings.append("⚠ Extensive brain involvement (>10% of slice)")
+            warnings.append("⚠ Sự xâm lấn não diện rộng (>10% lát cắt)")
         
         # Location warnings
         location_lower = location.lower()
         if 'frontal' in location_lower:
-            warnings.append("⚠ Frontal lobe involvement may affect motor control")
+            warnings.append("⚠ Liên quan thùy trán có thể ảnh hưởng đến kiểm soát vận động")
         elif 'temporal' in location_lower:
-            warnings.append("⚠ Temporal lobe involvement may affect language/memory")
+            warnings.append("⚠ Liên quan thùy thái dương có thể ảnh hưởng đến ngôn ngữ/trí nhớ")
         
         # Shape warnings
         if features.get('circularity', 1.0) < 0.4:
-            warnings.append("⚠ Highly irregular shape detected")
+            warnings.append("⚠ Phát hiện hình dạng rất không đều")
         
         # Multiple regions warning
         if features.get('solidity', 1.0) < 0.7:
-            warnings.append("⚠ Irregular boundaries suggest infiltrative growth")
+            warnings.append("⚠ Ranh giới không đều gợi ý sự phát triển xâm lấn")
         
         return warnings
 

@@ -32,6 +32,9 @@ from xai.gradcam import GradCAMExplainer
 from xai.rule_based import RuleBasedAnalyzer
 from xai.shap_explain import SHAPExplainer, extract_features_for_shap
 
+from database import SessionLocal
+from models import DiagnosticHistory
+
 router = APIRouter()
 
 
@@ -95,46 +98,63 @@ def image_to_base64(img: Image.Image) -> str:
 
 
 def generate_combined_insights(gradcam, rules, shap) -> list:
-    """Generate combined insights from all XAI methods."""
+    """Generate combined insights from all XAI methods in Vietnamese."""
     insights = []
     
     # Grad-CAM insights
     if gradcam and gradcam.get('attention_score', 0) > 0.7:
-        insights.append("🔍 CNN shows high confidence in identified tumor region")
+        insights.append("Độ tin cậy: CNN cho thấy độ tin cậy cao đối với vùng u được xác định")
     elif gradcam and gradcam.get('attention_score', 0) < 0.3:
-        insights.append("⚠ CNN attention is diffuse - prediction may be uncertain")
+        insights.append("Cảnh báo: Sự tập trung của CNN bị phân tán - dự đoán có thể không chắc chắn")
     
     # Rule-based insights
     if rules:
         risk = rules.get('risk_level', 'Unknown')
         if risk == 'High':
             insights.append(
-                f"⚠ High risk classification: {rules.get('tumor_area_mm2', 'unknown')}mm² tumor detected"
+                f"Rủi ro: Phân loại rủi ro CAO: Phát hiện u kích thước {rules.get('tumor_area_mm2', 'không xác định')}mm²"
             )
         elif risk == 'Low':
             insights.append(
-                f"✓ Low risk classification: Small tumor ({rules.get('tumor_area_mm2', 'unknown')}mm²)"
+                f"Thông tin: Phân loại rủi ro THẤP: Khối u nhỏ ({rules.get('tumor_area_mm2', 'không xác định')}mm²)"
             )
         
         # Location insights
         location = rules.get('location', '').lower()
         if 'frontal' in location:
-            insights.append("📍 Frontal lobe location may affect motor functions")
+            insights.append("Vị trí: Vị trí thùy trán có thể ảnh hưởng đến chức năng vận động")
         elif 'temporal' in location:
-            insights.append("📍 Temporal lobe location may affect memory/language")
+            insights.append("Vị trí: Vị trí thùy thái dương có thể ảnh hưởng đến trí nhớ/ngôn ngữ")
         
         # Warnings
         warnings = rules.get('warnings', [])
         if warnings:
-            insights.extend(warnings[:2])
+            # Try to translate common warnings on the fly or just use them
+            for w in warnings[:2]:
+                w_vn = w.replace("⚠ Very large tumor detected", "⚠ Phát hiện khối u rất lớn") \
+                        .replace("⚠ Extensive brain involvement", "⚠ Sự xâm lấn não diện rộng") \
+                        .replace("⚠ Frontal lobe involvement", "⚠ Liên quan thùy trán") \
+                        .replace("⚠ Temporal lobe involvement", "⚠ Liên quan thùy thái dương") \
+                        .replace("⚠ Highly irregular shape detected", "⚠ Phát hiện hình dạng không đều") \
+                        .replace("⚠ Irregular boundaries suggest infiltrative growth", "⚠ Ranh giới không đều gợi ý sự phát triển xâm lấn")
+                insights.append(w_vn)
     
     # SHAP insights
     if shap:
         top_feature = shap.get('top_features', [None])[0] if shap.get('top_features') else None
         if top_feature:
             importance = shap.get('feature_importance', {}).get(top_feature, 0)
+            # Map feature names to Vietnamese if possible
+            feature_map = {
+                "tumor_area": "diện tích khối u",
+                "circularity": "độ tròn",
+                "solidity": "độ đặc",
+                "perimeter": "chu vi",
+                "mean_intensity": "cường độ trung bình"
+            }
+            top_feature_vn = feature_map.get(top_feature, top_feature)
             insights.append(
-                f"📊 Most important feature: {top_feature} (importance: {importance:.3f})"
+                f"Đặc trưng: Đặc trưng quan trọng nhất: {top_feature_vn} (độ quan trọng: {importance:.3f})"
             )
     
     return insights
@@ -244,7 +264,7 @@ async def diagnose(file: UploadFile = File(...)):
                     "Consider additional imaging if needed"
                 ],
                 "severity": "medium" if prediction["tumor_detected"] else "low",
-                "disclaimer": "⚠️ This is an AI-generated report. Not a substitute for professional medical advice."
+                "disclaimer": "This is an AI-generated report. Not a substitute for professional medical advice."
             }
                 # ===== STEP 4b: GROQ VISION ANALYSIS =====
         vision_report = None
@@ -260,7 +280,7 @@ async def diagnose(file: UploadFile = File(...)):
                 v_findings = vision_report.get('visual_findings', [])
                 if v_findings and isinstance(report.get('findings'), list):
                     report['findings'] = report['findings'] + [
-                        f"🔭 [Vision] {f}" for f in v_findings[:2]
+                        f"Vision: {f}" for f in v_findings[:2]
                     ]
                 report['vision_model'] = vision_report.get('model_used', 'unknown')
                 print(f"   ✅ Vision analysis merged (model: {vision_report.get('model_used')})")
@@ -456,6 +476,70 @@ async def diagnose(file: UploadFile = File(...)):
             }
         }
         
+        try:
+            db = SessionLocal()
+            try:
+                # Thumbnail: reuse the small preview — resize to 128×128 to save space
+                thumb_b64 = None
+                try:
+                    thumb = img.copy().convert("RGB")
+                    thumb.thumbnail((128, 128))
+                    import io as _io, base64 as _b64
+                    buf = _io.BytesIO()
+                    thumb.save(buf, format="PNG")
+                    thumb_b64 = "data:image/png;base64," + _b64.b64encode(buf.getvalue()).decode()
+                except Exception:
+                    pass
+
+                # Build the XAI blob — strip heavy base64 images to keep DB lean
+                xai_for_db = {}
+                if xai_result:
+                    xai_for_db = {
+                        "rule_based":       xai_result.get("rule_based"),
+                        "shap":             xai_result.get("shap"),
+                        "combined_insights": xai_result.get("combined_insights"),
+                        "gradcam_score":    (
+                            xai_result.get("gradcam", {}) or {}
+                        ).get("attention_score"),
+                    }
+
+                record = DiagnosticHistory(
+                    image_filename  = file.filename,
+                    image_base64    = thumb_b64,
+                    tumor_detected  = prediction["tumor_detected"],
+                    confidence      = prediction["confidence"],
+                    tumor_area_pct  = prediction["tumor_area_percent"],
+                    location_hint   = prediction["location_hint"],
+                    severity        = report.get("severity"),
+                    prediction_data = {
+                        "tumor_detected":     prediction["tumor_detected"],
+                        "confidence":         prediction["confidence"],
+                        "tumor_area_percent": prediction["tumor_area_percent"],
+                        "location_hint":      prediction["location_hint"],
+                        "location_3d_key":    location_3d_key,
+                        "centroid_px":        prediction.get("centroid_px"),
+                        "centroid_normalized": prediction.get("centroid_normalized"),
+                    },
+                    report_data     = report,
+                    xai_data        = xai_for_db,
+                    mask_data       = prediction["mask"],    # 256×256 nested list
+                    processing_time = processing_time,
+                    model_version   = "U-Net v1.0",
+                )
+                db.add(record)
+                db.commit()
+
+                # Attach the new record ID to the response so frontend can link directly
+                response["history_id"] = str(record.id)
+                print(f"   💾 Saved to history: {record.id}")
+
+            finally:
+                db.close()
+
+        except Exception as e:
+            # History save failure must NEVER break the diagnosis response
+            print(f"   ⚠️  History save failed (non-fatal): {e}")
+
         # Add MNI data if available
         if mni_data:
             response['mni_data'] = mni_data

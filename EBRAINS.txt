@@ -19,18 +19,6 @@ Cosine SimilarityĐo góc giữa 2 vector đặc trưng → cho ra similarity_sc
 
 + Prototype-based models (so sánh ca bệnh tương tự)
 
---------- FIX 
-
-+ Fix chỉnh màu sáng giao diện 
-+ Ngôn ngữ 
-
------
-+ Điều chỉnh nội dung chuẩn đoán
-+ Tổng hợp các thông tin trọng tâm , không trùng lặp lại 
-+ Chưa hiển thị tiếng việt khi xem trong atlas 
-+ Chỉnh lại 
-
-
 
 
 -------------------------------------
@@ -43,26 +31,9 @@ Swin UNETR
 
 
 -----
-* Note chức năng lưu lịch sử : 
-Nhóm 2: Các File Cần Chỉnh Sửa (Modified Files)
-Đây là nơi bạn tích hợp tính năng vào luồng hoạt động hiện tại:
 
-backend/app.py:
-Import và đăng ký history_router.
-Lệnh khởi tạo bảng: Base.metadata.create_all(bind=engine).
+*Note : 
+Mô hình hiện tại: Bạn đang dùng một kiến trúc 2D U-Net tùy chỉnh (được định nghĩa trong file model/model_architecture.py) sử dụng framework TensorFlow/Keras.
+Khả năng hiện tại: Mô hình này chỉ thực hiện phân đoạn nhị phân (Binary Segmentation). Nó chỉ có 1 đầu ra (sigmoid) để xác định vùng đó là "Khối u" hay "Nền", chưa thể phân tách sâu hơn.
 
-backend/routes/diagnosis.py:
-Import db (Session) và DiagnosisRecord (Model).
-Thêm code lưu dữ liệu vào DB ngay sau khi AI trả về kết quả thành công.
 
-frontend/index.html:
-Thêm Tab/Nút "Lịch sử" vào thanh điều hướng (Nav).
-Thêm một <section> để chứa danh sách lịch sử.
-Khai báo file <script src="history_ui.js"></script>.
-
-frontend/app.js:
-Cập nhật hàm switchTab để hỗ trợ hiển thị tab Lịch sử.
-Gọi hàm tải dữ liệu lịch sử khi người dùng nhấn vào tab đó.
-
-frontend/styles.css:
-Thiết kế giao diện cho danh sách lịch sử (Bảng dữ liệu hoặc danh sách các thẻ kết quả).
