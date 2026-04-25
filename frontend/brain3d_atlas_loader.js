@@ -385,7 +385,7 @@
     return true;
   }
 
-  // ===== API =====
+  // ===== API =====-------------------------------------------------------
   function addAtlasToScene(scene) {
     if (atlasState.templateMesh) {
       atlasState.templateMesh.visible = atlasState.isVisible;
@@ -423,7 +423,7 @@
   function getSliceData(axis, sliceIdx) {
     if (!atlasState.isLoaded) return null;
     
-    // Auto-scale slice index to volume dimensions
+ 
     const dims = atlasState.templateVolume.dims;
     let scaledIdx = sliceIdx;
     

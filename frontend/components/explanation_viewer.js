@@ -10,7 +10,7 @@
         this.attachEventListeners();
       },
       
-      // Attach event listeners
+   
       attachEventListeners: function() {
         // Tab switching
         const pills = document.querySelectorAll('.pill');
@@ -35,7 +35,7 @@
         document.querySelectorAll('.panel, .xai-panel, .similar-panel, .info-panel')
           .forEach(panel => panel.style.display = 'none');
         
-        // Show selected panel
+       
         if (tab === 'scan') {
           document.querySelectorAll('.panel').forEach(p => p.style.display = 'flex');
         } else if (tab === 'xai') {

@@ -411,9 +411,13 @@ async def diagnose(file: UploadFile = File(...)):
             else:
                 cx_norm, cy_norm = 0.5, 0.5
 
+            # NEW: Multiclass mask for color grading
+            mc_mask_np = np.array(prediction.get('multiclass_mask'), dtype=np.uint8) if prediction.get('multiclass_mask') else None
+
             slices_data = generate_all_slices(
                 img=img,
                 mask_2d=mask_np,
+                mc_mask_2d=mc_mask_np,
                 cx=cx_norm,
                 cy=cy_norm,
                 size=512
@@ -460,6 +464,8 @@ async def diagnose(file: UploadFile = File(...)):
             "depth_metrics": depth_metrics,
             "report": report,
             "mask": prediction["mask"],
+            "multiclass_mask": prediction.get("multiclass_mask"),
+            "multiclass_stats": prediction.get("multiclass_stats"),
             "xai": xai_result,
             "visualization": {
                 "brain3d_url": f"/api/brain3d?location={location_3d_key}&tumor_size={tumor_size_3d:.2f}",
@@ -519,6 +525,8 @@ async def diagnose(file: UploadFile = File(...)):
                         "location_3d_key":    location_3d_key,
                         "centroid_px":        prediction.get("centroid_px"),
                         "centroid_normalized": prediction.get("centroid_normalized"),
+                        "multiclass_stats":   prediction.get("multiclass_stats"),
+                        "multiclass_mask":    prediction.get("multiclass_mask"),
                     },
                     report_data     = report,
                     xai_data        = xai_for_db,

@@ -33,7 +33,16 @@ Swin UNETR
 -----
 
 *Note : 
+
 Mô hình hiện tại: Bạn đang dùng một kiến trúc 2D U-Net tùy chỉnh (được định nghĩa trong file model/model_architecture.py) sử dụng framework TensorFlow/Keras.
 Khả năng hiện tại: Mô hình này chỉ thực hiện phân đoạn nhị phân (Binary Segmentation). Nó chỉ có 1 đầu ra (sigmoid) để xác định vùng đó là "Khối u" hay "Nền", chưa thể phân tách sâu hơn.
 
 
+mô hình của bạn chỉ có 1 đầu ra (Binary).
+vì code hiện tại chủ yếu dùng TensorFlow
+
+Đã có một Model hoạt động tốt trên bộ dữ liệu LGG MRI. Chức năng "phân lớp màu" mà tôi sắp viết sẽ chạy trực tiếp trên kết quả của Model này.
+
+ Phương pháp xử lý hậu kỳ (post-processing) dựa trên cường độ sáng (intensity) 
+ là một giải pháp cực kỳ hiệu quả: nó cung cấp thông tin chi tiết về cấu trúc khối u 
+ (vùng lõi, vùng phù, vùng tăng cường) cho bác sĩ mà không cần quy trình huấn luyện lại mô hình phức tạp.

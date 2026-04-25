@@ -187,6 +187,33 @@
           <div class="confidence-value" id="confidenceValue">0%</div>
         </div>
 
+        <!-- ===== TUMOR COLOR GRADING LEGEND ===== -->
+        <div class="grading-legend" style="
+          margin: 14px 0;
+          padding: 12px;
+          background: rgba(255,255,255,0.03);
+          border-radius: 8px;
+          border: 1px solid var(--border);
+        ">
+          <div style="font-size: 10px; color: var(--text-sec); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; font-weight: 700;">
+            <i class="fa-solid fa-palette" style="margin-right: 6px;"></i> Phân Lớp Màu (Grading)
+          </div>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="width: 10px; height: 10px; border-radius: 2px; background: #ff0040; box-shadow: 0 0 5px #ff0040;"></span>
+              <span style="font-size: 11px; color: var(--text-primary);">Hoại tử (Necrosis)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="width: 10px; height: 10px; border-radius: 2px; background: #00c853; box-shadow: 0 0 5px #00c853;"></span>
+              <span style="font-size: 11px; color: var(--text-primary);">Phù não (Edema)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="width: 10px; height: 10px; border-radius: 2px; background: #ffd600; box-shadow: 0 0 5px #ffd600;"></span>
+              <span style="font-size: 11px; color: var(--text-primary);">Tăng cường (Enhancing)</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Quick stats -->
         <div class="stats-grid">
           <div class="stat-card">

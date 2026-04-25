@@ -350,7 +350,23 @@
       for (let x = 0; x < 256; x++) {
         const idx = (y * 256 + x) * 4;
         const val = mask[y][x];
-        if (val > 0.5) {
+        
+        if (val === 1) { // Necrosis - Red
+          imageData.data[idx] = 255;
+          imageData.data[idx + 1] = 0;
+          imageData.data[idx + 2] = 64;
+          imageData.data[idx + 3] = 200;
+        } else if (val === 2) { // Edema - Green
+          imageData.data[idx] = 0;
+          imageData.data[idx + 1] = 200;
+          imageData.data[idx + 2] = 83;
+          imageData.data[idx + 3] = 160;
+        } else if (val === 3) { // Enhancing - Yellow
+          imageData.data[idx] = 255;
+          imageData.data[idx + 1] = 214;
+          imageData.data[idx + 2] = 0;
+          imageData.data[idx + 3] = 220;
+        } else if (val > 0.5) { // Fallback for binary mask
           imageData.data[idx] = 255;
           imageData.data[idx + 1] = 82;
           imageData.data[idx + 2] = 82;
@@ -408,7 +424,9 @@
         window.lastXAIData = null;
       }
 
-      if (diagnosisResult.mask) renderMaskOverlay(diagnosisResult.mask);
+      if (diagnosisResult.mask) {
+        renderMaskOverlay(diagnosisResult.multiclass_mask || diagnosisResult.mask);
+      }
 
       displayReport(diagnosisResult);
 

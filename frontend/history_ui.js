@@ -756,6 +756,8 @@
       prediction: rec.prediction_data,
       report: rec.report_data,
       mask: rec.mask_data,
+      multiclass_mask: rec.prediction_data?.multiclass_mask,
+      multiclass_stats: rec.prediction_data?.multiclass_stats,
       xai: rec.xai_data,
       detailed_metrics: rec.xai_data?.rule_based?.detailed_metrics,
       depth_metrics: rec.xai_data?.rule_based?.depth_metrics,

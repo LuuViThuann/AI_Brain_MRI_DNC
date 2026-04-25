@@ -450,7 +450,7 @@ def predict_tumor(img: Image.Image) -> dict:
             print(f"[❌] Prediction error: {str(e)}")
             raise RuntimeError(f"Model prediction failed: {str(e)}")
     
-     # Thêm sau khi tính được mask:
+    # Thêm sau khi tính được mask:
     if tumor_detected and np.sum(mask) > 0:
         ys, xs = np.where(mask == 1)
         cy, cx = int(np.mean(ys)), int(np.mean(xs))
@@ -461,19 +461,96 @@ def predict_tumor(img: Image.Image) -> dict:
             (cy - 128) / 128,  # -1 to 1
             0  # z-axis (single slice)
         ]
+        
+    # --- NEW: Generate multi-class mask (grading) ---
+        multiclass_mask = generate_multiclass_mask(np.array(img), mask)
+        
+        # Calculate stats for the multiclass mask
+        multiclass_stats = {
+            "ncr_count": int(np.sum(multiclass_mask == 1)),
+            "ed_count": int(np.sum(multiclass_mask == 2)),
+            "et_count": int(np.sum(multiclass_mask == 3)),
+            "total_tumor_pixels": int(np.sum(multiclass_mask > 0))
+        }
     else:
         cx, cy = 0, 0
         centroid_normalized = [0, 0, 0]
+        multiclass_mask = None
+        multiclass_stats = None
     
     return {
         "tumor_detected": tumor_detected,
         "confidence": round(confidence, 4),
         "tumor_area_percent": round(tumor_area_percent, 2),
         "mask": mask.tolist(),
+        "multiclass_mask": multiclass_mask.tolist() if multiclass_mask is not None else None,
+        "multiclass_stats": multiclass_stats,
         "location_hint": location_hint,
         "centroid_px": {"x": cx, "y": cy},  
         "centroid_normalized": centroid_normalized,  
     }
+
+
+def generate_multiclass_mask(mri_img_array: np.ndarray, binary_mask: np.ndarray) -> np.ndarray:
+    """
+    Heuristic-based multi-class segmentation.
+    Classifies regions within the binary mask based on intensity.
+    
+    Labels:
+    - 0: Background
+    - 1: Necrosis (NCR) - Low intensity
+    - 2: Edema (ED) - Surrounding/Intermediate intensity
+    - 3: Enhancing Tumor (ET) - High intensity
+    """
+    # Ensure mri_img is grayscale and same size as mask
+    if len(mri_img_array.shape) > 2:
+        # If RGB, convert to L
+        mri_img_gray = np.array(Image.fromarray(mri_img_array).convert("L").resize((256, 256)))
+    else:
+        mri_img_gray = np.array(Image.fromarray(mri_img_array).resize((256, 256)))
+        
+    mri_norm = mri_img_gray.astype(np.float32) / 255.0
+    
+    # Initialize multiclass mask
+    mc_mask = np.zeros_like(binary_mask, dtype=np.uint8)
+    
+    # Only process pixels inside the predicted tumor mask
+    tumor_indices = binary_mask > 0.5
+    if not np.any(tumor_indices):
+        return mc_mask
+        
+    tumor_intensities = mri_norm[tumor_indices]
+    
+    # === ADAPTIVE THRESHOLDING (Dynamic Grading) ===
+    # Thay vì dùng fixed percentile (25%, 85%), chúng ta dùng phân phối cường độ thực tế
+    avg_intensity = np.mean(tumor_intensities)
+    std_intensity = np.std(tumor_intensities)
+    
+    # NCR (Hoại tử) thường là vùng tối nhất
+    # ET (Tăng cường) thường là vùng sáng nhất
+    # ED (Phù nề) là vùng trung gian
+    
+    # Ngưỡng thích nghi:
+    # NCR: thấp hơn (mean - 0.6 * std)
+    # ET: cao hơn (mean + 0.7 * std)
+    low_thresh = max(0.1, avg_intensity - 0.6 * std_intensity)
+    high_thresh = min(0.9, avg_intensity + 0.7 * std_intensity)
+    
+    # Đảm bảo ngưỡng hợp lý
+    if high_thresh <= low_thresh:
+        high_thresh = low_thresh + 0.1
+    
+    # Apply labels
+    # 1. Mặc định là Edema (Label 2)
+    mc_mask[tumor_indices] = 2
+    
+    # 2. Gán Necrosis (Label 1) cho vùng tối
+    mc_mask[(tumor_indices) & (mri_norm < low_thresh)] = 1
+    
+    # 3. Gán Enhancing (Label 3) cho vùng sáng
+    mc_mask[(tumor_indices) & (mri_norm > high_thresh)] = 3
+    
+    return mc_mask
 
 
 # ===== TESTING =====

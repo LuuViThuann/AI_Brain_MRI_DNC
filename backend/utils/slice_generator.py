@@ -84,6 +84,47 @@ def _mask_to_rgba_b64(mask_arr: np.ndarray, size: int,
     return _pil_to_b64(img_rgba)
 
 
+def _multi_class_mask_to_rgba_b64(mc_mask_arr: np.ndarray, size: int) -> str:
+    """
+    Convert multi-class mask (0, 1, 2, 3) -> Color-coded RGBA PNG.
+    Labels:
+    - 1: Necrosis (NCR) -> Red (255, 50, 50)
+    - 2: Edema (ED) -> Green (50, 255, 50)
+    - 3: Enhancing (ET) -> Blue (50, 150, 255)
+    """
+    if mc_mask_arr is None or mc_mask_arr.max() <= 0:
+        return None
+        
+    h, w = mc_mask_arr.shape
+    rgba = np.zeros((h, w, 4), dtype=np.uint8)
+    
+    # 1. Necrosis (Red)
+    ncr = mc_mask_arr == 1
+    rgba[ncr, 0] = 255
+    rgba[ncr, 1] = 0
+    rgba[ncr, 2] = 64
+    rgba[ncr, 3] = 200
+    
+    # 2. Edema (Green)
+    ed = mc_mask_arr == 2
+    rgba[ed, 0] = 0
+    rgba[ed, 1] = 200
+    rgba[ed, 2] = 83
+    rgba[ed, 3] = 160
+    
+    # 3. Enhancing (Yellow)
+    et = mc_mask_arr == 3
+    rgba[et, 0] = 255
+    rgba[et, 1] = 214
+    rgba[et, 2] = 0
+    rgba[et, 3] = 220
+    
+    img_rgba = Image.fromarray(rgba, 'RGBA')
+    if w != size or h != size:
+        img_rgba = img_rgba.resize((size, size), Image.NEAREST)
+    return _pil_to_b64(img_rgba)
+
+
 def _add_scale_bar(img: Image.Image, mm_per_pixel: float = 0.94) -> Image.Image:
     draw = ImageDraw.Draw(img)
     w, h = img.size
@@ -128,12 +169,13 @@ def _add_crosshair(img: Image.Image, cx: float, cy: float,
 
 def generate_axial_slice(img: Image.Image,
                           mask_2d: np.ndarray,
+                          mc_mask_2d: np.ndarray = None,
                           cx: float = 0.5,
                           cy: float = 0.5,
                           size: int = 512) -> dict:
     """
     Axial slice = original MRI image (top-down view).
-    Returns { 'image_b64', 'clean_b64', 'mask_b64', 'view' }
+    Returns { 'image_b64', 'clean_b64', 'mask_b64', 'segmentation_b64', 'view' }
     """
     arr = _to_gray_array(img, size)
     LABELS = {'top': 'A', 'bottom': 'P', 'left': 'R', 'right': 'L'}
@@ -159,22 +201,32 @@ def generate_axial_slice(img: Image.Image,
     tumor = _add_axis_labels(tumor, LABELS)
     tumor = _add_crosshair(tumor, cx, cy, CH_COLOR)
 
+    # Segmentation (multi-color)
+    seg_b64 = None
+    if mc_mask_2d is not None:
+        mc_arr = np.array(
+            Image.fromarray(mc_mask_2d.astype(np.uint8)).resize((size, size), Image.NEAREST)
+        )
+        seg_b64 = _multi_class_mask_to_rgba_b64(mc_arr, size)
+
     return {
         'image_b64': _pil_to_b64(tumor),
         'clean_b64': _pil_to_b64(clean),
         'mask_b64':  mask_b64,
+        'segmentation_b64': seg_b64,
         'view': 'axial'
     }
 
 
 def generate_coronal_slice(img: Image.Image,
-                            mask_2d: np.ndarray,
-                            cx: float = 0.5,
-                            cy: float = 0.5,
-                            size: int = 512) -> dict:
+                             mask_2d: np.ndarray,
+                             mc_mask_2d: np.ndarray = None,
+                             cx: float = 0.5,
+                             cy: float = 0.5,
+                             size: int = 512) -> dict:
     """
     Coronal slice = simulated front view (flip vertical + depth gradient).
-    Returns { 'image_b64', 'clean_b64', 'mask_b64', 'view' }
+    Returns { 'image_b64', 'clean_b64', 'mask_b64', 'segmentation_b64', 'view' }
     """
     arr = _to_gray_array(img, size)
     arr = np.flipud(arr)
@@ -206,22 +258,32 @@ def generate_coronal_slice(img: Image.Image,
     tumor = _add_axis_labels(tumor, LABELS)
     tumor = _add_crosshair(tumor, cx, cy, CH_COLOR)
 
+    # Segmentation (multi-color)
+    seg_b64 = None
+    if mc_mask_2d is not None:
+        mc_arr = np.flipud(np.array(
+            Image.fromarray(mc_mask_2d.astype(np.uint8)).resize((size, size), Image.NEAREST)
+        ))
+        seg_b64 = _multi_class_mask_to_rgba_b64(mc_arr, size)
+
     return {
         'image_b64': _pil_to_b64(tumor),
         'clean_b64': _pil_to_b64(clean),
         'mask_b64':  mask_b64,
+        'segmentation_b64': seg_b64,
         'view': 'coronal'
     }
 
 
 def generate_sagittal_slice(img: Image.Image,
-                             mask_2d: np.ndarray,
-                             cx: float = 0.5,
-                             cy: float = 0.5,
-                             size: int = 512) -> dict:
+                              mask_2d: np.ndarray,
+                              mc_mask_2d: np.ndarray = None,
+                              cx: float = 0.5,
+                              cy: float = 0.5,
+                              size: int = 512) -> dict:
     """
     Sagittal slice = simulated side view (transpose + flip).
-    Returns { 'image_b64', 'clean_b64', 'mask_b64', 'view' }
+    Returns { 'image_b64', 'clean_b64', 'mask_b64', 'segmentation_b64', 'view' }
     """
     arr = _to_gray_array(img, size)
     arr = arr.T
@@ -251,35 +313,39 @@ def generate_sagittal_slice(img: Image.Image,
     tumor = _add_axis_labels(tumor, LABELS)
     tumor = _add_crosshair(tumor, cx, cy, CH_COLOR)
 
+    # Segmentation (multi-color)
+    seg_b64 = None
+    if mc_mask_2d is not None:
+        mc_resized = np.array(
+            Image.fromarray(mc_mask_2d.astype(np.uint8)).resize((size, size), Image.NEAREST)
+        )
+        mc_arr = np.fliplr(mc_resized.T)
+        seg_b64 = _multi_class_mask_to_rgba_b64(mc_arr, size)
+
     return {
         'image_b64': _pil_to_b64(tumor),
         'clean_b64': _pil_to_b64(clean),
         'mask_b64':  mask_b64,
+        'segmentation_b64': seg_b64,
         'view': 'sagittal'
     }
 
 
 def generate_all_slices(img: Image.Image,
                         mask_2d: np.ndarray,
+                        mc_mask_2d: np.ndarray = None,
                         cx: float = 0.5,
                         cy: float = 0.5,
                         size: int = 512) -> dict:
     """
     Generate all 3 slice views at once.
-
-    Returns:
-        {
-            'axial':    { 'image_b64', 'clean_b64', 'mask_b64' },
-            'coronal':  { 'image_b64', 'clean_b64', 'mask_b64' },
-            'sagittal': { 'image_b64', 'clean_b64', 'mask_b64' },
-        }
     """
-    axial    = generate_axial_slice(img, mask_2d, cx, cy, size)
-    coronal  = generate_coronal_slice(img, mask_2d, cx, cy, size)
-    sagittal = generate_sagittal_slice(img, mask_2d, cx, cy, size)
+    axial    = generate_axial_slice(img, mask_2d, mc_mask_2d, cx, cy, size)
+    coronal  = generate_coronal_slice(img, mask_2d, mc_mask_2d, cx, cy, size)
+    sagittal = generate_sagittal_slice(img, mask_2d, mc_mask_2d, cx, cy, size)
 
     return {
-        'axial':    {'image_b64': axial['image_b64'],    'clean_b64': axial['clean_b64'],    'mask_b64': axial['mask_b64']},
-        'coronal':  {'image_b64': coronal['image_b64'],  'clean_b64': coronal['clean_b64'],  'mask_b64': coronal['mask_b64']},
-        'sagittal': {'image_b64': sagittal['image_b64'], 'clean_b64': sagittal['clean_b64'], 'mask_b64': sagittal['mask_b64']},
+        'axial':    {'image_b64': axial['image_b64'],    'clean_b64': axial['clean_b64'],    'mask_b64': axial['mask_b64'],    'segmentation_b64': axial['segmentation_b64']},
+        'coronal':  {'image_b64': coronal['image_b64'],  'clean_b64': coronal['clean_b64'],  'mask_b64': coronal['mask_b64'],  'segmentation_b64': coronal['segmentation_b64']},
+        'sagittal': {'image_b64': sagittal['image_b64'], 'clean_b64': sagittal['clean_b64'], 'mask_b64': sagittal['mask_b64'], 'segmentation_b64': sagittal['segmentation_b64']},
     }

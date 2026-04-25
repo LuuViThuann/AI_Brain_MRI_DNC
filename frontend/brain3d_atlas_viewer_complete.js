@@ -485,16 +485,27 @@
     // ===== DRAW TUMOR SLICE =====
     function drawTumorSlice(ctx, view) {
       const diagnosis = viewerState.diagnosisData;
-      
       if (!diagnosis.mask) return;
+
+      const mask = diagnosis.multiclass_mask || diagnosis.mask;
       
-      const mask = diagnosis.mask;
-      
-      ctx.fillStyle = 'rgba(255, 0, 64, 0.7)';
-      
+      // We only draw the mask on the Axial view for now as it's a 2D mask
+      if (view !== 'axial') return;
+
       for (let y = 0; y < mask.length; y++) {
         for (let x = 0; x < mask[y].length; x++) {
-          if (mask[y][x] > 0.5) {
+          const val = mask[y][x];
+          if (val === 1) {
+            ctx.fillStyle = 'rgba(255, 0, 64, 0.8)'; // Necrosis
+            ctx.fillRect(x * 2, y * 2, 2, 2);
+          } else if (val === 2) {
+            ctx.fillStyle = 'rgba(0, 200, 83, 0.7)'; // Edema
+            ctx.fillRect(x * 2, y * 2, 2, 2);
+          } else if (val === 3) {
+            ctx.fillStyle = 'rgba(255, 214, 0, 0.9)'; // Enhancing
+            ctx.fillRect(x * 2, y * 2, 2, 2);
+          } else if (val > 0.5 && !diagnosis.multiclass_mask) {
+            ctx.fillStyle = 'rgba(255, 0, 64, 0.7)'; // Fallback binary
             ctx.fillRect(x * 2, y * 2, 2, 2);
           }
         }

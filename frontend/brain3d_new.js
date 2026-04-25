@@ -3064,14 +3064,7 @@
             <div style="height:6px;background:#f1f5f9;border-radius:10px;overflow:hidden;margin-bottom:16px;">
               <div style="height:100%;width:${sim}%;background:${simCol};border-radius:10px;"></div>
             </div>
-            <!-- Button UI -->
-            <div style="text-align:center;padding:10px;background:#f8fafc;
-              border:1px solid #e2e8f0;border-radius:10px;
-              color:#334155;font-size:12px;font-weight:bold;
-              transition:all 0.2s;" onmouseover="this.style.background='#eff6ff';this.style.borderColor='#3b82f6';this.style.color='#3b82f6'"
-              onmouseout="this.style.background='#f8fafc';this.style.borderColor='#e2e8f0';this.style.color='#334155'">
-              🔬 Mở So Sánh Chi Tiết
-            </div>
+           
           </div>
         </div>`;
     }).join('')}

@@ -48,6 +48,9 @@ THÔNG TIN FAISS :
 
 - https://atlases.ebrains.eu/viewer/#/a:juelich:iav:atlas:v1.0.0:monkey/t:minds:core:referencespace:v1.0.0:MEBRAINS/p:minds:core:parcellationatlas:v1.0.0:e3235c039c6f54c3ba151568c829f117/@:0.0.0.-W000.._PA4G.2-EVkp.-1f83._mwTU..438r..KIr7~.Zsx0~.6FAz..16SE/vs:v2-ff011b0b
 
+
+----------------
+* Phân lớp màu : https://www.kaggle.com/datasets/dschettler8845/brats-2021-task1/data?utm_source=chatgpt.com
 ------------------
 - CÁC CÁCH SO SÁCH MÔ HÌNH : < 
 

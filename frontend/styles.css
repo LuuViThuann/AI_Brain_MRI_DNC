@@ -2307,3 +2307,59 @@ body::before {
   background: rgba(255, 82, 82, 0.18) !important;
   border-color: rgba(255, 82, 82, 0.6) !important;
 }
+
+/* ============================================================
+   NEW: TUMOR SEGMENTATION GRADING STYLES
+   ============================================================ */
+.atlas-seg-legend {
+  position: absolute;
+  left: 14px;
+  bottom: 64px;
+  background: rgba(10, 14, 26, 0.88);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  z-index: 20;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  animation: atlasFadeIn 0.3s ease-out;
+}
+
+.atlas-seg-legend-title {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--cyan);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding-bottom: 4px;
+}
+
+.atlas-seg-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #c1cfe8;
+}
+
+.atlas-seg-item:last-child { margin-bottom: 0; }
+
+.atlas-seg-item .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.atlas-seg-item .dot.ncr { background-color: #ff3232; color: #ff3232; }
+.atlas-seg-item .dot.et  { background-color: #3296ff; color: #3296ff; }
+.atlas-seg-item .dot.ed  { background-color: #32ff32; color: #32ff32; }
+
+@keyframes atlasFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

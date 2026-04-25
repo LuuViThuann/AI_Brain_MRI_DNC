@@ -39,9 +39,9 @@
     // ── 4-mode view ──
     viewMode: 'tumor',
     imageData: {
-      axial: { tumor: null, clean: null, mask: null },
-      coronal: { tumor: null, clean: null, mask: null },
-      sagittal: { tumor: null, clean: null, mask: null },
+      axial: { tumor: null, clean: null, mask: null, segmentation: null },
+      coronal: { tumor: null, clean: null, mask: null, segmentation: null },
+      sagittal: { tumor: null, clean: null, mask: null, segmentation: null },
       heatmap: null,
     },
   };
@@ -92,7 +92,8 @@
       <!-- 4-Mode Switcher -->
       <div class="atlas-mode-switcher" id="atlasModeSwitcher">
         <button class="atlas-mode-btn" data-mode="gray"    title="Ảnh MRI gốc đen trắng"><span>Ảnh Xám</span></button>
-        <button class="atlas-mode-btn active" data-mode="tumor"   title="Phủ Khối U — vùng được phân đoạn"><span>Phủ U</span></button>
+        <button class="atlas-mode-btn" data-mode="tumor"   title="Phủ Khối U — vùng được phân đoạn"><span>Phủ U</span></button>
+        <button class="atlas-mode-btn" data-mode="segmentation" title="Phân Màu U — hiển thị các vùng mô u"><span>Phân Màu</span></button>
         <button class="atlas-mode-btn" data-mode="heatmap" title="Bản Đồ Nhiệt AI — mức độ tập trung Grad-CAM"><span>Bản Đồ Nhiệt</span></button>
         <button class="atlas-mode-btn" data-mode="region"  title="Bản đồ màu các vùng não"><span>Vùng Não</span></button>
         <span class="atlas-mode-badge" id="atlasModeBadge">Phủ U</span>
@@ -193,6 +194,13 @@
               <span>Bề Mặt</span><span>15mm</span><span>30mm</span><span>45mm+</span>
             </div>
             <div class="atlas-depth-value" id="atlasDepthValue">—</div>
+          </div>
+          <!-- NEW: Segmentation Legend Overlay -->
+          <div class="atlas-seg-legend" id="atlasSegLegend" style="display:none;">
+            <div class="atlas-seg-legend-title">Phân Vùng Khối U</div>
+            <div class="atlas-seg-item"><span class="dot ncr"></span><span>Hoại Tử (NCR)</span></div>
+            <div class="atlas-seg-item"><span class="dot et"></span><span>Tăng Cường (ET)</span></div>
+            <div class="atlas-seg-item"><span class="dot ed"></span><span>Phù Nề (ED)</span></div>
           </div>
         </div>
       </div>
@@ -317,6 +325,7 @@
   const MODE_LABELS = {
     gray: 'Ảnh MRI Xám',
     tumor: 'Phủ Khối U',
+    segmentation: 'Phân Màu Khối U',
     heatmap: 'Bản Đồ Nhiệt AI',
     region: 'Bản Đồ Vùng Não',
   };
@@ -345,6 +354,11 @@
     STATE.viewMode = mode;
     updateModeButtons();
     renderAllSlicesForMode();
+
+    // Toggle legend visibility
+    const segLegend = document.getElementById('atlasSegLegend');
+    if (segLegend) segLegend.style.display = (mode === 'segmentation') ? 'block' : 'none';
+
     console.log('[Atlas4Panel] 🎨 Mode:', mode);
   }
 
@@ -407,6 +421,10 @@
         break;
       case 'tumor':
         await paint(vd.tumor || vd.clean, undefined, undefined, 'contrast(1.18) brightness(1.08)');
+        break;
+      case 'segmentation':
+        await paint(vd.clean || vd.tumor, undefined, undefined, 'contrast(1.12) brightness(1.05)');
+        if (vd.segmentation) await paint(vd.segmentation, 0.85);
         break;
       case 'heatmap':
         await paint(vd.clean || vd.tumor, undefined, undefined, 'contrast(1.1) brightness(1.04)');
@@ -559,7 +577,7 @@
     }
 
     // ── 4. Mode watermark ──
-    const MODE_WM = { gray:'ẢNH MRI XÁM', tumor:'PHỦ KHỐI U', heatmap:'BẢN ĐỒ NHIỆT', region:'BẢN ĐỒ VÙNG KHU VỰC' };
+    const MODE_WM = { gray:'ẢNH MRI XÁM', tumor:'PHỦ KHỐI U', segmentation:'PHÂN VÙNG MÀU U', heatmap:'BẢN ĐỒ NHIỆT', region:'BẢN ĐỒ VÙNG KHU VỰC' };
     const wmText = MODE_WM[mode] || mode.toUpperCase();
     ctx.save();
     ctx.globalAlpha = 0.22;
@@ -1862,6 +1880,7 @@
             tumor: s.image_b64 || null,
             clean: s.clean_b64 || s.image_b64 || null,
             mask: s.mask_b64 || null,
+            segmentation: s.segmentation_b64 || null,
           };
         }
       });

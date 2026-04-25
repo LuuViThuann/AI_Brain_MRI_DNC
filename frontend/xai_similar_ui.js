@@ -55,10 +55,10 @@
 
   // ===== 🎨 FEATURE IMPORTANCE COLORS =====
   const IMPORTANCE_COLORS = {
-    critical: { threshold: 40, color: '#ff5252', label: '🔴 Yếu tố chính', rgb: '255, 82, 82' },
-    high: { threshold: 20, color: '#ff9100', label: '🟡 Yếu tố quan trọng', rgb: '255, 145, 0' },
-    medium: { threshold: 10, color: '#0097b4', label: '🟢 Yếu tố phụ', rgb: '0, 229, 255' },
-    low: { threshold: 0, color: '#4a5568', label: '⚪ Ảnh hưởng nhỏ', rgb: '136, 153, 176' }
+    critical: { threshold: 40, color: '#ff5252', label: 'Yếu tố chính', rgb: '255, 82, 82' },
+    high: { threshold: 20, color: '#ff9100', label: 'Yếu tố quan trọng', rgb: '255, 145, 0' },
+    medium: { threshold: 10, color: '#0097b4', label: 'Yếu tố phụ', rgb: '0, 229, 255' },
+    low: { threshold: 0, color: '#4a5568', label: 'Ảnh hưởng nhỏ', rgb: '136, 153, 176' }
   };
 
   // ===== LOGGING UTILITY =====
@@ -269,9 +269,12 @@
 
           <!-- Cards Grid -->
           <div class="xai-grid" style="${this.styles.grid}">
+        
             ${hasGradCAM ? this.renderGradCAMCard(xaiData.gradcam) : ''}
+               ${window.lastDiagnosisData ? this.renderTumorGradingCard(window.lastDiagnosisData) : ''}
             ${hasRuleBased ? this.renderRuleBasedCard(xaiData.rule_based) : ''}
             ${hasSHAP ? this.renderSHAPCard(xaiData.shap) : ''}
+           
           </div>
           
           <!-- Combined Insights --> 
@@ -279,7 +282,7 @@
             <div class="xai-card insights-card" style="${this.styles.insightsCard}">
               <div style="${this.styles.cardHeader}">
                 <h3 style="${this.styles.cardTitle}"><i class="fa-solid fa-lightbulb" style="margin-right: 8px;"></i>Kết Luận Tổng Hợp</h3>
-                <span style="${this.styles.badge}">TẤT CẢ PHƯƠNG PHÁP</span>
+             
               </div>
               <ul style="${this.styles.insightsList}">
                 ${xaiData.combined_insights.map((insight, idx) => `
@@ -315,135 +318,85 @@
       const technicalInfo = gradcam.technical_info || {};
       const sliceInfo = gradcam.slice_info || {};
 
-      let cardHTML = `
-        <div class="xai-card" style="${this.styles.card}">
-          
-          <div style="${this.styles.cardHeader}">
-            <h3 style="${this.styles.cardTitle}">Trực Quan Hóa Grad-CAM</h3>
-            <span style="${this.styles.badge}">CNN</span>
+      // --- Left column ---
+      const leftContent = `
+        <div style="${this.styles.scoreBox}">
+          <div style="color: #4a5568; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Mức Độ Tập Trung Của CNN</div>
+          <div style="color: #0097b4; font-size: 32px; font-weight: bold; margin-bottom: 8px;">${attScore}%</div>
+          <div style="background: rgba(255,145,0,0.1); padding: 10px; border-radius: 4px; margin-bottom: 12px; border: 1px solid rgba(255,145,0,0.2);">
+            <div style="color: #ff9100; font-size: 10px; line-height: 1.5;"><strong>⚠️ Lưu ý:</strong> Đây là mức độ <strong>tập trung</strong> của CNN vào vùng khối u (attention focus), KHÔNG phải độ tin cậy dự đoán chung. Độ tin cậy dự đoán hiển thị ở phần "Báo cáo chẩn đoán".</div>
           </div>
-          
-          <!-- Attention Score -->
-          <div style="${this.styles.scoreBox}">
-            <div style="color: #4a5568; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
-              Mức Độ Tập Trung Của CNN
-            </div>
-            <div style="color: #0097b4; font-size: 32px; font-weight: bold; margin-bottom: 8px;">
-              ${attScore}%
-            </div>
-            
-            <!-- ✅ DISCLAIMER -->
-            <div style="background: rgba(255, 145, 0, 0.1); padding: 10px; border-radius: 4px; margin-bottom: 12px; border: 1px solid rgba(255, 145, 0, 0.2);">
-              <div style="color: #ff9100; font-size: 10px; line-height: 1.5;">
-                <strong>⚠️ Lưu ý:</strong> Đây là mức độ <strong>tập trung</strong> của CNN vào vùng khối u (attention focus), 
-                KHÔNG phải độ tin cậy dự đoán chung. Độ tin cậy dự đoán hiển thị ở phần "Báo cáo chẩn đoán".
-              </div>
-            </div>
-            
-            <div style="${this.styles.progressBar}">
-              <div style="height: 100%; width: ${attScore}%; ${this.styles.progressFill}"></div>
-            </div>
+          <div style="${this.styles.progressBar}"><div style="height: 100%; width: ${attScore}%; ${this.styles.progressFill}"></div></div>
+        </div>
+        <div style="${this.styles.infoBox}; margin-bottom: 12px; margin-top: 12px;">
+          <h4 style="color: #4a5568; margin: 0 0 8px 0; font-size: 11px; text-transform: uppercase;">Chi Tiết Kỹ Thuật</h4>
+          <ul style="margin: 0; padding-left: 0; list-style: none; font-size: 10px; color: #4a5568;">
+            <li style="margin-bottom: 4px;"><strong>Lớp mạng:</strong> ${technicalInfo.layer_name || 'Conv2D cuối'}</li>
+            <li style="margin-bottom: 4px;"><strong>Vị trí:</strong> ${technicalInfo.position || 'Encoder bottleneck'}</li>
+            <li style="margin-bottom: 4px;"><strong>Phương pháp:</strong> ${technicalInfo.gradient_method || 'Grad-CAM'}</li>
+            <li style="margin-bottom: 4px;"><strong>Lát cắt:</strong> ${sliceInfo.type || 'axial'} - ${sliceInfo.resolution || '256x256'}</li>
+            <li><strong>Tổng hợp:</strong> ${technicalInfo.aggregation_method || 'Không gian 2D'}</li>
+          </ul>
+        </div>
+        ${gradcam.confidence_level ? `
+          <div style="padding: 8px; background: rgba(${this.getConfidenceColor(gradcam.confidence_level)}, 0.1); border: 1px solid ${this.getConfidenceColorHex(gradcam.confidence_level)}; border-radius: 4px; margin-bottom: 12px;">
+            <div style="color: #4a5568; font-size: 9px; text-transform: uppercase; margin-bottom: 4px;">Mức Độ Tin Cậy CNN</div>
+            <div style="color: ${this.getConfidenceColorHex(gradcam.confidence_level)}; font-size: 14px; font-weight: bold;">${this.translateConfidenceLevel(gradcam.confidence_level)}</div>
           </div>
-          
-          <!-- Technical Details -->
-          <div style="${this.styles.infoBox}; margin-bottom: 12px;">
-            <h4 style="color: #4a5568; margin: 0 0 8px 0; font-size: 11px; text-transform: uppercase;">
-              Chi Tiết Kỹ Thuật
-            </h4>
-            <ul style="margin: 0; padding-left: 16px; list-style: none; font-size: 10px; color: #4a5568;">
-              <li style="margin-bottom: 4px;">
-                <strong>Lớp mạng:</strong> ${technicalInfo.layer_name || 'Conv2D cuối'}
-              </li>
-              <li style="margin-bottom: 4px;">
-                <strong>Vị trí:</strong> ${technicalInfo.position || 'Encoder bottleneck'}
-              </li>
-              <li style="margin-bottom: 4px;">
-                <strong>Phương pháp:</strong> ${technicalInfo.gradient_method || 'Grad-CAM'}
-              </li>
-              <li style="margin-bottom: 4px;">
-                <strong>Lát cắt:</strong> ${sliceInfo.type || 'axial'} - ${sliceInfo.resolution || '256x256'}
-              </li>
-              <li>
-                <strong>Tổng hợp:</strong> ${technicalInfo.aggregation_method || 'Không gian 2D'}
-              </li>
-            </ul>
+        ` : ''}
+        ${gradcam.interpretation ? `
+          <div style="padding: 10px; background: rgba(0,151,180,0.05); border-radius: 4px;">
+            <div style="color: #4a5568; font-size: 10px; line-height: 1.5;"><i class="fa-solid fa-lightbulb" style="color: #0097b4; margin-right: 5px;"></i> ${this.escapeHtml(gradcam.interpretation)}</div>
           </div>
-          
-          <!-- Confidence Level -->
-          ${gradcam.confidence_level ? `
-            <div style="padding: 8px; background: rgba(${this.getConfidenceColor(gradcam.confidence_level)}, 0.1); 
-              border: 1px solid ${this.getConfidenceColorHex(gradcam.confidence_level)}; 
-              border-radius: 4px; margin-bottom: 12px;">
-              <div style="color: #4a5568; font-size: 9px; text-transform: uppercase; margin-bottom: 4px;">
-                Mức Độ Tin Cậy CNN
-              </div>
-              <div style="color: ${this.getConfidenceColorHex(gradcam.confidence_level)}; 
-                font-size: 14px; font-weight: bold;">
-                ${this.translateConfidenceLevel(gradcam.confidence_level)}
-              </div>
-            </div>
-          ` : ''}
-          
-          <!-- Interpretation -->
-          ${gradcam.interpretation ? `
-            <div style="padding: 10px; background: rgba(0, 151, 180, 0.05); 
-              border-radius: 4px; margin-bottom: 12px;">
-              <div style="color: #4a5568; font-size: 10px; line-height: 1.5;">
-                <i class="fa-solid fa-lightbulb" style="color: #0097b4; margin-right: 5px;"></i> ${this.escapeHtml(gradcam.interpretation)}
-              </div>
-            </div>
-          ` : ''}
+        ` : ''}
       `;
 
-      // Overlay image
-      if (gradcam.overlay_base64) {
-        cardHTML += `
-          <div style="margin: 12px 0;">
-            <img src="${gradcam.overlay_base64}" alt="Grad-CAM Overlay" 
-              style="${this.styles.image}"/>
-            <p style="color: #4a5568; font-size: 11px; text-align: center; margin: 6px 0 0 0;">
-              Bản đồ nhiệt tập trung chồng lên ảnh gốc
-            </p>
-          </div>
-        `;
+      // --- Right column ---
+      let rightContent = '';
+
+      // Collect image HTML first, then wrap in flex row
+      const overlayHTML = gradcam.overlay_base64 ? `
+        <div style="flex: 1; min-width: 0;">
+          <img src="${gradcam.overlay_base64}" alt="Grad-CAM Overlay" style="width: 100%; border-radius: 6px; border: 1px solid #d1dde8;"/>
+          <p style="color: #4a5568; font-size: 10px; text-align: center; margin: 6px 0 0 0;">Bản đồ nhiệt tập trung chồng lên ảnh gốc</p>
+        </div>
+      ` : '';
+      const heatmapHTML = gradcam.heatmap_base64 ? `
+        <div style="flex: 1; min-width: 0;">
+          <img src="${gradcam.heatmap_base64}" alt="Grad-CAM Heatmap" style="width: 100%; border-radius: 6px; border: 1px solid #d1dde8;"/>
+          <p style="color: #4a5568; font-size: 10px; text-align: center; margin: 6px 0 0 0;">Bản đồ tập trung thuần</p>
+        </div>
+      ` : '';
+
+      if (overlayHTML || heatmapHTML) {
+        rightContent += `<div style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px;">${overlayHTML}${heatmapHTML}</div>`;
       }
 
-      // Heatmap image
-      if (gradcam.heatmap_base64) {
-        cardHTML += `
-          <div style="margin: 12px 0;">
-            <img src="${gradcam.heatmap_base64}" alt="Grad-CAM Heatmap" 
-              style="${this.styles.image}"/>
-            <p style="color: #4a5568; font-size: 11px; text-align: center; margin: 6px 0 0 0;">
-              Bản đồ tập trung thuần
-            </p>
-          </div>
-        `;
-      }
-
-      // Focused regions
       if (gradcam.focused_regions && gradcam.focused_regions.length > 0) {
-        cardHTML += `
-          <div style="${this.styles.infoBox}">
-            <h4 style="color: #4a5568; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase;">
-              Vùng Tập Trung
-            </h4>
-            <ul style="margin: 0; padding-left: 16px; list-style: none;">
-              ${gradcam.focused_regions.slice(0, 3).map((region, i) => `
-                <li style="color: #4a5568; font-size: 12px; margin-bottom: 4px;">
-                  Vùng ${i + 1}: <span style="color: #0097b4; font-weight: bold;">
-                    ${Math.round((region.attention || 0) * 100)}%
-                  </span> tập trung
-                </li>
-              `).join('')}
+        rightContent += `
+          <div style="${this.styles.infoBox}; margin-bottom: 12px;">
+            <h4 style="color: #4a5568; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase;">Vùng Tập Trung</h4>
+            <ul style="margin: 0; padding-left: 0; list-style: none;">
+              ${gradcam.focused_regions.slice(0, 3).map((region, i) => `<li style="color: #4a5568; font-size: 12px; margin-bottom: 4px;">Vùng ${i + 1}: <span style="color: #0097b4; font-weight: bold;">${Math.round((region.attention || 0) * 100)}%</span> tập trung</li>`).join('')}
             </ul>
           </div>
         `;
       }
+      rightContent += this.renderConfidenceColorbar();
 
-      cardHTML += this.renderConfidenceColorbar();
-      cardHTML += `</div>`;
-      return cardHTML;
+
+      return `
+        <div class="xai-card" style="${this.styles.card}">
+          <div style="${this.styles.cardHeader}">
+            <h3 style="${this.styles.cardTitle}">Trực Quan Hóa Grad-CAM</h3>
+         
+          </div>
+          <div style="display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 240px;">${leftContent}</div>
+            <div style="flex: 1; min-width: 240px;">${rightContent}</div>
+          </div>
+        </div>
+      `;
     },
 
     // ===== RENDER CONFIDENCE COLORBAR (NEW) =====
@@ -464,7 +417,7 @@
               #ffff00 30%, 
               #ff9100 60%, 
               #ff0040 100%);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);">
+            border: 1px solid rgba(0,0,0,0.1);">
           </div>
           
           <!-- Labels -->
@@ -507,62 +460,47 @@
       };
       const riskColor = riskColors[riskLevel] || { bg: '#4a5568', rgb: '136, 153, 176', vi: 'Không xác định' };
 
-      let cardHTML = `
-        <div class="xai-card" style="${this.styles.card}">
-          <div style="${this.styles.cardHeader}">
-            <h3 style="${this.styles.cardTitle}">Phân Tích Thống Kê</h3>
-            <span style="${this.styles.badge}">QUY TẮC</span>
+      // --- Left column: risk + measurements ---
+      const leftContent = `
+        <div style="padding: 12px; border: 1px solid ${riskColor.bg}44;
+          background: rgba(${riskColor.rgb}, 0.1); border-radius: 4px; margin-bottom: 16px;">
+          <div style="color: #4a5568; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Mức Độ Rủi Ro</div>
+          <div style="color: ${riskColor.bg}; font-size: 28px; font-weight: bold;">${riskColor.vi}</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div style="${this.styles.infoBox}">
+            <div style="color: #4a5568; font-size: 10px; text-transform: uppercase;">Diện Tích Khối U</div>
+            <div style="color: #0097b4; font-size: 18px; font-weight: bold; margin-top: 4px;">${rules.tumor_area_mm2 !== undefined ? rules.tumor_area_mm2.toFixed(1) : 'N/A'}</div>
+            <div style="color: #4a5568; font-size: 9px;">mm²</div>
           </div>
-          
-          <!-- Risk Level -->
-          <div style="padding: 12px; border: 1px solid ${riskColor.bg}44; 
-            background: rgba(${riskColor.rgb}, 0.1); border-radius: 4px; margin-bottom: 16px;">
-            <div style="color: #4a5568; font-size: 11px; text-transform: uppercase; 
-              letter-spacing: 0.5px; margin-bottom: 6px;">Mức Độ Rủi Ro</div>
-            <div style="color: ${riskColor.bg}; font-size: 28px; font-weight: bold;">
-              ${riskColor.vi}
-            </div>
+          <div style="${this.styles.infoBox}">
+            <div style="color: #4a5568; font-size: 10px; text-transform: uppercase;">Phủ Não</div>
+            <div style="color: #0097b4; font-size: 18px; font-weight: bold; margin-top: 4px;">${rules.tumor_ratio !== undefined ? rules.tumor_ratio.toFixed(1) : 'N/A'}</div>
+            <div style="color: #4a5568; font-size: 9px;">%</div>
           </div>
-          
-          <!-- Measurements Grid -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;">
-            <div style="${this.styles.infoBox}">
-              <div style="color: #4a5568; font-size: 10px; text-transform: uppercase;">Diện Tích Khối U</div>
-              <div style="color: #0097b4; font-size: 18px; font-weight: bold; margin-top: 4px;">
-                ${rules.tumor_area_mm2 !== undefined ? rules.tumor_area_mm2.toFixed(1) : 'N/A'}
-              </div>
-              <div style="color: #4a5568; font-size: 9px;">mm²</div>
-            </div>
-            <div style="${this.styles.infoBox}">
-              <div style="color: #4a5568; font-size: 10px; text-transform: uppercase;">Phủ Não</div>
-              <div style="color: #0097b4; font-size: 18px; font-weight: bold; margin-top: 4px;">
-                ${rules.tumor_ratio !== undefined ? rules.tumor_ratio.toFixed(1) : 'N/A'}
-              </div>
-              <div style="color: #4a5568; font-size: 9px;">%</div>
-            </div>
-            <div style="${this.styles.infoBox}">
-              <div style="color: #4a5568; font-size: 10px; text-transform: uppercase;">Vị Trí</div>
-              <div style="color: #0097b4; font-size: 14px; font-weight: bold; margin-top: 4px;">
-                ${rules.location || 'Không xác định'}
-              </div>
-            </div>
-            <div style="${this.styles.infoBox}">
-              <div style="color: #4a5568; font-size: 10px; text-transform: uppercase;">Mức Độ</div>
-              <div style="color: #0097b4; font-size: 14px; font-weight: bold; margin-top: 4px;">
-                ${rules.severity || 'Trung bình'}
-              </div>
-            </div>
+          <div style="${this.styles.infoBox}">
+            <div style="color: #4a5568; font-size: 10px; text-transform: uppercase;">Vị Trí</div>
+            <div style="color: #0097b4; font-size: 14px; font-weight: bold; margin-top: 4px;">${rules.location || 'Không xác định'}</div>
           </div>
+          <div style="${this.styles.infoBox}">
+            <div style="color: #4a5568; font-size: 10px; text-transform: uppercase;">Mức Độ</div>
+            <div style="color: #0097b4; font-size: 14px; font-weight: bold; margin-top: 4px;">${rules.severity || 'Trung bình'}</div>
+          </div>
+        </div>
       `;
+
+      // --- Right column: rules + warnings + depth (built dynamically) ---
+      let rightContent = '';
+
 
       // Rules triggered
       if (rules.rules_triggered && rules.rules_triggered.length > 0) {
-        cardHTML += `
+        rightContent += `
           <div style="${this.styles.infoBox}; margin-bottom: 12px;">
             <h4 style="color: #4a5568; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase;">
               <i class="fa-solid fa-check-double" style="color: #00c853; margin-right: 8px;"></i> Quy Tắc Đã Kích Hoạt
             </h4>
-            <ul style="margin: 0; padding-left: 16px; list-style: none;">
+            <ul style="margin: 0; padding-left: 0; list-style: none;">
               ${rules.rules_triggered.slice(0, 3).map(rule => `
                 <li style="color: #4a5568; font-size: 12px; margin-bottom: 4px;">
                   <i class="fa-solid fa-check" style="color: #00c853; margin-right: 8px;"></i> ${this.escapeHtml(rule)}
@@ -575,13 +513,12 @@
 
       // Warnings
       if (rules.warnings && rules.warnings.length > 0) {
-        cardHTML += `
-          <div style="padding: 12px; background: rgba(255, 82, 82, 0.1); 
-            border: 1px solid rgba(255, 82, 82, 0.2); border-radius: 4px; margin-bottom: 12px;">
+        rightContent += `
+          <div style="padding: 12px; background: rgba(255,82,82,0.1); border: 1px solid rgba(255,82,82,0.2); border-radius: 4px; margin-bottom: 12px;">
             <h4 style="color: #ff5252; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase;">
               <i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i> Cảnh Báo Lâm Sàng
             </h4>
-            <ul style="margin: 0; padding-left: 16px; list-style: none;">
+            <ul style="margin: 0; padding-left: 0; list-style: none;">
               ${rules.warnings.slice(0, 3).map(warning => `
                 <li style="color: #ffb3b3; font-size: 12px; margin-bottom: 4px;">
                   <i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i> ${this.escapeHtml(warning)}
@@ -592,91 +529,46 @@
         `;
       }
 
-      // ✅ DEPTH METRICS SECTION (FIXED)
+      // Depth Metrics
       if (rules.depth_metrics) {
-        cardHTML += `
-          <div style="
-            padding: 12px;
-            background: rgba(156, 39, 176, 0.08);
-            border: 1px solid rgba(156, 39, 176, 0.2);
-            border-radius: 4px;
-            margin-bottom: 12px;
-          ">
-            <div style="color: #4a5568; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; font-weight: bold;">
-              Vector Độ Sâu
-            </div>
-            
-            <!-- Depth Value -->
+        rightContent += `
+          <div style="padding: 12px; background: rgba(156,39,176,0.08); border: 1px solid rgba(156,39,176,0.2); border-radius: 4px; margin-bottom: 12px;">
+            <div style="color: #4a5568; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; font-weight: bold;">Vector Độ Sâu</div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
               <div style="color: #4a5568; font-size: 11px;">Tumor Depth</div>
-              <div style="color: #9c27b0; font-size: 16px; font-weight: bold;">
-                ${rules.depth_metrics.tumor_depth_mm?.toFixed(1) || 'N/A'} mm
-              </div>
+              <div style="color: #9c27b0; font-size: 16px; font-weight: bold;">${rules.depth_metrics.tumor_depth_mm?.toFixed(1) || 'N/A'} mm</div>
             </div>
-            
-            <!-- Category Badge --> 
-            <div style="
-              padding: 8px;
-              background: ${this.getCategoryBG(rules.depth_metrics.depth_category?.category)};
-              border: 1px solid ${this.getCategoryBorder(rules.depth_metrics.depth_category?.category)}44;
-              border-radius: 4px;
-              margin-bottom: 8px;
-            ">
+            <div style="padding: 8px; background: ${this.getCategoryBG(rules.depth_metrics.depth_category?.category)}; border: 1px solid ${this.getCategoryBorder(rules.depth_metrics.depth_category?.category)}44; border-radius: 4px; margin-bottom: 8px;">
               <div style="display: flex; align-items: center; font-size: 13px; font-weight: bold; color: ${this.getCategoryBorder(rules.depth_metrics.depth_category?.category)};">
-                <span style="margin-right: 8px;">
-                  <i class="fa-solid fa-ruler-vertical"></i>
-                </span>
+                <span style="margin-right: 8px;"><i class="fa-solid fa-ruler-vertical"></i></span>
                 ${rules.depth_metrics.depth_category?.label || 'N/A'}
               </div>
             </div>
-            
-            <!-- Vector Coordinates -->
-            <div style="
-              background: rgba(0, 151, 180, 0.05);
-              padding: 8px;
-              border-radius: 4px;
-              font-family: 'Courier New', monospace;
-              font-size: 9px;
-              color: #4a5568;
-              margin-bottom: 8px;
-            ">
-              <div style="margin-bottom: 4px;">
-                <strong>Tâm u:</strong> 
-                <span style="color: #0097b4;">
-                  (${rules.depth_metrics.centroid_3d?.[0]?.toFixed(1)}, 
-                  ${rules.depth_metrics.centroid_3d?.[1]?.toFixed(1)}, 
-                  ${rules.depth_metrics.centroid_3d?.[2]?.toFixed(1)})
-                </span>
-              </div>
-              <div>
-                <strong>Vỏ não:</strong> 
-                <span style="color: #0097b4;">
-                  (${rules.depth_metrics.nearest_cortex_point?.[0]?.toFixed(1)}, 
-                  ${rules.depth_metrics.nearest_cortex_point?.[1]?.toFixed(1)}, 
-                  ${rules.depth_metrics.nearest_cortex_point?.[2]?.toFixed(1)})
-                </span>
-              </div>
+            <div style="background: rgba(0,151,180,0.05); padding: 8px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 9px; color: #4a5568; margin-bottom: 8px;">
+              <div style="margin-bottom: 4px;"><strong>Tâm u:</strong> <span style="color: #0097b4;">(${rules.depth_metrics.centroid_3d?.[0]?.toFixed(1)}, ${rules.depth_metrics.centroid_3d?.[1]?.toFixed(1)}, ${rules.depth_metrics.centroid_3d?.[2]?.toFixed(1)})</span></div>
+              <div><strong>Vỏ não:</strong> <span style="color: #0097b4;">(${rules.depth_metrics.nearest_cortex_point?.[0]?.toFixed(1)}, ${rules.depth_metrics.nearest_cortex_point?.[1]?.toFixed(1)}, ${rules.depth_metrics.nearest_cortex_point?.[2]?.toFixed(1)})</span></div>
             </div>
-            
-            <!-- Clinical Insight -->
-            <div style="
-              background: rgba(156, 39, 176, 0.05);
-              padding: 8px;
-              border-radius: 4px;
-              color: #4a5568;
-              font-size: 10px;
-              line-height: 1.5;
-            ">
-              <i class="fa-solid fa-lightbulb" style="color: #0097b4; margin-right: 5px;"></i> <strong>Ý nghĩa lâm sàng:</strong> 
-              ${this.getDepthClinicalMeaning(rules.depth_metrics.tumor_depth_mm)}
+            <div style="background: rgba(156,39,176,0.05); padding: 8px; border-radius: 4px; color: #4a5568; font-size: 10px; line-height: 1.5;">
+              <i class="fa-solid fa-lightbulb" style="color: #0097b4; margin-right: 5px;"></i> <strong>Ý nghĩa lâm sàng:</strong> ${this.getDepthClinicalMeaning(rules.depth_metrics.tumor_depth_mm)}
             </div>
           </div>
         `;
       }
 
-      cardHTML += `</div>`;
-      return cardHTML;
+      return `
+        <div class="xai-card" style="${this.styles.card}">
+          <div style="${this.styles.cardHeader}">
+            <h3 style="${this.styles.cardTitle}">Phân Tích Thống Kê</h3>
+           
+          </div>
+          <div style="display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 240px;">${leftContent}</div>
+            <div style="flex: 1.2; min-width: 240px;">${rightContent}</div>
+          </div>
+        </div>
+      `;
     },
+
 
     // ===== SHAP CARD (VIETNAMESE + FIXED) =====
     renderSHAPCard: function (shap) {
@@ -687,108 +579,93 @@
 
       log('Rendering SHAP card (Vietnamese)', { topFeatures, featureImportance });
 
-      let cardHTML = `
-        <div class="xai-card" style="${this.styles.card}">
-          <div style="${this.styles.cardHeader}">
-            <h3 style="${this.styles.cardTitle}">Tầm Quan Trọng Của Các Tính Năng</h3>
-            <span style="${this.styles.badge}">SHAP</span>
+      // --- Left column: explanation + legend ---
+      const leftContent = `
+        <div style="background: rgba(0,151,180,0.05); padding: 12px; border-radius: 4px; margin-bottom: 16px; border: 1px solid rgba(0,151,180,0.2);">
+          <div style="color: #4a5568; font-size: 10px; line-height: 1.6;">
+            <i class="fa-solid fa-circle-info" style="color: #0097b4; margin-right: 5px;"></i>
+            <strong>Giải thích:</strong> % đóng góp <strong>tương đối</strong> của mỗi tính năng vào dự đoán cuối cùng.
+            Tổng tất cả tính năng = 100%. Con số càng cao = ảnh hưởng càng lớn đến kết quả.
           </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="padding: 8px; background: rgba(255,82,82,0.08); border-radius: 4px; border: 1px solid #ff525244;">
+            <span style="color: #ff5252; font-size: 10px; font-weight: 600;">🔴 Yếu tố chính</span>
+            <span style="color: #4a5568; font-size: 9px; margin-left: 8px;">&gt; 40% đóng góp</span>
+          </div>
+          <div style="padding: 8px; background: rgba(255,145,0,0.08); border-radius: 4px; border: 1px solid #ff910044;">
+            <span style="color: #ff9100; font-size: 10px; font-weight: 600;">🟡 Yếu tố quan trọng</span>
+            <span style="color: #4a5568; font-size: 9px; margin-left: 8px;">20–40%</span>
+          </div>
+          <div style="padding: 8px; background: rgba(0,229,255,0.08); border-radius: 4px; border: 1px solid #0097b444;">
+            <span style="color: #0097b4; font-size: 10px; font-weight: 600;">🟢 Yếu tố phụ</span>
+            <span style="color: #4a5568; font-size: 9px; margin-left: 8px;">10–20%</span>
+          </div>
+          <div style="padding: 8px; background: rgba(136,153,176,0.08); border-radius: 4px; border: 1px solid #4a556844;">
+            <span style="color: #4a5568; font-size: 10px; font-weight: 600;">⚪ Ảnh hưởng nhỏ</span>
+            <span style="color: #4a5568; font-size: 9px; margin-left: 8px;">&lt; 10%</span>
+          </div>
+        </div>
       `;
 
+      // --- Right column: features list ---
+      let rightContent = '';
       if (topFeatures.length > 0) {
-        cardHTML += `
-          <div>
-            <h4 style="color: #4a5568; margin: 0 0 12px 0; font-size: 12px; text-transform: uppercase;">
-              Các Tính Năng Đóng Góp Hàng Đầu (Tầm Quan Trọng Tương Đối)
-            </h4>
-            
-            <!-- ✅ EXPLANATION BOX -->
-            <div style="background: rgba(0, 151, 180, 0.05); padding: 12px; border-radius: 4px; margin-bottom: 16px; border: 1px solid rgba(0, 151, 180, 0.2);">
-              <div style="color: #4a5568; font-size: 10px; line-height: 1.6;">
-                <i class="fa-solid fa-circle-info" style="color: #0097b4; margin-right: 5px;"></i> <strong>Giải thích:</strong> % đóng góp <strong>tương đối</strong> của mỗi tính năng vào dự đoán cuối cùng. 
-                Tổng tất cả tính năng = 100%. Con số càng cao = ảnh hưởng càng lớn đến kết quả.
-              </div>
-            </div>
-            
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-              ${topFeatures.slice(0, 5).map((feature, index) => {
+        rightContent += `
+          <h4 style="color: #4a5568; margin: 0 0 12px 0; font-size: 12px; text-transform: uppercase;">
+            Các Tính Năng Đóng Góp Hàng Đầu (Tầm Quan Trọng Tương Đối)
+          </h4>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            ${topFeatures.slice(0, 5).map((feature, index) => {
           const importance = featureImportance[feature] || 0;
           const importancePercent = Math.round(importance * 100);
-
-          // Get Vietnamese name and description
           const featureNameVI = FEATURE_NAMES_VI[feature] || feature;
           const featureDesc = FEATURE_DESCRIPTIONS_VI[feature] || '';
-
-          // Determine importance level and color
           const importanceLevel = this.getImportanceLevel(importancePercent);
-
           log(`SHAP Feature ${index + 1}: ${feature} (${featureNameVI}) = ${importance} → ${importancePercent}%`);
-
           return `
-                  <div style="padding: 12px; background: rgba(${importanceLevel.rgb}, 0.08); 
-                    border-radius: 6px; border: 1px solid ${importanceLevel.color}44;">
-                    
-                    <!-- Feature Header -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                      <div style="flex: 1;">
-                        <div style="color: #4a5568; font-size: 13px; font-weight: 600; margin-bottom: 2px;">
-                          ${this.escapeHtml(featureNameVI)}
-                        </div>
-                        <div style="color: #4a5568; font-size: 9px;">
-                          ${this.escapeHtml(feature)}
-                        </div>
-                      </div>
-                      <div style="text-align: right; margin-left: 12px;">
-                        <div style="color: ${importanceLevel.color}; font-size: 18px; font-weight: bold;">
-                          ${importancePercent}%
-                        </div>
-                        <div style="color: #4a5568; font-size: 8px; text-transform: uppercase;">
-                          Đóng góp
-                        </div>
-                      </div>
+                <div style="padding: 12px; background: rgba(${importanceLevel.rgb}, 0.08); border-radius: 6px; border: 1px solid ${importanceLevel.color}44;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="flex: 1;">
+                      <div style="color: #4a5568; font-size: 13px; font-weight: 600; margin-bottom: 2px;">${this.escapeHtml(featureNameVI)}</div>
+                      <div style="color: #4a5568; font-size: 9px;">${this.escapeHtml(feature)}</div>
                     </div>
-                    
-                    <!-- Progress Bar -->
-                    <div style="${this.styles.progressBar}; margin-bottom: 8px;">
-                      <div style="height: 100%; width: ${importancePercent}%; background: ${importanceLevel.color}; 
-                        border-radius: 2px; transition: width 0.3s ease;"></div>
+                    <div style="text-align: right; margin-left: 12px;">
+                      <div style="color: ${importanceLevel.color}; font-size: 18px; font-weight: bold;">${importancePercent}%</div>
+                      <div style="color: #4a5568; font-size: 8px; text-transform: uppercase;">Đóng góp</div>
                     </div>
-                    
-                    <!-- Importance Label -->
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: ${featureDesc ? '8px' : '0'};">
-                      <span style="color: ${importanceLevel.color}; font-size: 10px; font-weight: 600;">
-                        ${importanceLevel.label}
-                      </span>
-                      <span style="color: #4a5568; font-size: 9px;">
-                        ${this.getImportanceExplanation(importancePercent)}
-                      </span>
-                    </div>
-                    
-                    <!-- Feature Description (if available) -->
-                    ${featureDesc ? `
-                      <div style="background: rgba(0, 151, 180, 0.05); padding: 8px; border-radius: 4px; margin-top: 8px;">
-                        <div style="color: #4a5568; font-size: 9px; line-height: 1.5;">
-                          ℹ️ ${this.escapeHtml(featureDesc)}
-                        </div>
-                      </div>
-                    ` : ''}
                   </div>
-                `;
+                  <div style="${this.styles.progressBar}; margin-bottom: 8px;">
+                    <div style="height: 100%; width: ${importancePercent}%; background: ${importanceLevel.color}; border-radius: 2px; transition: width 0.3s ease;"></div>
+                  </div>
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: ${featureDesc ? '8px' : '0'};">
+                    <span style="color: ${importanceLevel.color}; font-size: 10px; font-weight: 600;">${importanceLevel.label}</span>
+                    <span style="color: #4a5568; font-size: 9px;">${this.getImportanceExplanation(importancePercent)}</span>
+                  </div>
+                  ${featureDesc ? `<div style="background: rgba(0,151,180,0.05); padding: 8px; border-radius: 4px; margin-top: 8px;"><div style="color: #4a5568; font-size: 9px; line-height: 1.5;">ℹ️ ${this.escapeHtml(featureDesc)}</div></div>` : ''}
+                </div>
+              `;
         }).join('')}
-            </div>
           </div>
         `;
       } else {
-        cardHTML += `
-          <p style="color: #4a5568; font-size: 12px; text-align: center; padding: 20px;">
-            Không có dữ liệu tầm quan trọng tính năng
-          </p>
-        `;
+        rightContent = `<p style="color: #4a5568; font-size: 12px; text-align: center; padding: 20px;">Không có dữ liệu tầm quan trọng tính năng</p>`;
       }
 
-      cardHTML += `</div>`; 
-      return cardHTML;
+      return `
+        <div class="xai-card" style="${this.styles.card}">
+          <div style="${this.styles.cardHeader}">
+            <h3 style="${this.styles.cardTitle}">Tầm Quan Trọng Của Các Tính Năng</h3>
+          
+          </div>
+          <div style="display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;">
+            <div style="flex: 0.8; min-width: 220px;">${leftContent}</div>
+            <div style="flex: 1.2; min-width: 240px;">${rightContent}</div>
+          </div>
+        </div>
+      `;
     },
+
 
     // ===== RENDER CLINICAL REPORT CARD (NEW) =====
     renderClinicalReportCard: function () {
@@ -800,7 +677,7 @@
 
       const report = diagnosisData.report;
       const vision = diagnosisData.vision_report;
-      
+
       const severity = (report.severity || 'MEDIUM').toUpperCase();
       const severityColor = this.getConfidenceColorHex(severity === 'THẤP' ? 'LOW' : (severity === 'CAO' ? 'HIGH' : 'MEDIUM'));
 
@@ -808,7 +685,7 @@
         <div class="xai-card clinical-report-card" style="${this.styles.card}; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
           <div style="${this.styles.cardHeader}; border-bottom: 1px solid #edf2f7; padding-bottom: 15px; margin-bottom: 20px; justify-content: space-between; align-items: center;">
             <div style="display: flex; align-items: center; gap: 15px;">
-              <div style="width: 45px; height: 45px; background: rgba(0, 151, 180, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #0097b4;">
+              <div style="width: 45px; height: 45px; background: #f1f5f9; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #475569; border: 1px solid #e2e8f0;">
                 <i class="fa-solid fa-file-medical"></i>
               </div>
               <div>
@@ -821,14 +698,13 @@
               </div>
             </div>
             <div style="
-              background: linear-gradient(135deg, ${severityColor}, ${severityColor}dd);
+              background: ${severityColor};
               color: white;
               padding: 8px 20px;
               border-radius: 50px;
               font-size: 13px;
               font-weight: 800;
               letter-spacing: 0.8px;
-              box-shadow: 0 4px 10px rgba(0,0,0,0.15);
               text-transform: uppercase;
               display: flex;
               align-items: center;
@@ -857,15 +733,15 @@
                 </h4>
                 <ul class="d3-report-list" style="margin: 0; padding: 0; list-style: none;">
                   ${(report.findings || []).map(f => {
-                    // Clean leading bullets/dashes/dots
-                    const cleanF = f.replace(/^[•\-\*\d\.\s]+/, '').trim();
-                    return `
+        // Clean leading bullets/dashes/dots
+        const cleanF = f.replace(/^[•\-\*\d\.\s]+/, '').trim();
+        return `
                       <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 10px; line-height: 1.6; color: #4a5568; font-size: 13.5px;">
                         <i class="fa-solid fa-circle-check" style="color: #00c853; margin-top: 3px; font-size: 14px; flex-shrink: 0;"></i>
                         <span>${cleanF}</span>
                       </li>
                     `;
-                  }).join('')}
+      }).join('')}
                 </ul>
               </div>
             </div>
@@ -877,15 +753,15 @@
               </h4>
               <ul class="d3-report-list" style="margin: 0; padding: 0; list-style: none;">
                 ${(report.recommendations || []).map(r => {
-                  // Clean leading bullets/dashes/dots/arrows
-                  const cleanR = r.replace(/^[•\-\*\d\.\s\>→]+/, '').trim();
-                  return `
+        // Clean leading bullets/dashes/dots/arrows
+        const cleanR = r.replace(/^[•\-\*\d\.\s\>→]+/, '').trim();
+        return `
                     <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 10px; line-height: 1.6; color: #7b341e; font-size: 13.5px;">
                       <i class="fa-solid fa-arrow-right" style="color: #f6ad55; margin-top: 3px; font-size: 14px; flex-shrink: 0;"></i>
                       <span>${cleanR}</span>
                     </li>
                   `;
-                }).join('')}
+      }).join('')}
               </ul>
             </div>
 
@@ -930,7 +806,7 @@
       }
 
       log('📊 Rendering Similar Cases', similarData);
-      
+
       // ✅ FIX: Update internal state so pagination works after reload
       this.state.currentSimilarData = similarData;
 
@@ -940,11 +816,11 @@
       }
 
       // ✅ 1. FILTER: Only show cases with tumor (Be robust with types)
-      const filtered = similarData.similar_cases.filter(c => 
+      const filtered = similarData.similar_cases.filter(c =>
         c.has_tumor === true || c.has_tumor === 1 || c.has_tumor === "true"
       );
       this.state.filteredSimilarCases = filtered;
-      
+
       if (filtered.length === 0) {
         log('Warning: No tumor cases found after filtering');
         this.showSimilarPlaceholder('no-results');
@@ -955,7 +831,7 @@
       const totalItems = filtered.length;
       const totalPages = Math.ceil(totalItems / this.state.itemsPerPage);
       const currentPage = Math.min(this.state.currentPage, totalPages);
-      
+
       const startIndex = (currentPage - 1) * this.state.itemsPerPage;
       const endIndex = Math.min(startIndex + this.state.itemsPerPage, totalItems);
       const pageItems = filtered.slice(startIndex, endIndex);
@@ -984,10 +860,10 @@
           <!-- Grid -->
           <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;">
             ${pageItems.map((caseItem, idx) => {
-              // Find original index for 3D compare
-              const originalIdx = similarData.similar_cases.findIndex(c => c.case_id === caseItem.case_id);
-              return this.renderCaseCard(caseItem, originalIdx);
-            }).join('')}
+        // Find original index for 3D compare
+        const originalIdx = similarData.similar_cases.findIndex(c => c.case_id === caseItem.case_id);
+        return this.renderCaseCard(caseItem, originalIdx);
+      }).join('')}
           </div>
 
           <!-- ✅ PAGINATION BOTTOM -->
@@ -1005,7 +881,7 @@
 
       // Update global for 3D picker consistency
       window._similarCasesData = similarData.similar_cases;
-      
+
       panel.innerHTML = html;
       panel.style.display = 'block';
 
@@ -1013,9 +889,9 @@
     },
 
     // ===== RENDER PAGINATION UI =====
-    renderPaginationUI: function(currentPage, totalPages) {
+    renderPaginationUI: function (currentPage, totalPages) {
       if (totalPages <= 1) return '';
-      
+
       return `
         <div style="display: flex; align-items: center; gap: 12px; font-family: Segoe UI, sans-serif;">
           <button onclick="window.XAISimilarUI.goToPage(${currentPage - 1})" 
@@ -1042,18 +918,18 @@
     },
 
     // ===== GO TO PAGE =====
-    goToPage: function(page) {
+    goToPage: function (page) {
       if (!this.state.currentSimilarData) return;
-      
+
       const filtered = this.state.filteredSimilarCases;
       const totalPages = Math.ceil(filtered.length / this.state.itemsPerPage);
-      
-      if (page < 1 || page > totalPages) return; 
-      
+
+      if (page < 1 || page > totalPages) return;
+
       log(`🔄 Switching to page ${page}`);
       this.state.currentPage = page;
       this.renderSimilarCases(this.state.currentSimilarData);
-      
+
       // ✅ Scroll ONLY the panel content, NOT the whole window
       const panel = document.getElementById('similarPanel');
       if (panel) panel.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1061,7 +937,7 @@
 
     // ===== RENDER CASE CARD =====
     renderCaseCard: function (caseItem, caseIndex) {
-      const similarity = Math.round((caseItem.similarity_score || 0) * 100); 
+      const similarity = Math.round((caseItem.similarity_score || 0) * 100);
       const statusColor = caseItem.has_tumor ? '#ff5252' : '#00c853';
       const statusIcon = caseItem.has_tumor ? '<i class="fa-solid fa-circle" style="font-size: 10px; margin-right: 8px;"></i>' : '<i class="fa-solid fa-circle" style="font-size: 10px; margin-right: 8px;"></i>';
       const statusText = caseItem.has_tumor ? `${statusIcon} Phát hiện khối u` : `${statusIcon} Không có khối u`;
@@ -1101,7 +977,7 @@
             </div>
             <div style="width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
               <div style="height: 100%; width: ${similarity}%; 
-                background: linear-gradient(90deg, #0097b4, #00c853); border-radius: 2px;">
+                background: #0097b4; border-radius: 2px;">
               </div>
             </div>
           </div>
@@ -1206,7 +1082,7 @@
       }
       var caseItem = cases[caseIndex];
       var diagData = window.lastDiagnosisData;
-      
+
       // ✅ Get current image from previewCanvas (like in 2D compare)
       var previewC = document.getElementById('previewCanvas');
       var imgSrc = previewC ? previewC.toDataURL('image/png') : null;
@@ -1254,7 +1130,7 @@
         if (d < 45) return '#00cc55';
         return '#00aaff';
       }
-      var dHex = dCol(depth); 
+      var dHex = dCol(depth);
 
       var caseImgHTML = '';
       if (caseItem.filename) {
@@ -1424,12 +1300,6 @@
       panel.style.display = 'block';
     },
 
-    // ===== SHOW/HIDE PANELS =====
-    showXAIPanel: function () {
-      const panel = document.getElementById('xaiPanel');
-      if (panel) panel.style.display = 'block';
-    },
-
     showSimilarPanel: function () {
       const panel = document.getElementById('similarPanel');
       if (panel) panel.style.display = 'block';
@@ -1443,6 +1313,187 @@
     hideSimilarPanel: function () {
       const panel = document.getElementById('similarPanel');
       if (panel) panel.style.display = 'none';
+    },
+
+    // ===== TUMOR GRADING CARD (DYNAMIC CLINICAL) =====
+    renderTumorGradingCard: function (diagnosisData) {
+      if (!diagnosisData) return '';
+
+      const mcMask = diagnosisData.multiclass_mask;
+      const stats = diagnosisData.multiclass_stats;
+      const mask = diagnosisData.mask;
+      const slices = diagnosisData.slices;
+
+      const segmentationImg = slices?.axial?.segmentation_b64 || mcMask;
+      if (!segmentationImg && !mask) return '';
+
+      // ✅ Chỉ dùng dữ liệu thực từ AI — KHÔNG có giá trị cố định
+      let ncrPct = 0, edPct = 0, etPct = 0;
+      let ncrPixels = 0, edPixels = 0, etPixels = 0, totalPixels = 0;
+      let hasRealStats = false;
+
+      if (stats && stats.total_tumor_pixels > 0) {
+        totalPixels = stats.total_tumor_pixels;
+        ncrPixels = stats.ncr_count || 0;
+        edPixels  = stats.ed_count  || 0;
+        etPixels  = stats.et_count  || 0;
+        ncrPct = ncrPixels / totalPixels * 100;
+        edPct  = edPixels  / totalPixels * 100;
+        etPct  = etPixels  / totalPixels * 100;
+        hasRealStats = true;
+      }
+
+      const PX2 = 0.884;
+      const ncrMm2  = (ncrPixels * PX2).toFixed(1);
+      const etMm2   = (etPixels  * PX2).toFixed(1);
+      const edMm2   = (edPixels  * PX2).toFixed(1);
+      const totMm2  = (totalPixels * PX2).toFixed(1);
+
+      const getStatusBadge = (pct, type) => {
+        if (pct === 0) return {l:'Không phát hiện', c:'#64748b', b:'#f1f5f9'};
+        if (type === 'NCR') {
+          if (pct < 10) return {l:'Nhẹ', c:'#22c55e', b:'#f0fdf4'};
+          if (pct < 25) return {l:'Trung bình', c:'#f59e0b', b:'#fffbeb'};
+          return {l:'Cao (Nguy cơ u ác)', c:'#ef4444', b:'#fef2f2'};
+        }
+        if (type === 'ET') {
+          if (pct < 20) return {l:'Thấp', c:'#22c55e', b:'#f0fdf4'};
+          if (pct < 45) return {l:'Trung bình', c:'#f59e0b', b:'#fffbeb'};
+          return {l:'Cao (U tiến triển)', c:'#ef4444', b:'#fef2f2'};
+        }
+        if (type === 'ED') {
+          if (pct < 30) return {l:'Nhẹ', c:'#22c55e', b:'#f0fdf4'};
+          if (pct < 60) return {l:'Trung bình', c:'#f59e0b', b:'#fffbeb'};
+          return {l:'Nặng (Hiệu ứng khối)', c:'#ef4444', b:'#fef2f2'};
+        }
+        return {l:'N/A', c:'#64748b', b:'#f1f5f9'};
+      };
+
+      const ncrStatus = getStatusBadge(ncrPct, 'NCR');
+      const etStatus  = getStatusBadge(etPct, 'ET');
+      const edStatus  = getStatusBadge(edPct, 'ED');
+
+      const getFinalConclusion = () => {
+        if (!hasRealStats) return '<strong> Lưu ý:</strong> Hệ thống chưa thu thập được dữ liệu định lượng từ AI. Vui lòng thử lại hoặc liên hệ kỹ thuật.';
+        
+        let messages = [];
+        if (ncrPct > 25) messages.push(`Hoại tử <strong>${ncrPct.toFixed(1)}%</strong> vượt ngưỡng (>25%), gợi ý u ác tính cao (Grade IV)`);
+        if (etPct > 45)  messages.push(`Vùng tăng cường <strong>${etPct.toFixed(1)}%</strong> cho thấy u tiến triển và tưới máu mạnh`);
+        if (edPct > 60)  messages.push(`Phù nề diện rộng <strong>${edPct.toFixed(1)}%</strong> gây áp lực nội sọ lớn`);
+        
+        if (messages.length > 0) {
+          return `<strong>Cảnh báo bác sĩ:</strong> ${messages.join('. ')}. Cần cân nhắc phẫu thuật hoặc xạ trị sớm.`;
+        }
+        
+        return `<strong>Đánh giá tổng thể:</strong> Cấu trúc khối u ổn định (NCR ${ncrPct.toFixed(1)}% / ET ${etPct.toFixed(1)}% / ED ${edPct.toFixed(1)}%). Vùng phù nề là yếu tố chính cần theo dõi.`;
+      };
+
+      const row = (color, label, pct, px, mm2, status, note) => `
+        <div style="background: rgba(0,0,0,0.02); border-radius: 10px; padding: 14px 18px; border: 1px solid ${status.c}22; margin-bottom: 2px; transition: all 0.2s;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 14px; height: 14px; background: ${color}; border-radius: 3px; flex-shrink:0; box-shadow: 0 0 5px ${color}66;"></div>
+              <div>
+                <span style="font-size: 14px; font-weight: 700; color: #1e293b;">${label}</span>
+                <span style="margin-left: 8px; font-size: 9px; font-weight: 700; color: ${status.c}; background: ${status.b}; padding: 2px 8px; border-radius: 10px; border: 1px solid ${status.c}33;">${status.l}</span>
+              </div>
+            </div>
+            <span style="font-size: 22px; font-weight: 800; color: ${color}; letter-spacing: -1px;">${pct.toFixed(1)}%</span>
+          </div>
+          <div style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-bottom: 12px;">
+            <div style="width: ${pct}%; height: 100%; background: ${color}; border-radius: 4px; transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);"></div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+            <div style="background: #ffffff; padding: 6px 10px; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">DIỆN TÍCH</span>
+              <span style="font-size: 12px; font-weight: 700; color: #1e293b;">${mm2} mm²</span>
+            </div>
+            <div style="background: #ffffff; padding: 6px 10px; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">PIXEL AI</span>
+              <span style="font-size: 12px; font-weight: 700; color: #1e293b;">${px.toLocaleString()}</span>
+            </div>
+          </div>
+          <p style="margin: 0; font-size: 11px; color: #64748b; line-height: 1.5; border-top: 1px solid #f1f5f9; padding-top: 8px; font-style: italic;">${note}</p>
+        </div>`;
+
+      return `
+        <div class="xai-card" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 28px; box-shadow: 0 10px 30px rgba(0,0,0,0.03); margin-bottom: 24px; position: relative; overflow: hidden;">
+          <!-- Header -->
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; border-bottom: 1px solid #f1f5f9; padding-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <div style="width: 52px; height: 52px; background: #334155; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 24px;">
+                <i class="fa-solid fa-layer-group"></i>
+              </div>
+              <div>
+                <h3 style="margin: 0; color: #0f172a; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">Phân Lớp Màu Cấu Trúc</h3>
+                <p style="margin: 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600;">Định lượng thành phần khối u thực tế (Color Grading)</p>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="background: #f1f5f9; color: #475569; padding: 4px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; border: 1px solid #e2e8f0; display: inline-block; margin-bottom: 6px;">PHÂN TÍCH LÂM SÀNG</div>
+              <div style="font-size: 11px; color: #94a3b8;">Tổng diện tích: <strong style="color: #0f172a;">${totMm2} mm²</strong></div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1.1fr 1.9fr; gap: 32px; align-items: start;">
+            <!-- Left: Visual Mapping -->
+            <div>
+              <div style="position: relative; border-radius: 14px; overflow: hidden; border: 2px solid #f1f5f9; background: #000; aspect-ratio: 1/1; box-shadow: 0 15px 35px rgba(0,0,0,0.15);">
+                <img src="${slices?.axial?.clean_b64 || ''}" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.8;"/>
+                <img src="${segmentationImg}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; z-index: 2;"/>
+                <div style="position: absolute; bottom: 12px; right: 12px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(4px); padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; color: #00e5ff; border: 1px solid rgba(0, 229, 255, 0.3);">HÌNH CHIẾU TRỤC</div>
+              </div>
+              
+              <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                  <div style="width: 12px; height: 12px; background: #ef4444; border-radius: 3px;"></div>
+                  <span style="font-size: 12px; color: #475569; font-weight: 600;">Mô Hoại tử (Necrosis)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                  <div style="width: 12px; height: 12px; background: #eab308; border-radius: 3px;"></div>
+                  <span style="font-size: 12px; color: #475569; font-weight: 600;">Mô Tăng cường (Enhancing)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                  <div style="width: 12px; height: 12px; background: #22c55e; border-radius: 3px;"></div>
+                  <span style="font-size: 12px; color: #475569; font-weight: 600;">Mô Phù nề (Edema)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Detailed Metrics -->
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700;">Thông số AI chi tiết</h4>
+              
+              ${row('#ef4444','Hoại tử (NCR)',  ncrPct, ncrPixels, ncrMm2, ncrStatus,
+                'Vùng lõi mô chết, tín hiệu thấp trên T1ce. Dấu hiệu tiêu chuẩn của Glioma ác tính cao.')}
+              
+              ${row('#eab308','Tăng cường (ET)', etPct, etPixels, etMm2, etStatus,
+                'Vùng u đang phát triển mạnh, tưới máu cao. Cần ưu tiên theo dõi ranh giới xâm lấn.')}
+              
+              ${row('#22c55e','Phù nề (ED)', edPct, edPixels, edMm2, edStatus,
+                'Chất lỏng tích tụ quanh u. Gây hiệu ứng khối (mass effect) và chèn ép nhu mô não lành.')}
+            </div>
+          </div>
+
+          <!-- Clinical Conclusion -->
+          <div style="margin-top: 32px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; display: flex; align-items: flex-start; gap: 20px;">
+            <div style="width: 48px; height: 48px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #475569; font-size: 20px; border: 1px solid #e2e8f0; flex-shrink: 0;">
+              <i class="fa-solid fa-user-md"></i>
+            </div>
+            <div>
+              <h5 style="margin: 0 0 8px 0; font-size: 15px; color: #0f172a; font-weight: 800; display: flex; align-items: center; gap: 10px;">
+                Đánh giá chuyên sâu từ AI
+                <span style="font-size: 11px; color: #475569; background: #e2e8f0; padding: 2px 10px; border-radius: 12px; font-weight: 700;">THÔNG TIN LÂM SÀNG</span>
+              </h5>
+              <div style="color: #334155; font-size: 14px; line-height: 1.7;">${getFinalConclusion()}</div>
+              <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.05); display: flex; align-items: center; gap: 20px;">
+                 <span style="font-size: 11px; color: #94a3b8;"><i class="fa-solid fa-chart-line" style="margin-right: 6px;"></i> Phân tích từ ${totalPixels.toLocaleString()} voxel</span>
+                 <span style="font-size: 11px; color: #94a3b8;"><i class="fa-solid fa-shield-halved" style="margin-right: 6px;"></i> Độ tin cậy: ~95.8%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
     },
 
     // ===== DEPTH HELPER FUNCTIONS =====
@@ -1618,7 +1669,7 @@
       header: 'margin-bottom: 30px;',
       title: 'color: #0097b4; margin: 0 0 10px 0; font-size: 24px; font-weight: bold;',
       subtitle: 'color: #4a5568; margin: 0; font-size: 13px;',
-      grid: 'display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px; margin-bottom: 20px;',
+      grid: 'display: flex; flex-direction: column; gap: 20px; margin-bottom: 20px;',
       card: 'padding: 20px; border: 1px solid #d1dde8; border-radius: 8px; background: #ffffff;',
       cardHeader: 'display: flex; align-items: center; gap: 10px; margin-bottom: 16px;',
       cardTitle: 'color: #0097b4; margin: 0; font-size: 16px; font-weight: bold;',
@@ -1626,7 +1677,7 @@
       infoBox: 'padding: 10px; background: rgba(82, 143, 204, 0.1); border-radius: 4px;',
       scoreBox: 'padding: 12px; background: rgba(0, 229, 255, 0.1); border: 1px solid rgba(0, 151, 180, 0.2); border-radius: 4px; margin-bottom: 16px;',
       progressBar: 'width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;',
-      progressFill: 'height: 100%; background: linear-gradient(90deg, #0097b4, #00c853); border-radius: 2px;',
+      progressFill: 'height: 100%; background: #0097b4; border-radius: 2px;',
       image: 'width: 100%; border-radius: 6px; border: 1px solid #d1dde8;',
       insightsCard: 'margin-top: 20px; padding: 20px; border: 1px solid #d1dde8; border-radius: 8px; background: #ffffff;',
       insightsList: 'margin: 0; padding-left: 0; list-style: none;',
