@@ -1,4 +1,4 @@
-Thông tin ghi chú kỹ thuật : ===
+Thông tin ghi chú kỹ thuật : ===  mô hình của bạn là 2D U-Net chạy trên từng lát cắt đơn lẻ
 
 Feature ExtractionTrích xuất vector đặc trưng từ ảnh (thường dùng CNN/ResNet)
 
@@ -46,3 +46,54 @@ vì code hiện tại chủ yếu dùng TensorFlow
  Phương pháp xử lý hậu kỳ (post-processing) dựa trên cường độ sáng (intensity) 
  là một giải pháp cực kỳ hiệu quả: nó cung cấp thông tin chi tiết về cấu trúc khối u 
  (vùng lõi, vùng phù, vùng tăng cường) cho bác sĩ mà không cần quy trình huấn luyện lại mô hình phức tạp.
+
+ Bổ sung cho Grad-CAM : < ===============
+
+ 1. Vị trí giải phẫu cụ thể của tổn thương
+Hiển thị rõ: thùy trán trái/phải, thùy thái dương, tiểu não, não thất, tuyến yên…
+Có thể thêm sơ đồ não nhỏ để đánh dấu vị trí.
+2. Kích thước khối u
+Đường kính lớn nhất (mm/cm).
+Chiều dài × chiều rộng × chiều cao.
+Giúp bác sĩ đánh giá mức độ lớn nhỏ.
+3. Thể tích khối u
+Tính theo cm³ hoặc ml.
+Quan trọng để theo dõi tiến triển hoặc đáp ứng điều trị.
+4. Diện tích vùng nghi ngờ trên lát cắt hiện tại
+Hiển thị cm² hoặc số pixel.
+Dễ so sánh giữa các lần chụp.
+5. Xác suất từng loại u
+Ví dụ: Glioma 82%, Meningioma 11%, Pituitary 5%...
+Giúp bác sĩ thấy các khả năng chẩn đoán phân biệt.
+6. Độ tin cậy dự đoán tổng thể
+Confidence score riêng biệt với attention score.
+Ví dụ: Tin cậy chẩn đoán 87%.
+7. Mức độ chắc chắn của mô hình (Uncertainty)
+Cao / Trung bình / Thấp.
+Nếu không chắc chắn thì cảnh báo cần xem lại thủ công.
+8. Bản đồ segmentation (viền khối u)
+Vẽ ranh giới vùng nghi ngờ rõ ràng trên MRI.
+Tốt hơn chỉ heatmap.
+9. Overlay MRI + Heatmap + Mask
+Chồng cả heatmap và viền khối u trên ảnh gốc.
+Có thanh chỉnh độ trong suốt.
+10. Mức độ phù não xung quanh (Edema)
+Có / Không.
+Nhẹ / Trung bình / Nặng.
+11. Dấu hiệu chèn ép cấu trúc não
+Lệch đường giữa (midline shift).
+Chèn ép não thất.
+Tăng áp lực nội sọ nghi ngờ.
+12. Mô tả bằng văn bản dễ hiểu
+Ví dụ: “AI tập trung mạnh vào khối tăng tín hiệu vùng thùy trán trái, bờ không đều.”
+13. Nguy cơ ác tính
+Thấp / Trung bình / Cao.
+Chỉ mang tính hỗ trợ.
+14. Biểu đồ tiến triển theo thời gian
+Tháng 1: 2.3 cm
+Tháng 3: 2.8 cm
+Tháng 6: 3.1 cm
+15. Khuyến nghị tiếp theo
+MRI có tiêm thuốc.
+Sinh thiết.
+Theo dõi sau 1 tháng.

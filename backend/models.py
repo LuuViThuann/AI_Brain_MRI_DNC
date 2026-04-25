@@ -4,7 +4,7 @@ DiagnosticHistory: stores every completed diagnosis for history tracking.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, String, DateTime, Boolean, Float, Text, Integer
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -46,7 +46,7 @@ class DiagnosticHistory(Base):
         index=True,
     )
     patient_name    = Column(String(120), nullable=True, default=None)
-    timestamp       = Column(DateTime, default=datetime.utcnow, index=True)
+    timestamp       = Column(DateTime, default=datetime.now, index=True)
     image_filename  = Column(String(255), nullable=False)
     image_base64    = Column(Text, nullable=True)   
 

@@ -497,16 +497,17 @@ async def diagnose(file: UploadFile = File(...)):
                 except Exception:
                     pass
 
-                # Build the XAI blob — strip heavy base64 images to keep DB lean
+                # Build the XAI blob — KEEP base64 images for history restoration
                 xai_for_db = {}
                 if xai_result:
+                    # Use a deep copy or ensure we don't have non-serializable objects
+                    # xai_result should already be a dict with base64 strings instead of PIL images
                     xai_for_db = {
-                        "rule_based":       xai_result.get("rule_based"),
-                        "shap":             xai_result.get("shap"),
-                        "combined_insights": xai_result.get("combined_insights"),
-                        "gradcam_score":    (
-                            xai_result.get("gradcam", {}) or {}
-                        ).get("attention_score"),
+                        "gradcam": xai_result.get("gradcam"),
+                        "rule_based": xai_result.get("rule_based"),
+                        "shap": xai_result.get("shap"),
+                        "combined_insights": xai_result.get("combined_insights", []),
+                        "error": xai_result.get("error")
                     }
 
                 record = DiagnosticHistory(
@@ -527,6 +528,7 @@ async def diagnose(file: UploadFile = File(...)):
                         "centroid_normalized": prediction.get("centroid_normalized"),
                         "multiclass_stats":   prediction.get("multiclass_stats"),
                         "multiclass_mask":    prediction.get("multiclass_mask"),
+                        "slices":             slices_data,  # ✅ SAVE SLICES FOR HISTORY
                     },
                     report_data     = report,
                     xai_data        = xai_for_db,
@@ -540,6 +542,10 @@ async def diagnose(file: UploadFile = File(...)):
                 # Attach the new record ID to the response so frontend can link directly
                 response["history_id"] = str(record.id)
                 print(f"   💾 Saved to history: {record.id}")
+                print(f"      • XAI items: {list(xai_for_db.keys()) if xai_for_db else 'None'}")
+                if xai_for_db and xai_for_db.get('gradcam'):
+                    has_img = 'overlay_base64' in xai_for_db['gradcam']
+                    print(f"      • Grad-CAM images: {'YES' if has_img else 'NO'}")
 
             finally:
                 db.close()

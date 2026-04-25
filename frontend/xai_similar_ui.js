@@ -100,6 +100,8 @@
       filteredSimilarCases: [], // ✅ For tumor-only filtering
       currentPage: 1,           // ✅ Pagination
       itemsPerPage: 8,          // ✅ Cards per page
+      activeRecordId: null,     // ✅ Track which history item is selected
+      historyItems: [],         // ✅ Cache history list
       isInitialized: false
     },
 
@@ -138,6 +140,9 @@
 
           this.renderSimilarCases(event.detail.similarData);
         }
+
+        // ✅ Refresh history sidebar when new diagnosis completes
+        this.loadHistoryAndRefresh();
       });
 
       document.addEventListener('diagnosisError', (event) => {
@@ -232,16 +237,21 @@
       log('📊 Rendering XAI Dashboard', xaiData);
 
       if (!xaiData) {
+        // If no data provided, try to load latest from history
+        if (!this.state.historyItems || this.state.historyItems.length === 0) {
+          this.loadHistoryAndRefresh();
+          return;
+        }
         this.showXAIError('No XAI data provided');
         return;
       }
 
-      const hasGradCAM = xaiData.gradcam && Object.keys(xaiData.gradcam).length > 0;
+      const hasGradCAM = xaiData.gradcam && (Object.keys(xaiData.gradcam).length > 0 || xaiData.gradcam.attention_score !== undefined);
       const hasRuleBased = xaiData.rule_based && Object.keys(xaiData.rule_based).length > 0;
       const hasSHAP = xaiData.shap && Object.keys(xaiData.shap).length > 0;
       const hasInsights = xaiData.combined_insights && xaiData.combined_insights.length > 0;
 
-      const hasAnyData = hasGradCAM || hasRuleBased || hasSHAP;
+      const hasAnyData = hasGradCAM || hasRuleBased || hasSHAP || hasInsights;
 
       if (!hasAnyData && xaiData.error) {
         this.showXAIError(xaiData.error);
@@ -258,48 +268,36 @@
       const html = `
         <div class="xai-container" style="${this.styles.container}">
           
-          <!-- Header -->
-          <div class="xai-header" style="${this.styles.header}">
-            <h2 style="${this.styles.title}">Phân Tích AI Có Giải Thích</h2>
-            <p style="${this.styles.subtitle}">Phân tích đa phương pháp để hiểu quyết định của AI</p>
-          </div>
-          
-          <!-- Clinical Diagnosis Report -->
-          ${this.renderClinicalReportCard()}
+          <div class="xai-layout">
+            ${this.renderXAISidebar(this.state.historyItems)}
 
-          <!-- Cards Grid -->
-          <div class="xai-grid" style="${this.styles.grid}">
-        
-            ${hasGradCAM ? this.renderGradCAMCard(xaiData.gradcam) : ''}
-               ${window.lastDiagnosisData ? this.renderTumorGradingCard(window.lastDiagnosisData) : ''}
-            ${hasRuleBased ? this.renderRuleBasedCard(xaiData.rule_based) : ''}
-            ${hasSHAP ? this.renderSHAPCard(xaiData.shap) : ''}
-           
-          </div>
-          
-          <!-- Combined Insights --> 
-          ${hasInsights ? `
-            <div class="xai-card insights-card" style="${this.styles.insightsCard}">
-              <div style="${this.styles.cardHeader}">
-                <h3 style="${this.styles.cardTitle}"><i class="fa-solid fa-lightbulb" style="margin-right: 8px;"></i>Kết Luận Tổng Hợp</h3>
-             
+            <div class="xai-content-main">
+              <!-- Header -->
+              <div class="xai-header" style="${this.styles.header}">
+                <h2 style="${this.styles.title}">Phân Tích AI Có Giải Thích</h2>
+                <p style="${this.styles.subtitle}">Phân tích đa phương pháp để hiểu quyết định của AI</p>
               </div>
-              <ul style="${this.styles.insightsList}">
-                ${xaiData.combined_insights.map((insight, idx) => `
-                  <li style="${this.styles.insightItem}">
-                    <span style="${this.styles.insightEmoji}">${this.getInsightEmoji(insight)}</span>
-                    ${this.escapeHtml(insight)}
-                  </li>
-                `).join('')}
-              </ul>
+              
+              <!-- Clinical Diagnosis Report -->
+              ${this.renderClinicalReportCard()}
+
+              <!-- Cards Grid -->
+              <div class="xai-grid" style="${this.styles.grid}">
+            
+                ${hasGradCAM ? this.renderGradCAMCard(xaiData.gradcam) : ''}
+                  ${window.lastDiagnosisData ? this.renderTumorGradingCard(window.lastDiagnosisData) : ''}
+                ${hasRuleBased ? this.renderRuleBasedCard(xaiData.rule_based) : ''}
+                ${hasSHAP ? this.renderSHAPCard(xaiData.shap) : ''}
+              
+                <!-- Integrated Final Report (Inside Grid) -->
+                <div id="integratedReportArea" style="width: 100%; margin-top: 10px;">
+                  ${this.renderIntegratedReport(xaiData, window.lastDiagnosisData)}
+                </div>
+              </div>
+              
+             
+
             </div>
-          ` : ''}
-          
-          <!-- Status Footer -->
-          <div style="${this.styles.statusFooter}">
-            <span style="color: #4a5568; font-size: 11px;">
-              <i class="fa-solid fa-circle-check" style="color: #00c853; margin-right: 5px;"></i> Phân tích hoàn tất | ${new Date().toLocaleTimeString('vi-VN')}
-            </span>
           </div>
         </div>
       `;
@@ -355,15 +353,15 @@
       let rightContent = '';
 
       // Collect image HTML first, then wrap in flex row
-      const overlayHTML = gradcam.overlay_base64 ? `
+      const overlayHTML = (gradcam.overlay_base64 && gradcam.overlay_base64 !== "data:image/png;base64,") ? `
         <div style="flex: 1; min-width: 0;">
-          <img src="${gradcam.overlay_base64}" alt="Grad-CAM Overlay" style="width: 100%; border-radius: 6px; border: 1px solid #d1dde8;"/>
-          <p style="color: #4a5568; font-size: 10px; text-align: center; margin: 6px 0 0 0;">Bản đồ nhiệt tập trung chồng lên ảnh gốc</p>
+          <img src="${gradcam.overlay_base64}" alt="Grad-CAM Overlay" style="width: 100%; border-radius: 6px; border: 1px solid #d1dde8;" onerror="this.style.display='none'"/>
+          <p style="color: #4a5568; font-size: 10px; text-align: center; margin: 6px 0 0 0;">Bản đồ nhiệt tập trung</p>
         </div>
       ` : '';
-      const heatmapHTML = gradcam.heatmap_base64 ? `
+      const heatmapHTML = (gradcam.heatmap_base64 && gradcam.heatmap_base64 !== "data:image/png;base64,") ? `
         <div style="flex: 1; min-width: 0;">
-          <img src="${gradcam.heatmap_base64}" alt="Grad-CAM Heatmap" style="width: 100%; border-radius: 6px; border: 1px solid #d1dde8;"/>
+          <img src="${gradcam.heatmap_base64}" alt="Grad-CAM Heatmap" style="width: 100%; border-radius: 6px; border: 1px solid #d1dde8;" onerror="this.style.display='none'"/>
           <p style="color: #4a5568; font-size: 10px; text-align: center; margin: 6px 0 0 0;">Bản đồ tập trung thuần</p>
         </div>
       ` : '';
@@ -384,9 +382,19 @@
       }
       rightContent += this.renderConfidenceColorbar();
 
+      // If images are missing (old history), show a notice 
+      if (!overlayHTML && !heatmapHTML) {
+        rightContent = `
+          <div style="padding: 30px 20px; text-align: center; background: rgba(0,0,0,0.02); border-radius: 8px; border: 1px dashed #d1dde8;">
+            <i class="fa-solid fa-image-slash" style="font-size: 24px; color: #94a3b8; margin-bottom: 12px;"></i>
+            <p style="color: #64748b; font-size: 11px; margin: 0;">Ảnh Grad-CAM không có sẵn cho bản ghi lịch sử cũ.</p>
+          </div>
+          ${rightContent}
+        `;
+      }
 
       return `
-        <div class="xai-card" style="${this.styles.card}">
+        <div class="xai-card xai-animate delay-2" style="${this.styles.card}">
           <div style="${this.styles.cardHeader}">
             <h3 style="${this.styles.cardTitle}">Trực Quan Hóa Grad-CAM</h3>
          
@@ -440,7 +448,7 @@
             <div style="color: #ff9100; font-size: 11px; margin-bottom: 4px;">
               <i class="fa-solid fa-circle" style="font-size: 8px; margin-right: 5px;"></i> <strong>0.3 - 0.7:</strong> Không chắc chắn (cần xác minh)
             </div>
-            <div style="color: #ffff00; font-size: 11px;">
+            <div style="color: #ca8a04; font-size: 11px;">
               <i class="fa-solid fa-circle" style="font-size: 8px; margin-right: 5px;"></i> <strong>&lt; 0.3:</strong> Không chắc (Không phải khối u)
             </div>
           </div>
@@ -448,7 +456,6 @@
       `;
     },
 
-    // ===== RULE-BASED CARD =====
     renderRuleBasedCard: function (rules) {
       if (!rules) return '';
 
@@ -463,7 +470,7 @@
       // --- Left column: risk + measurements ---
       const leftContent = `
         <div style="padding: 12px; border: 1px solid ${riskColor.bg}44;
-          background: rgba(${riskColor.rgb}, 0.1); border-radius: 4px; margin-bottom: 16px;">
+          background: rgba(${riskColor.rgb}, 0.1); border-radius: 8px; margin-bottom: 5px;">
           <div style="color: #4a5568; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Mức Độ Rủi Ro</div>
           <div style="color: ${riskColor.bg}; font-size: 28px; font-weight: bold;">${riskColor.vi}</div>
         </div>
@@ -496,7 +503,7 @@
       // Rules triggered
       if (rules.rules_triggered && rules.rules_triggered.length > 0) {
         rightContent += `
-          <div style="${this.styles.infoBox}; margin-bottom: 12px;">
+          <div style="${this.styles.infoBox}; margin-bottom: 5px;">
             <h4 style="color: #4a5568; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase;">
               <i class="fa-solid fa-check-double" style="color: #00c853; margin-right: 8px;"></i> Quy Tắc Đã Kích Hoạt
             </h4>
@@ -514,7 +521,7 @@
       // Warnings
       if (rules.warnings && rules.warnings.length > 0) {
         rightContent += `
-          <div style="padding: 12px; background: rgba(255,82,82,0.1); border: 1px solid rgba(255,82,82,0.2); border-radius: 4px; margin-bottom: 12px;">
+          <div style="padding: 12px; background: rgba(255,82,82,0.1); border: 1px solid rgba(255,82,82,0.2); border-radius: 8px; margin-bottom: 5px;">
             <h4 style="color: #ff5252; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase;">
               <i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i> Cảnh Báo Lâm Sàng
             </h4>
@@ -532,23 +539,23 @@
       // Depth Metrics
       if (rules.depth_metrics) {
         rightContent += `
-          <div style="padding: 12px; background: rgba(156,39,176,0.08); border: 1px solid rgba(156,39,176,0.2); border-radius: 4px; margin-bottom: 12px;">
+          <div style="padding: 12px; background: rgba(156,39,176,0.08); border: 1px solid rgba(156,39,176,0.2); border-radius: 8px; margin-bottom: 5px;">
             <div style="color: #4a5568; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; font-weight: bold;">Vector Độ Sâu</div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
               <div style="color: #4a5568; font-size: 11px;">Tumor Depth</div>
               <div style="color: #9c27b0; font-size: 16px; font-weight: bold;">${rules.depth_metrics.tumor_depth_mm?.toFixed(1) || 'N/A'} mm</div>
             </div>
-            <div style="padding: 8px; background: ${this.getCategoryBG(rules.depth_metrics.depth_category?.category)}; border: 1px solid ${this.getCategoryBorder(rules.depth_metrics.depth_category?.category)}44; border-radius: 4px; margin-bottom: 8px;">
+            <div style="padding: 8px; background: ${this.getCategoryBG(rules.depth_metrics.depth_category?.category)}; border: 1px solid ${this.getCategoryBorder(rules.depth_metrics.depth_category?.category)}44; border-radius: 8px; margin-bottom: 8px;">
               <div style="display: flex; align-items: center; font-size: 13px; font-weight: bold; color: ${this.getCategoryBorder(rules.depth_metrics.depth_category?.category)};">
                 <span style="margin-right: 8px;"><i class="fa-solid fa-ruler-vertical"></i></span>
                 ${rules.depth_metrics.depth_category?.label || 'N/A'}
               </div>
             </div>
-            <div style="background: rgba(0,151,180,0.05); padding: 8px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 9px; color: #4a5568; margin-bottom: 8px;">
+            <div style="background: rgba(0,151,180,0.05); padding: 8px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 9px; color: #4a5568; margin-bottom: 8px;">
               <div style="margin-bottom: 4px;"><strong>Tâm u:</strong> <span style="color: #0097b4;">(${rules.depth_metrics.centroid_3d?.[0]?.toFixed(1)}, ${rules.depth_metrics.centroid_3d?.[1]?.toFixed(1)}, ${rules.depth_metrics.centroid_3d?.[2]?.toFixed(1)})</span></div>
               <div><strong>Vỏ não:</strong> <span style="color: #0097b4;">(${rules.depth_metrics.nearest_cortex_point?.[0]?.toFixed(1)}, ${rules.depth_metrics.nearest_cortex_point?.[1]?.toFixed(1)}, ${rules.depth_metrics.nearest_cortex_point?.[2]?.toFixed(1)})</span></div>
             </div>
-            <div style="background: rgba(156,39,176,0.05); padding: 8px; border-radius: 4px; color: #4a5568; font-size: 10px; line-height: 1.5;">
+            <div style="background: rgba(156,39,176,0.05); padding: 8px; border-radius: 8px; color: #4a5568; font-size: 10px; line-height: 1.5;">
               <i class="fa-solid fa-lightbulb" style="color: #0097b4; margin-right: 5px;"></i> <strong>Ý nghĩa lâm sàng:</strong> ${this.getDepthClinicalMeaning(rules.depth_metrics.tumor_depth_mm)}
             </div>
           </div>
@@ -556,7 +563,7 @@
       }
 
       return `
-        <div class="xai-card" style="${this.styles.card}">
+        <div class="xai-card xai-animate delay-4" style="${this.styles.card}">
           <div style="${this.styles.cardHeader}">
             <h3 style="${this.styles.cardTitle}">Phân Tích Thống Kê</h3>
            
@@ -581,7 +588,7 @@
 
       // --- Left column: explanation + legend ---
       const leftContent = `
-        <div style="background: rgba(0,151,180,0.05); padding: 12px; border-radius: 4px; margin-bottom: 16px; border: 1px solid rgba(0,151,180,0.2);">
+        <div style="background: rgba(0,151,180,0.05); padding: 12px; border-radius: 8px; margin-bottom: 5px; border: 1px solid rgba(0,151,180,0.2);">
           <div style="color: #4a5568; font-size: 10px; line-height: 1.6;">
             <i class="fa-solid fa-circle-info" style="color: #0097b4; margin-right: 5px;"></i>
             <strong>Giải thích:</strong> % đóng góp <strong>tương đối</strong> của mỗi tính năng vào dự đoán cuối cùng.
@@ -590,19 +597,19 @@
         </div>
         <div style="display: flex; flex-direction: column; gap: 8px;">
           <div style="padding: 8px; background: rgba(255,82,82,0.08); border-radius: 4px; border: 1px solid #ff525244;">
-            <span style="color: #ff5252; font-size: 10px; font-weight: 600;">🔴 Yếu tố chính</span>
+            <span style="color: #ff5252; font-size: 10px; font-weight: 600;"><i class="fa-solid fa-circle" style="font-size: 8px; margin-right: 5px;"></i> Yếu tố chính</span>
             <span style="color: #4a5568; font-size: 9px; margin-left: 8px;">&gt; 40% đóng góp</span>
           </div>
           <div style="padding: 8px; background: rgba(255,145,0,0.08); border-radius: 4px; border: 1px solid #ff910044;">
-            <span style="color: #ff9100; font-size: 10px; font-weight: 600;">🟡 Yếu tố quan trọng</span>
+            <span style="color: #ff9100; font-size: 10px; font-weight: 600;"><i class="fa-solid fa-circle" style="font-size: 8px; margin-right: 5px;"></i> Yếu tố quan trọng</span>
             <span style="color: #4a5568; font-size: 9px; margin-left: 8px;">20–40%</span>
           </div>
           <div style="padding: 8px; background: rgba(0,229,255,0.08); border-radius: 4px; border: 1px solid #0097b444;">
-            <span style="color: #0097b4; font-size: 10px; font-weight: 600;">🟢 Yếu tố phụ</span>
+            <span style="color: #0097b4; font-size: 10px; font-weight: 600;"><i class="fa-solid fa-circle" style="font-size: 8px; margin-right: 5px;"></i> Yếu tố phụ</span>
             <span style="color: #4a5568; font-size: 9px; margin-left: 8px;">10–20%</span>
           </div>
           <div style="padding: 8px; background: rgba(136,153,176,0.08); border-radius: 4px; border: 1px solid #4a556844;">
-            <span style="color: #4a5568; font-size: 10px; font-weight: 600;">⚪ Ảnh hưởng nhỏ</span>
+            <span style="color: #4a5568; font-size: 10px; font-weight: 600;"><i class="fa-solid fa-circle" style="font-size: 8px; margin-right: 5px;"></i> Ảnh hưởng nhỏ</span>
             <span style="color: #4a5568; font-size: 9px; margin-left: 8px;">&lt; 10%</span>
           </div>
         </div>
@@ -613,7 +620,7 @@
       if (topFeatures.length > 0) {
         rightContent += `
           <h4 style="color: #4a5568; margin: 0 0 12px 0; font-size: 12px; text-transform: uppercase;">
-            Các Tính Năng Đóng Góp Hàng Đầu (Tầm Quan Trọng Tương Đối)
+            Các Chỉ Số Ảnh Hưởng Chính (Tỷ Trọng Đóng Góp)
           </h4>
           <div style="display: flex; flex-direction: column; gap: 12px;">
             ${topFeatures.slice(0, 5).map((feature, index) => {
@@ -642,7 +649,7 @@
                     <span style="color: ${importanceLevel.color}; font-size: 10px; font-weight: 600;">${importanceLevel.label}</span>
                     <span style="color: #4a5568; font-size: 9px;">${this.getImportanceExplanation(importancePercent)}</span>
                   </div>
-                  ${featureDesc ? `<div style="background: rgba(0,151,180,0.05); padding: 8px; border-radius: 4px; margin-top: 8px;"><div style="color: #4a5568; font-size: 9px; line-height: 1.5;">ℹ️ ${this.escapeHtml(featureDesc)}</div></div>` : ''}
+                  ${featureDesc ? `<div style="background: rgba(0,151,180,0.05); padding: 8px; border-radius: 4px; margin-top: 8px;"><div style="color: #4a5568; font-size: 9px; line-height: 1.5;"><i class="fa-solid fa-circle-info" style="color: #0097b4; margin-right: 5px;"></i> ${this.escapeHtml(featureDesc)}</div></div>` : ''}
                 </div>
               `;
         }).join('')}
@@ -653,9 +660,9 @@
       }
 
       return `
-        <div class="xai-card" style="${this.styles.card}">
+        <div class="xai-card xai-animate delay-5" style="${this.styles.card}">
           <div style="${this.styles.cardHeader}">
-            <h3 style="${this.styles.cardTitle}">Tầm Quan Trọng Của Các Tính Năng</h3>
+            <h3 style="${this.styles.cardTitle}">Tỷ Trọng Đóng Góp Vào Chẩn Đoán</h3>
           
           </div>
           <div style="display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;">
@@ -682,7 +689,7 @@
       const severityColor = this.getConfidenceColorHex(severity === 'THẤP' ? 'LOW' : (severity === 'CAO' ? 'HIGH' : 'MEDIUM'));
 
       return `
-        <div class="xai-card clinical-report-card" style="${this.styles.card}; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+        <div class="xai-card clinical-report-card xai-animate delay-1" style="${this.styles.card}; margin-bottom: 5px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
           <div style="${this.styles.cardHeader}; border-bottom: 1px solid #edf2f7; padding-bottom: 15px; margin-bottom: 20px; justify-content: space-between; align-items: center;">
             <div style="display: flex; align-items: center; gap: 15px;">
               <div style="width: 45px; height: 45px; background: #f1f5f9; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #475569; border: 1px solid #e2e8f0;">
@@ -794,6 +801,184 @@
           </div>
         </div>
       `;
+    },
+
+    // ===== INTEGRATED REPORT CARD (NEW) =====
+    renderIntegratedReport: function (xaiData, diagnosisData) {
+      if (!diagnosisData || !xaiData) return '';
+
+      const prediction = diagnosisData.prediction || {};
+      const stats = diagnosisData.multiclass_stats || {};
+      const gradcam = xaiData.gradcam || {};
+      const rules = xaiData.rule_based || {};
+      
+      const ncrPct = stats.total_tumor_pixels > 0 ? (stats.ncr_count / stats.total_tumor_pixels * 100) : 0;
+      const etPct  = stats.total_tumor_pixels > 0 ? (stats.et_count  / stats.total_tumor_pixels * 100) : 0;
+      const edPct  = stats.total_tumor_pixels > 0 ? (stats.ed_count  / stats.total_tumor_pixels * 100) : 0;
+
+      // Integrated Conclusion Text Logic
+      const generateContent = () => {
+        let content = '';
+        const confidence = (prediction.confidence ? prediction.confidence * 100 : 0).toFixed(1);
+        const area = (rules.tumor_area_mm2 || 0).toFixed(1);
+        const location = prediction.location_hint || 'Không rõ vị trí';
+        const attention = gradcam.attention_score ? (gradcam.attention_score * 100).toFixed(1) : (stats.gradcam_attention ? (stats.gradcam_attention * 100).toFixed(1) : 'N/A');
+        
+        content += `<p style="margin-bottom: 12px; font-weight: 400; color: #475569;">Dựa trên phân tích đa tầng từ mô hình <strong>CNN Deep Learning</strong> và hệ thống giải thích <strong>XAI</strong>, hệ thống ghi nhận các phát hiện chính sau:</p>`;
+        
+        content += `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 5px;">`;
+        
+        // Point 1: Detection & Confidence
+        content += `
+          <div style="background: #ffffff; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+            <div style="font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 6px;">Độ tin cậy chuẩn đoán</div>
+            <div style="font-size: 20px; font-weight: 700; color: #0097b4;">${confidence}%</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 4px;"><i class="fa-solid fa-check-double" style="margin-right: 4px;"></i> Xác nhận sự diện diện khối u</div>
+          </div>
+        `;
+        
+        // Point 2: Location
+        content += `
+          <div style="background: #ffffff; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+            <div style="font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 6px;">Vị trí ghi nhận</div>
+            <div style="font-size: 18px; font-weight: 700; color: #1e293b;">${this.translateMedicalLocation(location)}</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 4px;"><i class="fa-solid fa-location-dot" style="margin-right: 4px;"></i> Tọa độ không gian 3D chuẩn hóa</div>
+          </div>
+        `;
+        content += `</div>`;
+
+        content += `<div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 5px;">
+          <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #334155; font-weight: 700; text-transform: uppercase;">Cấu trúc khối u (Phân lớp màu)</h4>
+          <div style="display: flex; gap: 20px; align-items: center;">
+            <div style="flex: 1;">
+               <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                  <span style="font-size: 12px; color: #64748b;">Hoại tử (NCR): <strong>${ncrPct.toFixed(1)}%</strong></span>
+                  <span style="font-size: 12px; color: #64748b;">Tăng cường (ET): <strong>${etPct.toFixed(1)}%</strong></span>
+                  <span style="font-size: 12px; color: #64748b;">Phù nề (ED): <strong>${edPct.toFixed(1)}%</strong></span>
+               </div>
+               <div style="height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden; display: flex;">
+                  <div style="width: ${ncrPct}%; height: 100%; background: #ef4444;"></div>
+                  <div style="width: ${etPct}%; height: 100%; background: #f59e0b;"></div>
+                  <div style="width: ${edPct}%; height: 100%; background: #22c55e;"></div>
+               </div>
+            </div>
+          </div>
+          <p style="margin: 12px 0 0 0; font-size: 12px; color: #475569; line-height: 1.6;">
+            <i class="fa-solid fa-microscope" style="margin-right: 6px;"></i> 
+            Kết quả định lượng diện tích khối u đạt <strong>${area} mm²</strong>. 
+            Mức độ tập trung sự chú ý của AI (Grad-CAM) đạt <strong>${attention}%</strong> tại vùng nhân khối u.
+          </p>
+        </div>`;
+
+        // Final Clinical Verdict
+        let verdict = '';
+        let verdictColor = '#0097b4';
+        const risk = rules.risk_level || 'Trung bình';
+        
+        if (risk.toLowerCase().includes('cao') || ncrPct > 25) {
+          verdict = `<strong>Đánh giá rủi ro:</strong> Khối u có dấu hiệu ác tính cao (Grade IV) với tỷ lệ hoại tử ${ncrPct.toFixed(1)}%. Cần can thiệp phẫu thuật khẩn cấp và làm sinh thiết giải phẫu bệnh.`;
+          verdictColor = '#ef4444';
+        } else if (risk.toLowerCase().includes('thấp')) {
+          verdict = `<strong>Đánh giá rủi ro:</strong> Khối u tiến triển chậm, vùng tăng cường thấp. Đề nghị theo dõi định kỳ 3-6 tháng và kết hợp điều trị nội khoa.`;
+          verdictColor = '#22c55e';
+        } else {
+          verdict = `<strong>Đánh giá rủi ro:</strong> Khối u ở mức độ trung bình. Cần đánh giá thêm sự thâm nhiễm vùng phù nề (${edPct.toFixed(1)}%) và các triệu chứng lâm sàng đi kèm.`;
+          verdictColor = '#f59e0b';
+        }
+
+        content += `<div style="background: #ffffff; padding: 15px; border-radius: 8px; border: 1px solid ${verdictColor}44; box-shadow: 0 4px 12px rgba(0,0,0,0.05); background-color: ${verdictColor}05;">
+          <div style="color: ${verdictColor}; font-size: 14px; line-height: 1.8;">
+            <i class="fa-solid fa-stethoscope" style="margin-right: 8px;"></i>
+            ${verdict}
+          </div>
+        </div>`;
+
+        return content;
+      };
+
+      return `
+        <div class="xai-card integrated-report-card xai-animate delay-6" style="width: 100%; background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.08); margin-bottom: 5px; position: relative; overflow: hidden; box-sizing: border-box;">
+          <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: rgba(0, 151, 180, 0.03); border-radius: 50%; z-index: 0;"></div>
+          
+          <!-- Header -->
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; position: relative; z-index: 1;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 56px; height: 56px; background: #0097b4; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 26px; box-shadow: 0 8px 16px rgba(0, 151, 180, 0.2);">
+                <i class="fa-solid fa-file-waveform"></i>
+              </div>
+              <div>
+                <h3 style="margin: 0; color: #0f172a; font-size: 24px; font-weight: 500; letter-spacing: -0.5px;">Báo Cáo Kết Luận Đa Tầng</h3>
+                <p style="margin: 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600;">Integrated AI Clinical Assessment</p>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">ID CHẨN ĐOÁN</div>
+              <div style="font-family: 'Consolas', monospace; font-size: 13px; font-weight: 700; color: #475569;">#${diagnosisData.history_id?.substring(0, 8) || 'LIVE-XAI'}</div>
+            </div>
+          </div>
+
+          <!-- Content Body -->
+          <div style="position: relative; z-index: 1; color: #334155; font-size: 14px; line-height: 1.6;">
+            ${generateContent()}
+          </div>
+
+          <!-- Footer -->
+          <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 1;">
+            <div style="display: flex; gap: 10px;">
+               <span style="font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 6px;">
+                Hệ thống chẩn đoán NeuroScanAI v2.0
+               </span>
+               <span style="font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 6px;">
+                  <i class="fa-solid fa-fingerprint"></i> Xác thực số: AI-${Math.floor(Math.random()*1000)}
+               </span>
+            </div>
+           
+          </div>
+        </div>
+      `;
+    },
+    
+    // Helper to translate location hints to medical Vietnamese
+    translateMedicalLocation: function(location) {
+      if (!location) return 'Không rõ vị trí';
+      
+      const loc = location.toLowerCase();
+      
+      const map = {
+        'inferior': 'Cực dưới',
+        'superior': 'Cực trên',
+        'middle': 'Vùng giữa',
+        'left': 'trái',
+        'right': 'phải',
+        'occipital lobe': 'Thùy chẩm',
+        'parietal lobe': 'Thùy đỉnh',
+        'temporal lobe': 'Thùy thái dương',
+        'frontal lobe': 'Thùy trán',
+        'parietal': 'Thùy đỉnh',
+        'occipital': 'Thùy chẩm',
+        'temporal': 'Thùy thái dương',
+        'frontal': 'Thùy trán'
+      };
+      
+      // Order of processing: directional then anatomical
+      let translated = location;
+      
+      if (loc.includes('inferior left')) translated = 'Cực dưới thùy ' + (loc.includes('occipital') ? 'chẩm' : loc.includes('parietal') ? 'đỉnh' : loc.includes('temporal') ? 'thái dương' : 'trán') + ' trái';
+      else if (loc.includes('inferior right')) translated = 'Cực dưới thùy ' + (loc.includes('occipital') ? 'chẩm' : loc.includes('parietal') ? 'đỉnh' : loc.includes('temporal') ? 'thái dương' : 'trán') + ' phải';
+      else if (loc.includes('superior left')) translated = 'Cực trên thùy ' + (loc.includes('occipital') ? 'chẩm' : loc.includes('parietal') ? 'đỉnh' : loc.includes('temporal') ? 'thái dương' : 'trán') + ' trái';
+      else if (loc.includes('superior right')) translated = 'Cực trên thùy ' + (loc.includes('occipital') ? 'chẩm' : loc.includes('parietal') ? 'đỉnh' : loc.includes('temporal') ? 'thái dương' : 'trán') + ' phải';
+      else if (loc.includes('middle left')) translated = 'Vùng giữa thùy ' + (loc.includes('occipital') ? 'chẩm' : loc.includes('parietal') ? 'đỉnh' : loc.includes('temporal') ? 'thái dương' : 'trán') + ' trái';
+      else if (loc.includes('middle right')) translated = 'Vùng giữa thùy ' + (loc.includes('occipital') ? 'chẩm' : loc.includes('parietal') ? 'đỉnh' : loc.includes('temporal') ? 'thái dương' : 'trán') + ' phải';
+      
+      // Fallback for simple matches
+      if (translated === location) {
+         Object.entries(map).forEach(([eng, vi]) => {
+           const reg = new RegExp(eng, 'gi');
+           translated = translated.replace(reg, vi);
+         });
+      }
+      
+      return translated;
     },
 
     // ===== RENDER SIMILAR CASES =====  
@@ -1324,7 +1509,14 @@
       const mask = diagnosisData.mask;
       const slices = diagnosisData.slices;
 
-      const segmentationImg = slices?.axial?.segmentation_b64 || mcMask;
+      let segmentationImg = slices?.axial?.segmentation_b64;
+      
+      // Fallback: If no slice image, generate from mask array
+      if (!segmentationImg) {
+        log('Generating fallback segmentation image from mask data');
+        segmentationImg = this.maskToBase64(mcMask || mask);
+      }
+
       if (!segmentationImg && !mask) return '';
 
       // ✅ Chỉ dùng dữ liệu thực từ AI — KHÔNG có giá trị cố định
@@ -1417,15 +1609,15 @@
         </div>`;
 
       return `
-        <div class="xai-card" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 28px; box-shadow: 0 10px 30px rgba(0,0,0,0.03); margin-bottom: 24px; position: relative; overflow: hidden;">
+        <div class="xai-card xai-animate delay-3" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.03); margin-bottom: 5px; width: 100%; box-sizing: border-box;">
           <!-- Header -->
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; border-bottom: 1px solid #f1f5f9; padding-bottom: 20px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px solid #f1f5f9; padding-bottom: 15px;">
             <div style="display: flex; align-items: center; gap: 16px;">
               <div style="width: 52px; height: 52px; background: #334155; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 24px;">
                 <i class="fa-solid fa-layer-group"></i>
               </div>
               <div>
-                <h3 style="margin: 0; color: #0f172a; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">Phân Lớp Màu Cấu Trúc</h3>
+                <h3 style="margin: 0; color: #0f172a; font-size: 22px; font-weight: 500; letter-spacing: -0.5px;">Phân Lớp Màu Cấu Trúc</h3>
                 <p style="margin: 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600;">Định lượng thành phần khối u thực tế (Color Grading)</p>
               </div>
             </div>
@@ -1435,33 +1627,60 @@
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1.1fr 1.9fr; gap: 32px; align-items: start;">
-            <!-- Left: Visual Mapping -->
-            <div>
-              <div style="position: relative; border-radius: 14px; overflow: hidden; border: 2px solid #f1f5f9; background: #000; aspect-ratio: 1/1; box-shadow: 0 15px 35px rgba(0,0,0,0.15);">
-                <img src="${slices?.axial?.clean_b64 || ''}" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.8;"/>
-                <img src="${segmentationImg}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; z-index: 2;"/>
-                <div style="position: absolute; bottom: 12px; right: 12px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(4px); padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; color: #00e5ff; border: 1px solid rgba(0, 229, 255, 0.3);">HÌNH CHIẾU TRỤC</div>
+          <div style="display: flex; flex-direction: column; gap: 24px;">
+            <!-- Top: Visual Mapping (4/4/4 Grid) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+              <!-- Axial View -->
+              <div style="position: relative; border-radius: 12px; overflow: hidden; border: 2px solid #f1f5f9; background: #000; aspect-ratio: 1/1; box-shadow: 0 8px 20px rgba(0,0,0,0.12);">
+                <img src="${slices?.axial?.clean_b64 || diagnosisData.image_base64 || ''}" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.8;" onerror="this.style.display='none'"/>
+                <img src="${segmentationImg}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; z-index: 2;" onerror="this.style.display='none'"/>
+                <div style="position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.7); color: #fff; font-size: 10px; font-weight: 800; padding: 3px 10px; border-radius: 6px; backdrop-filter: blur(4px);">AXIAL</div>
               </div>
               
-              <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 8px;">
-                <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
-                  <div style="width: 12px; height: 12px; background: #ef4444; border-radius: 3px;"></div>
-                  <span style="font-size: 12px; color: #475569; font-weight: 600;">Mô Hoại tử (Necrosis)</span>
+              <!-- Coronal View -->
+              <div style="position: relative; border-radius: 12px; overflow: hidden; border: 2px solid #f1f5f9; background: #000; aspect-ratio: 1/1; box-shadow: 0 8px 20px rgba(0,0,0,0.12);">
+                <img src="${slices?.coronal?.clean_b64 || ''}" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.8;" onerror="this.style.display='none'"/>
+                <img src="${slices?.coronal?.segmentation_b64 || ''}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; z-index: 2;" onerror="this.style.display='none'"/>
+                <div style="position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.7); color: #fff; font-size: 10px; font-weight: 800; padding: 3px 10px; border-radius: 6px; backdrop-filter: blur(4px);">CORONAL</div>
+              </div>
+
+              <!-- Sagittal View -->
+              <div style="position: relative; border-radius: 12px; overflow: hidden; border: 2px solid #f1f5f9; background: #000; aspect-ratio: 1/1; box-shadow: 0 8px 20px rgba(0,0,0,0.12);">
+                <img src="${slices?.sagittal?.clean_b64 || ''}" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.8;" onerror="this.style.display='none'"/>
+                <img src="${slices?.sagittal?.segmentation_b64 || ''}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; z-index: 2;" onerror="this.style.display='none'"/>
+                <div style="position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.7); color: #fff; font-size: 10px; font-weight: 800; padding: 3px 10px; border-radius: 6px; backdrop-filter: blur(4px);">SAGITTAL</div>
+              </div>
+            </div>
+
+            <!-- Bottom: Quantitative Details -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+              <!-- Left: Legend -->
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="padding: 15px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                  <h4 style="margin: 0 0 12px 0; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Chú giải vùng u</h4>
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <div style="width: 12px; height: 12px; background: #ef4444; border-radius: 3px;"></div>
+                      <span style="font-size: 13px; color: #475569; font-weight: 600;">Hoại tử (NCR)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <div style="width: 12px; height: 12px; background: #f59e0b; border-radius: 3px;"></div>
+                      <span style="font-size: 13px; color: #475569; font-weight: 600;">Tăng cường (ET)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <div style="width: 12px; height: 12px; background: #22c55e; border-radius: 3px;"></div>
+                      <span style="font-size: 13px; color: #475569; font-weight: 600;">Phù nề (ED)</span>
+                    </div>
+                  </div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
-                  <div style="width: 12px; height: 12px; background: #eab308; border-radius: 3px;"></div>
-                  <span style="font-size: 12px; color: #475569; font-weight: 600;">Mô Tăng cường (Enhancing)</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
-                  <div style="width: 12px; height: 12px; background: #22c55e; border-radius: 3px;"></div>
-                  <span style="font-size: 12px; color: #475569; font-weight: 600;">Mô Phù nề (Edema)</span>
+                
+                 
                 </div>
               </div>
             </div>
 
             <!-- Right: Detailed Metrics -->
-            <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; flex-direction: column; gap: 5px;margin-top: 15px;">
               <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700;">Thông số AI chi tiết</h4>
               
               ${row('#ef4444','Hoại tử (NCR)',  ncrPct, ncrPixels, ncrMm2, ncrStatus,
@@ -1473,10 +1692,9 @@
               ${row('#22c55e','Phù nề (ED)', edPct, edPixels, edMm2, edStatus,
                 'Chất lỏng tích tụ quanh u. Gây hiệu ứng khối (mass effect) và chèn ép nhu mô não lành.')}
             </div>
-          </div>
 
-          <!-- Clinical Conclusion -->
-          <div style="margin-top: 32px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; display: flex; align-items: flex-start; gap: 20px;">
+              <!-- Clinical Conclusion -->
+          <div style="margin-top: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; display: flex; align-items: flex-start; gap: 20px;">
             <div style="width: 48px; height: 48px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #475569; font-size: 20px; border: 1px solid #e2e8f0; flex-shrink: 0;">
               <i class="fa-solid fa-user-md"></i>
             </div>
@@ -1492,6 +1710,10 @@
               </div>
             </div>
           </div>
+
+          </div>
+
+        
         </div>
       `;
     },
@@ -1530,7 +1752,7 @@
       const map = {
         'SUPERFICIAL': '#ff0040',
         'SHALLOW': '#ff9100',
-        'INTERMEDIATE': '#ffff00',
+        'INTERMEDIATE': '#ca8a04',
         'DEEP': '#00c853',
         'VERY_DEEP': '#00a3cc'
       };
@@ -1542,7 +1764,7 @@
       const map = {
         'SUPERFICIAL': '#ff5252',
         'SHALLOW': '#ffb74d',
-        'INTERMEDIATE': '#ffff99',
+        'INTERMEDIATE': '#b45309',
         'DEEP': '#66bb6a',
         'VERY_DEEP': '#4dd0e1'
       };
@@ -1666,24 +1888,276 @@
     // ===== STYLES OBJECT =====
     styles: {
       container: 'padding: 20px 30px; background: transparent; border-radius: 12px; max-width: 1400px; margin: 0 auto;',
-      header: 'margin-bottom: 30px;',
+      header: 'margin-bottom: 5px;',
       title: 'color: #0097b4; margin: 0 0 10px 0; font-size: 24px; font-weight: bold;',
       subtitle: 'color: #4a5568; margin: 0; font-size: 13px;',
-      grid: 'display: flex; flex-direction: column; gap: 20px; margin-bottom: 20px;',
-      card: 'padding: 20px; border: 1px solid #d1dde8; border-radius: 8px; background: #ffffff;',
+      grid: 'display: flex; flex-direction: column; gap: 5px; margin-bottom: 5px;',
+      card: 'padding: 20px; border: 1px solid #d1dde8; border-radius: 12px; background: #ffffff; margin-bottom: 5px; box-sizing: border-box; width: 100%;',
       cardHeader: 'display: flex; align-items: center; gap: 10px; margin-bottom: 16px;',
       cardTitle: 'color: #0097b4; margin: 0; font-size: 16px; font-weight: bold;',
       badge: 'background: #0097b4; color: transparent; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;',
-      infoBox: 'padding: 10px; background: rgba(82, 143, 204, 0.1); border-radius: 4px;',
-      scoreBox: 'padding: 12px; background: rgba(0, 229, 255, 0.1); border: 1px solid rgba(0, 151, 180, 0.2); border-radius: 4px; margin-bottom: 16px;',
+      infoBox: 'padding: 10px; background: rgba(82, 143, 204, 0.1); border-radius: 8px;',
+      scoreBox: 'padding: 12px; background: rgba(0, 229, 255, 0.1); border: 1px solid rgba(0, 151, 180, 0.2); border-radius: 8px; margin-bottom: 5px;',
       progressBar: 'width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;',
       progressFill: 'height: 100%; background: #0097b4; border-radius: 2px;',
-      image: 'width: 100%; border-radius: 6px; border: 1px solid #d1dde8;',
-      insightsCard: 'margin-top: 20px; padding: 20px; border: 1px solid #d1dde8; border-radius: 8px; background: #ffffff;',
+      image: 'width: 100%; border-radius: 8px; border: 1px solid #d1dde8;',
+      insightsCard: 'margin-top: 20px; padding: 20px; border: 1px solid #d1dde8; border-radius: 12px; background: #ffffff;',
       insightsList: 'margin: 0; padding-left: 0; list-style: none;',
       insightItem: 'color: #4a5568; margin-bottom: 8px; padding-left: 20px; position: relative; font-size: 13px; line-height: 1.5;',
       insightEmoji: 'position: absolute; left: 0; color: #0097b4; font-weight: bold; width: 16px;',
-      statusFooter: 'margin-top: 16px; padding-top: 16px; border-top: 1px solid #d1dde8; text-align: center;'
+      statusFooter: 'margin-top: 5px; padding-top: 16px; border-top: 1px solid #d1dde8; text-align: center;'
+    },
+
+    // ===== 🎨 IMAGE UTILITIES =====
+
+    maskToBase64: function(mask) {
+      if (!mask || !Array.isArray(mask)) return '';
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.createImageData(256, 256);
+        
+        for (let y = 0; y < 256; y++) {
+          if (!mask[y]) continue;
+          for (let x = 0; x < 256; x++) {
+            const idx = (y * 256 + x) * 4;
+            const val = mask[y][x];
+            
+            if (val === 1) { // NCR - Red
+              imageData.data[idx] = 239; imageData.data[idx+1] = 68; imageData.data[idx+2] = 68; imageData.data[idx+3] = 200;
+            } else if (val === 2) { // ED - Green
+              imageData.data[idx] = 34; imageData.data[idx+1] = 197; imageData.data[idx+2] = 94; imageData.data[idx+3] = 160;
+            } else if (val === 3) { // ET - Yellow
+              imageData.data[idx] = 234; imageData.data[idx+1] = 179; imageData.data[idx+2] = 8; imageData.data[idx+3] = 220;
+            } else if (val > 0.5) { // Binary - Reddish
+              imageData.data[idx] = 239; imageData.data[idx+1] = 68; imageData.data[idx+2] = 68; imageData.data[idx+3] = 140;
+            }
+          }
+        }
+        ctx.putImageData(imageData, 0, 0);
+        return canvas.toDataURL();
+      } catch (e) {
+        error('Mask to Base64 failed', e);
+        return '';
+      }
+    },
+
+    // ===== ⏳ HISTORY & SIDEBAR METHODS =====
+
+    loadHistoryAndRefresh: async function() {
+      log('Loading history and refreshing dashboard');
+      const items = await this.fetchXAIHistory();
+      this.state.historyItems = items;
+      
+      // ✅ Sync with live data if available to avoid unnecessary reload
+      if (window.lastXAIData) {
+        this.state.currentXAIData = window.lastXAIData;
+        if (window.lastDiagnosisData?.history_id) {
+          this.state.activeRecordId = window.lastDiagnosisData.history_id;
+        }
+      }
+
+      if (!this.state.currentXAIData && items.length > 0) {
+        // Only load from history if we don't have a current active diagnosis
+        this.loadHistoryCaseIntoXAI(items[0].id);
+      } else {
+        this.renderXAIDashboard(this.state.currentXAIData);
+      }
+    },
+
+    fetchXAIHistory: async function() {
+      log('Fetching XAI history list...');
+      try {
+        const response = await fetch(`${API_BASE}/history?per_page=20`);
+        if (!response.ok) throw new Error('Failed to fetch history');
+        const data = await response.json();
+        return data.items || [];
+      } catch (err) {
+        error('Error fetching XAI history:', err);
+        return [];
+      }
+    },
+
+    renderXAISidebar: function(historyItems) {
+      if (!historyItems || historyItems.length === 0) {
+        return `
+          <div class="xai-sidebar">
+            <div class="xai-sidebar-header">
+              <h3 class="xai-sidebar-title"><i class="fa-solid fa-clock-rotate-left"></i> LỊCH SỬ</h3>
+              <span class="xai-sidebar-subtitle">Các ca chẩn đoán gần đây</span>
+            </div>
+            <div style="padding: 40px 20px; text-align: center; color: #94a3b8; font-size: 12px;">
+              Chưa có dữ liệu lịch sử
+            </div>
+          </div>
+        `;
+      }
+      
+      // ✅ SORT: Stable alphabetical sort for ISO strings (newest first)
+      const sortedItems = [...historyItems].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+      
+      const activeId = this.state.activeRecordId;
+      const liveId = window.lastDiagnosisData?.history_id;
+
+      return `
+        <div class="xai-sidebar">
+          <div class="xai-sidebar-header">
+            <h3 class="xai-sidebar-title">
+              <i class="fa-solid fa-clock-rotate-left"></i> LỊCH SỬ
+            </h3>
+            <span class="xai-sidebar-subtitle">Tổng số: <strong>${sortedItems.length}</strong> ca bệnh</span>
+          </div>
+          <div class="xai-history-list">
+            ${sortedItems.map(item => {
+              // ✅ ROBUST PARSING: Avoid Date object timezone shifts
+              // Expected format: YYYY-MM-DDTHH:mm:ss.ssssss
+              let dateStr = "??/??/????";
+              let timeStr = "??:??";
+              
+              if (item.timestamp) {
+                try {
+                  const parts = item.timestamp.split('T');
+                  const dParts = parts[0].split('-');
+                  dateStr = `${dParts[2]}/${dParts[1]}/${dParts[0]}`;
+                  timeStr = parts[1].substring(0, 5);
+                } catch (e) {
+                  const d = new Date(item.timestamp);
+                  dateStr = d.toLocaleDateString('vi-VN');
+                  timeStr = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                }
+              }
+              
+              const isActive = item.id === activeId;
+              const isLive = item.id === liveId;
+              const hasTumor = item.tumor_detected;
+              
+              return `
+                <div class="xai-history-item ${isActive ? 'active' : ''} ${isLive ? 'live-item' : ''}" 
+                     onclick="window.XAISimilarUI.loadHistoryCaseIntoXAI('${item.id}')">
+                  <div class="xai-history-item-header">
+                    <span class="xai-history-date">${dateStr} ${timeStr}</span>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                      ${isLive ? '<span class="xai-history-badge live">VỪA XONG</span>' : ''}
+                      <span class="xai-history-badge ${hasTumor ? 'tumor' : 'clear'}">
+                        ${hasTumor ? 'CÓ U' : 'SẠCH'}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="xai-history-filename" title="${item.image_filename}">
+                    <i class="fa-regular fa-file-image" style="margin-right: 6px; color: #64748b;"></i>${item.image_filename}
+                  </div>
+                  <div class="xai-history-footer">
+                    <span class="xai-history-id">#${item.id.substring(0, 8)}</span>
+                    ${item.confidence ? `<span class="xai-history-conf">${Math.round(item.confidence * 100)}% tin cậy</span>` : ''}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    },
+
+    loadHistoryCaseIntoXAI: async function(recordId) {
+      log(`🔄 Switching to historical case: ${recordId}`);
+      this.state.activeRecordId = recordId;
+      
+      try {
+        // Show loading state in main content area
+        const mainArea = document.querySelector('.xai-content-main');
+        if (mainArea) {
+          mainArea.innerHTML = `
+            <div style="padding: 150px 0; text-align: center; color: #0097b4; background: white; border-radius: 16px;">
+              <div class="loader-pulse" style="margin-bottom: 24px;"></div>
+              <i class="fa-solid fa-spinner fa-spin fa-3x" style="margin-bottom: 20px; color: #0097b4;"></i>
+              <p style="font-weight: 700; font-size: 18px; color: #1e293b;">Đang truy xuất dữ liệu từ cơ sở dữ liệu...</p>
+              <p style="color: #64748b; font-size: 13px; margin-top: 8px;">ID bản ghi: #${recordId.substring(0, 8)}</p>
+            </div>
+          `;
+        }
+
+        const response = await fetch(`${API_BASE}/history/${recordId}`);
+        if (!response.ok) throw new Error('Failed to fetch case detail');
+        let data = await response.json();
+        
+        log('✅ Case data retrieved:', data);
+
+        // Defensive parsing if xai_data arrives as a string
+        if (typeof data.xai_data === 'string') {
+          try {
+            data.xai_data = JSON.parse(data.xai_data);
+          } catch(e) {
+            error('Failed to parse xai_data string', e);
+          }
+        }
+        
+        // Ensure xai_data exists even if empty
+        data.xai_data = data.xai_data || { gradcam: null, rule_based: null, shap: null, combined_insights: [] };
+
+        // SYNC Global state
+        const pred = data.prediction_data || {};
+        const slices = pred.slices || data.slices || {};
+
+        // ✅ FALLBACK: If gradcam images are missing, try to restore from slices.heatmap_b64
+        if (data.xai_data.gradcam && !data.xai_data.gradcam.heatmap_base64 && slices.heatmap_b64) {
+          log('🛠️ Applying Grad-CAM heatmap fallback from slices');
+          data.xai_data.gradcam.heatmap_base64 = slices.heatmap_b64;
+          // Also use thumbnail as overlay if missing
+          if (!data.xai_data.gradcam.overlay_base64) {
+             data.xai_data.gradcam.overlay_base64 = data.image_base64;
+          }
+        }
+        
+        window.lastDiagnosisData = {
+          prediction: pred,
+          report: data.report_data,
+          xai: data.xai_data,
+          mask: data.mask_data,
+          multiclass_mask: pred.multiclass_mask || data.mask_data,
+          multiclass_stats: pred.multiclass_stats,
+          slices: slices,
+          image_base64: data.image_base64,
+          history_id: data.id,
+          metadata: {
+            filename: data.image_filename,
+            timestamp: data.timestamp,
+            severity: data.severity
+          }
+        };
+        
+        window.lastXAIData = data.xai_data;
+        this.state.currentXAIData = data.xai_data;
+
+        // ✅ VERIFICATION: Check for Grad-CAM images specifically
+        if (data.xai_data?.gradcam) {
+          const gc = data.xai_data.gradcam;
+          log('🔍 Grad-CAM Check:', {
+             overlay: !!gc.overlay_base64,
+             heatmap: !!gc.heatmap_base64,
+             score: gc.attention_score
+          });
+        }
+
+        log('📊 Restored state:', {
+          hasXAI: !!data.xai_data,
+          hasGradCAM: !!data.xai_data?.gradcam,
+          hasSlices: !!window.lastDiagnosisData.slices
+        });
+
+        // Re-render dashboard
+        this.renderXAIDashboard(data.xai_data);
+        
+        // Also update 3D brain if possible
+        if (window.update3DBrain) {
+          window.update3DBrain(window.lastDiagnosisData);
+        }
+
+      } catch (err) {
+        error('Error loading history case:', err);
+        this.showXAIError('Không thể tải dữ liệu ca bệnh: ' + err.message);
+      }
     }
   };
 

@@ -925,8 +925,10 @@
         break;
 
       case 'xai':
-        // ✅ Call XAISimilarUI to render XAI panel
-        if (window.XAISimilarUI?.renderXAIDashboard && lastXAIData) {
+        // ✅ Call XAISimilarUI to refresh history and render dashboard
+        if (window.XAISimilarUI?.loadHistoryAndRefresh) {
+          window.XAISimilarUI.loadHistoryAndRefresh();
+        } else if (window.XAISimilarUI?.renderXAIDashboard && lastXAIData) {
           window.XAISimilarUI.renderXAIDashboard(lastXAIData);
         } else if (window.XAISimilarUI?.showXAIPanel) {
           window.XAISimilarUI.showXAIPanel();
