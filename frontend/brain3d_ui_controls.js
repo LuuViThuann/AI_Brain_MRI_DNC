@@ -67,22 +67,20 @@
     console.log('[UI Controls] ✅ Đã tạo nút Detail Analysis (disabled cho đến khi chẩn đoán)');
   }
 
-  // ===== SHOW PANEL =====
+  // ===== SHOW PANEL ===== 
   function _showPanel(panel) {
     panel.classList.add('metrics-open');
     // ✅ Gỡ bỏ display: none !important nếu có để class CSS có thể hoạt động
     panel.style.removeProperty('display');
     panel.style.display = 'flex';
     panel.style.flexDirection = 'column';
-    panel.style.animation = 'none';
-    panel.offsetHeight; // Force reflow
-    panel.style.animation = '';
-    console.log('[UI Controls] 📊 Bảng chi tiết: HIỂN THỊ');
+    panel.style.animation = 'slideInLeft 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards';
+    console.log('[UI Controls] 📊 Bảng chi tiết: HIỂN THỊ (Trượt từ trái sang)');
   }
 
-  // ===== HIDE PANEL =====
+  // ===== HIDE PANEL ===== 
   function _hidePanel(panel) {
-    panel.style.animation = 'slideOutRight 0.25s ease-out forwards';
+    panel.style.animation = 'slideOutLeft 0.25s ease-out forwards';
     setTimeout(() => {
       panel.classList.remove('metrics-open');
       // ✅ Ép buộc ẩn bằng !important để tránh mọi xung đột
@@ -301,21 +299,21 @@ style.textContent = `
     overscroll-behavior: contain;
   }
 
-  /* Slide in từ phải */
-  @keyframes slideInRight {
-    from { opacity: 0; transform: translateX(100%); }
-    to   { opacity: 1; transform: translateX(0); }
+  /* Slide in từ trái (mép trái màn hình vào trong) */
+  @keyframes slideInLeft {
+    from { opacity: 0; transform: translate3d(-300px, 0, 0); }
+    to   { opacity: 1; transform: translate3d(0, 0, 0); }
   }
-
-  /* Slide out sang phải */
-  @keyframes slideOutRight {
-    from { opacity: 1; transform: translateX(0); }
-    to   { opacity: 0; transform: translateX(100%); }
+  
+  /* Slide out sang trái (từ trong ra mép trái màn hình) */
+  @keyframes slideOutLeft {
+    from { opacity: 1; transform: translate3d(0, 0, 0); }
+    to   { opacity: 0; transform: translate3d(-300px, 0, 0); }
   }
 
   /* Animation khi panel mở */
   #tumorMetricsPanel.metrics-open {
-    animation: slideInRight 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: slideInLeft 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   /* Pulse nút khi chẩn đoán xong */

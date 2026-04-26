@@ -617,12 +617,12 @@
     const conf = Math.round((data.prediction?.confidence || 0) * 100);
 
     const STYLES = {
-      'OUTSIDE': { border: '#dd0000', text: '#ff4444', bg: 'rgba(220,0,0,0.18)', emoji: '🔴', badge: 'NGUY HIỂM KỊCH TRẦN' },
-      'SUPERFICIAL': { border: '#ff2828', text: '#ff5252', bg: 'rgba(255,40,40,0.18)', emoji: '🔴', badge: 'RỦI RO BAO PHỦ' },
-      'SHALLOW': { border: '#ff9100', text: '#ffb74d', bg: 'rgba(255,145,0,0.16)', emoji: '🟠', badge: 'NÔNG & RỦI RO CAO' },
-      'INTERMEDIATE': { border: '#ffd600', text: '#ffe57a', bg: 'rgba(255,214,0,0.12)', emoji: '🟡', badge: 'RỦI RO TRUNG BÌNH' },
-      'DEEP': { border: '#00c853', text: '#66bb6a', bg: 'rgba(0,200,83,0.12)', emoji: '🟢', badge: 'SÂU & RỦI RO THẤP' },
-      'VERY_DEEP': { border: '#00a3ff', text: '#4dd0e1', bg: 'rgba(0,163,255,0.12)', emoji: '🔵', badge: 'RẤT SÂU, ÍT RỦI RO' },
+      'OUTSIDE': { border: '#ef4444', text: '#ef4444', bg: 'rgba(255,255,255,0.92)', emoji: '🔴', badge: 'NGUY HIỂM KỊCH TRẦN' },
+      'SUPERFICIAL': { border: '#f87171', text: '#f87171', bg: 'rgba(255,255,255,0.92)', emoji: '🔴', badge: 'RỦI RO BAO PHỦ' },
+      'SHALLOW': { border: '#f59e0b', text: '#f59e0b', bg: 'rgba(255,255,255,0.92)', emoji: '🟠', badge: 'NÔNG & RỦI RO CAO' },
+      'INTERMEDIATE': { border: '#eab308', text: '#eab308', bg: 'rgba(255,255,255,0.92)', emoji: '🟡', badge: 'RỦI RO TRUNG BÌNH' },
+      'DEEP': { border: '#22c55e', text: '#16a34a', bg: 'rgba(255,255,255,0.92)', emoji: '🟢', badge: 'SÂU & RỦI RO THẤP' },
+      'VERY_DEEP': { border: '#3b82f6', text: '#2563eb', bg: 'rgba(255,255,255,0.92)', emoji: '🔵', badge: 'RẤT SÂU, BÊN TRONG' },
     };
     const S = STYLES[category] || STYLES['INTERMEDIATE'];
     const depthPct = depth != null ? Math.min((depth / 55) * 100, 100) : 0;
@@ -635,33 +635,37 @@
     overlay.id = 'viewer3dDepthOverlay';
     overlay.style.cssText = [
       'position:absolute;bottom:44px;left:10px',
-      'width:192px;z-index:8;pointer-events:none',
+      'width:200px;z-index:8;pointer-events:none',
       `background:${S.bg}`,
-      `border:1px solid ${S.border}40`,
-      `border:1px solid ${S.border}60`,
-      'border-radius:8px;padding:9px 11px',
-      'font-family:Consolas,monospace',
-      'backdrop-filter:blur(6px)',
+      `border-left:4px solid ${S.border}`,
+      'border-radius:8px;padding:12px',
+      'font-family:Inter, Segoe UI, sans-serif',
+      'backdrop-filter:blur(8px)',
+      'box-shadow:0 8px 32px rgba(0,0,0,0.3)',
+      'animation: depthOverlayFadeIn 0.4s ease-out'
     ].join(';');
 
     overlay.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-        <span style="color:var(--text-sec);font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:700;">ĐỘ SÂU U TỪ VỎ NÃO</span>
-        <span style="color:${S.text};font-size:9px;font-weight:700;background:${S.bg};padding:1px 6px;
-          border:1px solid ${S.border}50;border-radius:10px;">${S.emoji} ${S.badge}</span>
+      <style>
+        @keyframes depthOverlayFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      </style>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <span style="color:#64748b;font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:700;">ĐỘ SÂU U TỪ VỎ NÃO</span>
+        <span style="color:${S.text};font-size:9px;font-weight:800;background:rgba(0,0,0,0.05);padding:2px 6px;
+          border-radius:10px;">${S.badge}</span>
       </div>
-      <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:5px;">
-        <span style="color:${S.text};font-size:22px;font-weight:800;line-height:1;">${depth != null ? depth.toFixed(1) : '—'}</span>
-        <span style="color:var(--text-dim);font-size:11px;">mm</span>
+      <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:8px;">
+        <span style="color:${S.text};font-size:26px;font-weight:900;line-height:1;">${depth != null ? depth.toFixed(1) : '—'}</span>
+        <span style="color:#94a3b8;font-size:12px;font-weight:600;">mm</span>
       </div>
-      <div style="width:100%;height:4px;background:rgba(0,0,0,0.4);border-radius:3px;overflow:hidden;margin-bottom:6px;">
+      <div style="width:100%;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;margin-bottom:10px;">
         <div style="height:100%;width:${depthPct}%;background:${S.border};border-radius:3px;
-          transition:width 1s ease;"></div>
+          transition:width 1s cubic-bezier(0.34, 1.56, 0.64, 1);"></div>
       </div>
-      <div style="color:var(--text-sec);font-size:9px;line-height:1.4;border-top:1px solid rgba(255,255,255,0.06);padding-top:5px;">
-        <div style="margin-bottom:2px;"><span style="color:var(--text-dim);">Diện Tích:</span> <span style="color:${S.text};">${area != null ? area.toFixed(2) + '%' : 'Không'}</span></div>
-        <div style="margin-bottom:2px;"><span style="color:var(--text-dim);">Tin Cậy:</span> <span style="color:var(--cyan);">${conf}%</span></div>
-        <div style="color:var(--text-dim);font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${location}">${location}</div>
+      <div style="color:#475569;font-size:10px;line-height:1.4;border-top:1px solid #f1f5f9;padding-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+        <div><span style="color:#94a3b8;">D.Tích:</span> <span style="font-weight:700;">${area != null ? area.toFixed(2) + '%' : '—'}</span></div>
+        <div style="text-align:right;"><span style="color:#94a3b8;">Tin Cậy:</span> <span style="color:#0ea5e9;font-weight:700;">${conf}%</span></div>
+        <div style="grid-column: span 2; color:#94a3b8; font-size:9px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${location}</div>
       </div>
     `;
 
@@ -696,12 +700,12 @@
 
     // ── Color palette per depth category ──
     const DEPTH_STYLES = {
-      'OUTSIDE': { bg: 'rgba(220,0,0,0.10)', border: '#dd0000', text: '#c62828', glow: '#dd0000', emoji: '🔴', label: 'NGOÀI VỎ NÃO', badge: 'NGUY KỊCH', grad: '#dd0000,#ff4444' },
-      'SUPERFICIAL': { bg: 'rgba(255,40,40,0.10)', border: '#ff2828', text: '#d32f2f', glow: '#ff2828', emoji: '🔴', label: 'QUÁ NÔNG', badge: 'NGHIÊM TRỌNG', grad: '#ff2828,#ff6b6b' },
-      'SHALLOW': { bg: 'rgba(255,145,0,0.10)', border: '#ff9100', text: '#e65100', glow: '#ff9100', emoji: '🟠', label: 'NÔNG / GẦN VỎ NÃO', badge: 'RỦI RO CAO', grad: '#ff6b00,#ffb300' },
-      'INTERMEDIATE': { bg: 'rgba(255,214,0,0.08)', border: '#ffd600', text: '#f57f17', glow: '#ffd600', emoji: '🟡', label: 'TRUNG BÌNH', badge: 'RỦI RO VỪA', grad: '#ffc200,#ffed4a' },
-      'DEEP': { bg: 'rgba(0,200,83,0.08)', border: '#00c853', text: '#2e7d32', glow: '#00c853', emoji: '🟢', label: 'SÂU ĐÁNG KỂ', badge: 'RỦI RO THẤP', grad: '#00a844,#43e97b' },
-      'VERY_DEEP': { bg: 'rgba(0,163,255,0.08)', border: '#00a3ff', text: '#1565c0', glow: '#00a3ff', emoji: '🔵', label: 'RẤT SÂU, BÊN TRONG', badge: 'AN TOÀN HƠN', grad: '#0062cc,#00d2ff' }
+      'OUTSIDE': { bg: '#ffffff', tint: 'rgba(220,0,0,0.05)', border: '#dc2626', text: '#991b1b', glow: '#dc2626', emoji: '🔴', label: 'NGOÀI VỎ NÃO', badge: 'NGUY KỊCH', grad: '#dc2626,#f87171' },
+      'SUPERFICIAL': { bg: '#ffffff', tint: 'rgba(239,68,68,0.05)', border: '#ef4444', text: '#991b1b', glow: '#ef4444', emoji: '🔴', label: 'QUÁ NÔNG', badge: 'NGHIÊM TRỌNG', grad: '#ef4444,#fca5a5' },
+      'SHALLOW': { bg: '#ffffff', tint: 'rgba(245,158,11,0.05)', border: '#f59e0b', text: '#92400e', glow: '#f59e0b', emoji: '🟠', label: 'NÔNG / GẦN VỎ NÃO', badge: 'RỦI RO CAO', grad: '#f59e0b,#fcd34d' },
+      'INTERMEDIATE': { bg: '#ffffff', tint: 'rgba(234,179,8,0.05)', border: '#eab308', text: '#854d0e', glow: '#eab308', emoji: '🟡', label: 'TRUNG BÌNH', badge: 'RỦI RO VỪA', grad: '#eab308,#fde047' },
+      'DEEP': { bg: '#ffffff', tint: 'rgba(34,197,94,0.05)', border: '#22c55e', text: '#166534', glow: '#22c55e', emoji: '🟢', label: 'SÂU ĐÁNG KỂ', badge: 'RỦI RO THẤP', grad: '#22c55e,#86efac' },
+      'VERY_DEEP': { bg: '#ffffff', tint: 'rgba(59,130,246,0.05)', border: '#3b82f6', text: '#1e40af', glow: '#3b82f6', emoji: '🔵', label: 'RẤT SÂU, BÊN TRONG', badge: 'AN TOÀN HƠN', grad: '#3b82f6,#93c5fd' }
     };
 
     const S = DEPTH_STYLES[category] || DEPTH_STYLES['INTERMEDIATE'];
@@ -723,7 +727,8 @@
     // Update DOM
     card.style.display = 'block';
     inner.style.background = S.bg;
-    inner.style.border = `1px solid ${S.border}40`;
+    inner.style.borderColor = S.border;
+    inner.style.borderLeftWidth = '5px';
     if (glowBar) { glowBar.style.background = `linear-gradient(90deg,transparent,${S.glow},transparent)`; }
 
     if (emoji) emoji.textContent = S.emoji;
@@ -738,8 +743,8 @@
     if (badge) {
       badge.textContent = S.badge;
       badge.style.color = S.text;
-      badge.style.background = S.bg;
-      badge.style.border = `1px solid ${S.border}60`;
+      badge.style.background = S.tint;
+      badge.style.borderColor = S.border + '44';
     }
     if (progBar) {
       progBar.style.background = `linear-gradient(90deg,${S.grad})`;
@@ -750,7 +755,9 @@
     }
     if (desc) {
       desc.innerHTML = DEPTH_DESC[category] || '—';
-      desc.style.color = S.text + 'cc';
+      desc.style.color = '#1e293b'; // High contrast dark text
+      desc.style.background = S.tint;
+      desc.style.borderColor = S.border + '22';
     }
 
     console.log(`[App] 📏 DepthCard rendered: ${depth?.toFixed(1)}mm | ${category} | ${S.badge}`);
@@ -764,10 +771,13 @@
     }
     window.lastDiagnosisData = data;
 
-    console.log('%c[App] 🧠 Updating 3D brain with FULL metrics and depth visualization...', 'color: #00c853; font-weight: bold;');
-
     const location = mapLocationToKey(data.prediction.location_hint);
     const tumorSize = Math.min(data.prediction.tumor_area_percent / 5, 0.5);
+
+    // ✅ NEW: Update sidebar immediately with diagnostic data (using fallback for missing 3D metrics)
+    if (window.updateTumorMetrics) {
+      window.updateTumorMetrics(data);
+    }
 
     fetch(`${API_BASE}/brain3d?location=${location}&tumor_size=${tumorSize}`)
       .then(r => r.json())
@@ -909,11 +919,23 @@
       }
     }
 
-    // Hide all panels
-    if (mainLayout) mainLayout.style.display = 'none';
-    if (xaiPanel) xaiPanel.style.display = 'none';
-    if (similarPanel) similarPanel.style.display = 'none';
-    if (infoPanel) infoPanel.style.display = 'none';
+    // Hide all panels & Reset animation classes
+    if (mainLayout) {
+      mainLayout.style.display = 'none';
+      mainLayout.classList.remove('active');
+    }
+    if (xaiPanel) {
+      xaiPanel.style.display = 'none';
+      xaiPanel.classList.remove('active');
+    }
+    if (similarPanel) {
+      similarPanel.style.display = 'none';
+      similarPanel.classList.remove('active');
+    }
+    if (infoPanel) {
+      infoPanel.style.display = 'none';
+      infoPanel.classList.remove('active');
+    }
     if (historyPanel) historyPanel.style.display = 'none';
     if (atlasPanel) atlasPanel.classList.remove('active');
 
@@ -921,11 +943,15 @@
     switch (tabName) {
       case 'scan':
       case 'brain3d':
-        if (mainLayout) mainLayout.style.display = 'grid';
+        if (mainLayout) {
+          mainLayout.style.display = 'grid';
+          // Force reflow
+          mainLayout.offsetHeight;
+          mainLayout.classList.add('active');
+        }
         break;
 
       case 'xai':
-        // ✅ Call XAISimilarUI to refresh history and render dashboard
         if (window.XAISimilarUI?.loadHistoryAndRefresh) {
           window.XAISimilarUI.loadHistoryAndRefresh();
         } else if (window.XAISimilarUI?.renderXAIDashboard && lastXAIData) {
@@ -938,19 +964,22 @@
             xaiPanel.innerHTML = `
               <div style="padding: 80px 40px; text-align: center; color: var(--text-sec);">
                 <div style="font-size: 64px; margin-bottom: 24px;">🔍</div>
-                <h2 style="color: var(--cyan);">XAI Analysis</h2>
+                <h2 style="color: var(--cyan);">Phân Tích XAI</h2>
                 <p style="margin-top: 16px;">
-                  Upload an MRI image and run diagnosis to see XAI analysis.
+                  Vui lòng tải ảnh MRI và chạy chẩn đoán để xem phân tích.
                 </p>
               </div>
             `;
+            if (window.XAISimilarUI?.showXAIPanel) {
+              window.XAISimilarUI.showXAIPanel();
+            } else {
+              xaiPanel.style.display = 'block';
+            }
           }
         }
-        if (xaiPanel) xaiPanel.style.display = 'block';
         break;
 
       case 'similar':
-        // ✅ Call XAISimilarUI to render Similar panel
         if (window.XAISimilarUI?.renderSimilarCases && lastSimilarData) {
           window.XAISimilarUI.renderSimilarCases(lastSimilarData);
         } else if (window.XAISimilarUI?.showSimilarPanel) {
@@ -961,19 +990,30 @@
             similarPanel.innerHTML = `
               <div style="padding: 80px 40px; text-align: center; color: var(--text-sec);">
                 <div style="font-size: 64px; margin-bottom: 24px;">🔎</div>
-                <h2 style="color: var(--cyan);">Similar Cases</h2>
+                <h2 style="color: var(--cyan);">Ca Bệnh Tương Tự</h2>
                 <p style="margin-top: 16px;">
-                  Upload an MRI to find similar cases from database.
+                  Vui lòng tải ảnh MRI để tìm các ca bệnh tương tự.
                 </p>
               </div>
             `;
+            if (window.XAISimilarUI?.showSimilarPanel) {
+              window.XAISimilarUI.showSimilarPanel();
+            } else {
+              similarPanel.style.display = 'block';
+            }
           }
         }
-        if (similarPanel) similarPanel.style.display = 'block';
         break;
 
       case 'info':
-        if (infoPanel) infoPanel.style.display = 'block';
+        if (infoPanel) {
+          infoPanel.style.display = 'block';
+          // Add basic fade in for info panel too if desired
+          infoPanel.style.opacity = '0';
+          infoPanel.offsetHeight;
+          infoPanel.style.transition = 'opacity 0.3s ease';
+          infoPanel.style.opacity = '1';
+        }
         break;
 
       case 'history':

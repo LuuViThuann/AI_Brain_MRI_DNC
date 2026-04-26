@@ -30,18 +30,36 @@
   window.HistoryUI = {
     /** Called when user clicks the "Lịch Sử" tab */
     open() {
+      if (!panel) return;
       panel.style.display = "flex";
-      loadPage(1);
+      // Force reflow
+      panel.offsetHeight;
+      panel.classList.add("active");
+      
+      // Load only if empty or explicitly needed
+      if (cachedItems.length === 0) {
+        loadPage(1);
+      }
     },
     /** Called when user leaves the tab */
     close() {
-      panel.style.display = "none";
+      if (!panel) return;
+      panel.classList.remove("active");
+      // Delay display:none to allow transition to finish
+      setTimeout(() => {
+        if (!panel.classList.contains("active")) {
+          panel.style.display = "none";
+        }
+      }, 400);
     },
     /** Called by diagnosis.js after a successful diagnosis to refresh count */
     onNewDiagnosis() {
       // If history tab is visible, reload page 1
-      if (panel && panel.style.display !== "none") {
+      if (panel && panel.classList.contains("active")) {
         loadPage(1);
+      } else {
+        // Just clear cache to force reload next time opened
+        cachedItems = [];
       }
     },
   };
@@ -76,12 +94,6 @@
     if (!panel) return;
 
     panel.style.display   = "none";
-    panel.style.position  = "fixed";
-    panel.style.inset     = "56px 0 0 0";
-    panel.style.zIndex    = "80";
-    panel.style.background= "var(--bg-deep)";
-    panel.style.flexDirection = "column";
-    panel.style.overflow  = "hidden";
 
     panel.innerHTML = `
       <!-- Toolbar -->
@@ -263,6 +275,11 @@
 
     emptyEl.style.display = "none";
     listEl.style.display  = "grid";
+    // Smoothly show items
+    listEl.style.opacity = "0";
+    listEl.offsetHeight; // force reflow
+    listEl.style.transition = "opacity 0.3s ease";
+    listEl.style.opacity = "1";
 
     items.forEach((item, idx) => {
       const card = buildCard(item, idx);
@@ -953,7 +970,10 @@
   function setLoading(on) {
     if (!loadingEl || !listEl) return;
     loadingEl.style.display = on ? "flex" : "none";
-    if (on) listEl.style.display = "none";
+    // Don't hide listEl immediately to avoid blinking if data is cached
+    if (on && listEl.children.length === 0) {
+      listEl.style.display = "none";
+    }
   }
 
   function checkEmpty() {

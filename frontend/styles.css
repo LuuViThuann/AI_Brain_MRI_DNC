@@ -195,6 +195,14 @@ body::before {
   gap: 0;
   height: calc(100vh - 56px);
   overflow: hidden;
+  opacity: 0;
+  transform: translateY(5px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.main-layout.active {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* ============================================================
@@ -2285,6 +2293,31 @@ body::before {
 #historyPager button:hover {
   border-color: var(--cyan-dim);
   color: var(--cyan-dim);
+}
+
+/* ── History panel ──────────────────────────────────────────── */
+#historyPanel {
+  position: fixed;
+  top: 56px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(100vh - 56px);
+  padding: 0;
+  overflow: hidden;
+  background: var(--bg-deep);
+  z-index: 100;
+  display: none;
+  flex-direction: column;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+              transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#historyPanel.active {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* ── Empty state ───────────────────────────────────────────── */

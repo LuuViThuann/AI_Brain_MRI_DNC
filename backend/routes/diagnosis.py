@@ -97,6 +97,222 @@ def image_to_base64(img: Image.Image) -> str:
     return f"data:image/png;base64,{img_base64}"
 
 
+# ============================================================================
+# CLINICAL ANALYSIS HELPERS
+# ============================================================================
+
+def compute_class_probabilities(prediction: dict, location_hint: str) -> dict:
+    """
+    Ước tính xác suất từng loại khối u dựa trên vị trí + confidence.
+    Đây là heuristic (không phải multi-class classifier thật).
+    """
+    conf = prediction.get('confidence', 0.5)
+    tumor_detected = prediction.get('tumor_detected', False)
+    loc = (location_hint or '').lower()
+    area_pct = prediction.get('tumor_area_percent', 0)
+
+    if not tumor_detected:
+        return {
+            "no_tumor": round(1.0 - conf, 3),
+            "glioma": round(conf * 0.4, 3),
+            "meningioma": round(conf * 0.35, 3),
+            "pituitary": round(conf * 0.25, 3),
+            "dominant": "Không phát hiện u",
+            "note": "Phân bố xác suất heuristic dựa trên mô hình U-Net + vị trí"
+        }
+
+    # Base weights by location
+    glioma_w = 0.55
+    mening_w = 0.25
+    pitu_w   = 0.12
+    none_w   = 0.08
+
+    if 'frontal' in loc or 'parietal' in loc:
+        glioma_w, mening_w, pitu_w = 0.62, 0.22, 0.08
+    elif 'temporal' in loc:
+        glioma_w, mening_w, pitu_w = 0.50, 0.30, 0.12
+    elif 'central' in loc or 'inferior' in loc:
+        glioma_w, mening_w, pitu_w = 0.35, 0.28, 0.30
+    elif 'occipital' in loc:
+        glioma_w, mening_w, pitu_w = 0.60, 0.28, 0.05
+
+    # Scale by confidence
+    total = glioma_w + mening_w + pitu_w + none_w
+    glioma_p  = round(glioma_w / total * conf, 3)
+    mening_p  = round(mening_w / total * conf, 3)
+    pitu_p    = round(pitu_w   / total * conf, 3)
+    none_p    = round(max(0, 1.0 - glioma_p - mening_p - pitu_p), 3)
+
+    probs = {"glioma": glioma_p, "meningioma": mening_p, "pituitary": pitu_p, "no_tumor": none_p}
+    dominant = max(probs, key=probs.get)
+    dominant_labels = {
+        "glioma": "Glioma", "meningioma": "Meningioma",
+        "pituitary": "U tuyến yên", "no_tumor": "Không u"
+    }
+    return {
+        **probs,
+        "dominant": dominant_labels.get(dominant, dominant),
+        "dominant_key": dominant,
+        "note": "Xác suất heuristic dựa trên vị trí và confidence U-Net (không phải multi-class classifier)"
+    }
+
+
+def compute_malignancy_risk(prediction: dict, rule_based: dict) -> dict:
+    """Ước tính nguy cơ ác tính từ các chỉ số."""
+    score = 0
+    factors = []
+
+    area = (rule_based or {}).get('tumor_area_mm2', 0)
+    if area > 2000:
+        score += 3; factors.append(f"Kích thước lớn ({area:.0f} mm²)")
+    elif area > 500:
+        score += 2; factors.append(f"Kích thước trung bình ({area:.0f} mm²)")
+    else:
+        score += 1
+
+    qf = (rule_based or {}).get('quantitative_features', {})
+    circ = qf.get('circularity', 1.0)
+    if circ < 0.4:
+        score += 2; factors.append(f"Bờ không đều (circularity={circ:.2f})")
+    elif circ < 0.6:
+        score += 1; factors.append(f"Bờ tương đối không đều (circularity={circ:.2f})")
+
+    loc = (prediction.get('location_hint') or '').lower()
+    if 'frontal' in loc or 'temporal' in loc:
+        score += 1; factors.append("Vị trí vùng chức năng quan trọng")
+
+    conf = prediction.get('confidence', 0)
+    if conf > 0.85:
+        score += 1; factors.append(f"Độ tin cậy mô hình cao ({conf:.0%})")
+
+    if score <= 2:
+        level, color, en = "Thấp", "#22c55e", "LOW"
+    elif score <= 4:
+        level, color, en = "Trung bình", "#f59e0b", "MEDIUM"
+    else:
+        level, color, en = "Cao", "#ef4444", "HIGH"
+
+    return {
+        "level": level, "level_en": en, "score": score,
+        "max_score": 7, "color": color,
+        "factors": factors,
+        "disclaimer": "Chỉ mang tính hỗ trợ. Cần sinh thiết để xác định chính xác."
+    }
+
+
+def compute_edema_assessment(multiclass_stats: dict, prediction: dict) -> dict:
+    """Đánh giá phù não từ multiclass segmentation."""
+    if not multiclass_stats:
+        total_pct = prediction.get('tumor_area_percent', 0)
+        if total_pct > 15:
+            level, color = "Trung bình (ước tính)", "#f59e0b"
+        elif total_pct > 5:
+            level, color = "Nhẹ (ước tính)", "#84cc16"
+        else:
+            level, color = "Không rõ", "#94a3b8"
+        return {"level": level, "color": color, "ed_pixels": 0,
+                "ed_percent": 0, "note": "Ước tính từ diện tích khối u"}
+
+    total = multiclass_stats.get('total_tumor_pixels', 1) or 1
+    ed = multiclass_stats.get('ed_count', 0)
+    ed_pct = round(ed / total * 100, 1)
+
+    if ed_pct == 0:
+        level, color = "Không", "#22c55e"
+    elif ed_pct < 20:
+        level, color = "Nhẹ", "#84cc16"
+    elif ed_pct < 50:
+        level, color = "Trung bình", "#f59e0b"
+    else:
+        level, color = "Nặng", "#ef4444"
+
+    return {
+        "level": level, "color": color,
+        "ed_pixels": int(ed), "ed_percent": ed_pct,
+        "note": "Dựa trên phân vùng đa lớp (multiclass segmentation)"
+    }
+
+
+def compute_mass_effect(prediction: dict, rule_based: dict) -> dict:
+    """Đánh giá dấu hiệu chèn ép cấu trúc não."""
+    area_pct = prediction.get('tumor_area_percent', 0)
+    area_mm2 = (rule_based or {}).get('tumor_area_mm2', 0)
+    loc = (prediction.get('location_hint') or '').lower()
+
+    # Midline shift estimate
+    centroid = prediction.get('centroid_px', {}) or {}
+    cx = centroid.get('x', 128)
+    deviation_px = abs(cx - 128)
+    deviation_mm = round(deviation_px * 0.5, 1)
+    midline_shift = deviation_mm > 5
+    midline_mm = deviation_mm if midline_shift else 0
+
+    # Ventricular compression
+    ventricular_compression = area_pct > 8 and ('central' in loc or 'parietal' in loc)
+
+    # ICP suspicion
+    icp_suspected = area_mm2 > 2000 or area_pct > 15
+
+    signs = []
+    severity = "Không có"
+    color = "#22c55e"
+
+    if midline_shift:
+        signs.append(f"Lệch đường giữa ~{midline_mm} mm")
+    if ventricular_compression:
+        signs.append("Nghi ngờ chèn ép não thất")
+    if icp_suspected:
+        signs.append("Tăng áp lực nội sọ nghi ngờ")
+
+    if len(signs) >= 2:
+        severity, color = "Đáng kể", "#ef4444"
+    elif len(signs) == 1:
+        severity, color = "Nhẹ", "#f59e0b"
+
+    return {
+        "signs": signs,
+        "midline_shift_mm": midline_mm,
+        "ventricular_compression": ventricular_compression,
+        "icp_suspected": icp_suspected,
+        "severity": severity,
+        "color": color
+    }
+
+
+def compute_next_recommendations(prediction: dict, malignancy: dict, edema: dict, mass_effect: dict) -> list:
+    """Khuyến nghị tiếp theo dựa trên kết quả phân tích."""
+    recs = []
+    risk_level = malignancy.get('level_en', 'MEDIUM')
+    tumor_detected = prediction.get('tumor_detected', False)
+
+    if not tumor_detected:
+        recs.append({"icon": "fa-calendar-check", "text": "Theo dõi định kỳ sau 6-12 tháng nếu có triệu chứng", "priority": "normal"})
+        recs.append({"icon": "fa-user-doctor", "text": "Tham khảo ý kiến chuyên gia thần kinh học", "priority": "normal"})
+        return recs
+
+    if risk_level == 'HIGH':
+        recs.append({"icon": "fa-syringe",       "text": "Sinh thiết não khẩn cấp để xác định loại u", "priority": "urgent"})
+        recs.append({"icon": "fa-hospital",       "text": "Hội chẩn phẫu thuật thần kinh", "priority": "urgent"})
+        recs.append({"icon": "fa-pills",          "text": "Cân nhắc corticosteroid nếu có phù não", "priority": "high"})
+    elif risk_level == 'MEDIUM':
+        recs.append({"icon": "fa-vial",           "text": "Sinh thiết hoặc cắt lọc định hướng", "priority": "high"})
+        recs.append({"icon": "fa-user-doctor",    "text": "Hội chẩn đa chuyên khoa (thần kinh, ung bướu)", "priority": "high"})
+    else:
+        recs.append({"icon": "fa-calendar-check", "text": "Theo dõi MRI sau 3 tháng", "priority": "normal"})
+
+    # Contrast MRI always recommended
+    recs.append({"icon": "fa-radiation",      "text": "MRI có tiêm thuốc tương phản (Gadolinium)", "priority": "high"})
+
+    if edema.get('level') in ['Trung bình', 'Nặng']:
+        recs.append({"icon": "fa-droplet",     "text": "Điều trị phù não: Dexamethasone + kiểm soát dịch", "priority": "high"})
+
+    if mass_effect.get('severity') == 'Đáng kể':
+        recs.append({"icon": "fa-brain",       "text": "Theo dõi áp lực nội sọ, cân nhắc phẫu thuật giải áp", "priority": "urgent"})
+
+    recs.append({"icon": "fa-microscope",     "text": "Xét nghiệm dịch não tủy nếu chỉ định", "priority": "normal"})
+    return recs[:6]
+
+
 def generate_combined_insights(gradcam, rules, shap) -> list:
     """Generate combined insights from all XAI methods in Vietnamese."""
     insights = []
@@ -311,15 +527,24 @@ async def diagnose(file: UploadFile = File(...)):
                 print(f"      • Grad-CAM...")
                 gradcam_explainer = GradCAMExplainer(model)
                 gradcam_result = gradcam_explainer.generate_gradcam(img_array)
-                
-                # Convert to base64
+
+                # Convert main images to base64
                 gradcam_result['overlay_base64'] = image_to_base64(gradcam_result['overlay'])
                 del gradcam_result['overlay']
-                
+
                 heatmap_img = Image.fromarray((gradcam_result['heatmap'] * 255).astype(np.uint8))
                 gradcam_result['heatmap_base64'] = image_to_base64(heatmap_img)
                 del gradcam_result['heatmap']
-                
+
+                # ===== CLINICAL ENRICHMENT =====
+                try:
+                    # Class probabilities
+                    gradcam_result['class_probabilities'] = compute_class_probabilities(
+                        prediction, prediction.get('location_hint', '')
+                    )
+                except Exception as ce:
+                    print(f"      ⚠️  class_probabilities failed: {ce}")
+
                 xai_result['gradcam'] = gradcam_result
                 print(f"      ✅ Grad-CAM complete")
             except Exception as e:
@@ -357,9 +582,30 @@ async def diagnose(file: UploadFile = File(...)):
                 xai_result['shap']
             )
             xai_result['combined_insights'] = combined_insights
-            
+
+            # ===== 5. CLINICAL META-ANALYSIS =====
+            try:
+                rule_b = xai_result.get('rule_based') or {}
+                mc_stats = prediction.get('multiclass_stats')
+
+                malignancy_risk = compute_malignancy_risk(prediction, rule_b)
+                edema_assessment = compute_edema_assessment(mc_stats, prediction)
+                mass_effect = compute_mass_effect(prediction, rule_b)
+                next_recs = compute_next_recommendations(prediction, malignancy_risk, edema_assessment, mass_effect)
+
+                xai_result['clinical_meta'] = {
+                    "malignancy_risk": malignancy_risk,
+                    "edema_assessment": edema_assessment,
+                    "mass_effect_signs": mass_effect,
+                    "next_recommendations": next_recs,
+                }
+                print(f"      ✅ Clinical meta-analysis complete")
+            except Exception as ce:
+                print(f"      ⚠️  Clinical meta failed: {ce}")
+                xai_result['clinical_meta'] = None
+
             print(f"   ✅ XAI analysis complete")
-            
+
         except Exception as e:
             print(f"   ⚠️  XAI analysis failed: {str(e)}")
             xai_result['error'] = str(e)
@@ -506,6 +752,7 @@ async def diagnose(file: UploadFile = File(...)):
                         "gradcam": xai_result.get("gradcam"),
                         "rule_based": xai_result.get("rule_based"),
                         "shap": xai_result.get("shap"),
+                        "clinical_meta": xai_result.get("clinical_meta"),
                         "combined_insights": xai_result.get("combined_insights", []),
                         "error": xai_result.get("error")
                     }

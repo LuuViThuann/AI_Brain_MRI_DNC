@@ -433,7 +433,9 @@ class FAISSSearcher:
                     "source": case_meta.get('source', ''),
                     "patient_id": case_meta.get('patient_id', ''),
                     "tumor_location": case_meta.get('location', 'N/A'),
-                    "tumor_size": case_meta.get('tumor_size', 0)
+                    "tumor_size": case_meta.get('tumor_size', 0),
+                    "tumor_depth_mm": case_meta.get('tumor_depth_mm'),
+                    "depth_category": case_meta.get('depth_category')
                 })
             
             search_time = (time.time() - start_time) * 1000
