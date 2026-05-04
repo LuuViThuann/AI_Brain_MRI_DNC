@@ -19,6 +19,14 @@ Cosine SimilarityĐo góc giữa 2 vector đặc trưng → cho ra similarity_sc
 
 + Prototype-based models (so sánh ca bệnh tương tự)
 
+Thông tin docs : 
+
+* FAISS : 
+
+Tạo Index (Offline): Bạn chạy file dataset_scripts/build_faiss_index.py để quét toàn bộ dataset cũ, trích xuất đặc điểm và lưu vào file index của FAISS.
+Truy vấn (Online): Trong file backend/routes/similar_cases.py, khi có yêu cầu /api/similar/find, FAISS sẽ mở file index đó lên và thực hiện lệnh search_similar để trả về danh sách các ca giống nhất cho Frontend hiển thị.
+Tóm lại: FAISS giúp hệ thống của bạn có khả năng "so sánh đối chiếu" thông minh như một bác sĩ giàu kinh nghiệm, người đã từng xem qua hàng ngàn tấm phim MRI trong đời.
+
 
 
 -------------------------------------
@@ -37,6 +45,7 @@ Swin UNETR
 Mô hình hiện tại: Bạn đang dùng một kiến trúc 2D U-Net tùy chỉnh (được định nghĩa trong file model/model_architecture.py) sử dụng framework TensorFlow/Keras.
 Khả năng hiện tại: Mô hình này chỉ thực hiện phân đoạn nhị phân (Binary Segmentation). Nó chỉ có 1 đầu ra (sigmoid) để xác định vùng đó là "Khối u" hay "Nền", chưa thể phân tách sâu hơn.
 
+Hệ thống sử dụng thư viện FAISS (Facebook AI Similarity Search) để so sánh đặc trưng (feature vector) của ảnh MRI bạn tải lên với hàng ngàn ca bệnh trong cơ sở dữ liệu.
 
 mô hình của bạn chỉ có 1 đầu ra (Binary).
 vì code hiện tại chủ yếu dùng TensorFlow
@@ -97,3 +106,31 @@ Tháng 6: 3.1 cm
 MRI có tiêm thuốc.
 Sinh thiết.
 Theo dõi sau 1 tháng.
+
+==== Trong mục ca tương tự hãy điều chỉnh : Có các badge hiển thị "hạng" chỉ cho hiển thị 3 mục hàng đầu tiên và sau không cần hiển thị , điều chỉnh phối màu nổi bật cho 3 mục hạng đầu tiên
+
+
+1. Công cụ Cắt Lớp Phẫu Thuật (Surgical Slicing/Clipping Planes)
+Hiện tại bộ não có độ trong suốt, nhưng bác sĩ rất khó xác định chính xác vị trí khối u so với các cấu trúc bên trong (như não thất hay các hạch nền).
+
+Giải pháp: Thêm các thanh trượt cho phép bác sĩ "cắt" bộ não theo 3 trục (Axial, Sagittal, Coronal) ngay trong không gian 3D.
+Lợi ích: Bác sĩ có thể thấy mặt cắt thực tế tại vị trí khối u, hiểu rõ khối u đang nằm sâu bao nhiêu và tiếp giáp với những cấu trúc quan trọng nào bên trong.
+2. Đồng bộ hóa 3D và 2D (Synchronized Crosshair)
+Bác sĩ thường tin tưởng vào ảnh lát cắt 2D gốc hơn là mô hình 3D dựng lại.
+
+Giải pháp: Khi bác sĩ click vào một điểm trên khối u ở 3D, hệ thống sẽ tự động nhảy đến đúng lát cắt MRI tương ứng ở phần 2D bên dưới. Ngược lại, khi cuộn ảnh 2D, một "mặt phẳng lát cắt" sẽ di chuyển tương ứng trên mô hình 3D.
+Lợi ích: Đảm bảo tính nhất quán tuyệt đối giữa dữ liệu gốc và mô hình trực quan.
+3. Bản đồ Chức năng Não (Functional Anatomy Map)
+Biết khối u nằm ở "Thùy đỉnh" là chưa đủ, bác sĩ cần biết nó có gần các vùng chức năng quan trọng không.
+
+Giải pháp: Thêm một chế độ hiển thị (Overlay) các vùng chức năng chính lên bề mặt não (như vùng vận động, vùng cảm giác, vùng ngôn ngữ Broca/Wernicke).
+Lợi ích: Giúp bác sĩ đánh giá rủi ro hậu phẫu (ví dụ: nếu mổ khối u này, bệnh nhân có nguy cơ bị liệt hay mất ngôn ngữ không).
+4. Mô phỏng Đường mổ (Surgical Path Planning)
+Giải pháp: Cho phép bác sĩ chọn một điểm trên hộp sọ làm điểm vào (Entry point), hệ thống sẽ vẽ một tia laser xuyên thấu đến tâm khối u.
+Lợi ích: Tính toán khoảng cách ngắn nhất và hiển thị các cấu trúc não mà dụng cụ phẫu thuật sẽ phải đi xuyên qua.
+5. Phân tách Độ trong suốt theo Thành phần
+Thay vì làm mờ cả bộ não, bác sĩ có thể muốn:
+
+Ẩn hoàn toàn vỏ não để chỉ xem khối u và hệ thống mạch máu/não thất.
+Làm nổi bật vùng Phù não (Edema) với màu sắc khác so với Nhân khối u (Core) để thấy mức độ xâm lấn.
+

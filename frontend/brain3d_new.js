@@ -19,19 +19,86 @@
   const USE_FALLBACK_IF_MISSING = true;
   const FORCE_FALLBACK = false;
 
-  // Color Configuration - VIVID Medical Colors
+  // Color Configuration - tuned for clinical readability
   const BRAIN_COLORS = {
-    // Realistic brain tissue pink/beige color
-    healthy: 0xE8B4A8,      // Soft pink-beige (like real brain)
-    healthyDark: 0xD89B8F,  // Darker pink for wrinkles
+    // Keep the brain tissue neutral so lesion boundaries stay readable
+    healthy: 0xD9D2CA,
+    healthyDark: 0xBDB4AA,
 
-    // Tumor colors - HIGHLY VISIBLE NEON
-    tumorCore: 0xFF0040,       // Vivid neon red
-    tumorMid: 0xFF1744,        // Bright red
-    tumorEdge: 0xFF6B00,       // Neon orange
-    tumorGlow: 0xFF3D00,       // Deep orange glow
-    tumorIntense: 0xFF00FF,    // Magenta highlight for core
-    tumorHalo: 0xFF4500       // Orange-red halo
+    // Tumor colors remain vivid, but less neon and easier on the eye
+    tumorCore: 0xFF335C,
+    tumorMid: 0xFF5A5F,
+    tumorEdge: 0xFFB020,
+    tumorGlow: 0xF59E0B,
+    tumorIntense: 0xFFD6DE,
+    tumorHalo: 0xFBBF24
+  };
+
+  const COMPARE_TUMOR_STYLES = {
+    current: {
+      coreOpacity: 0.84,
+      emissiveIntensity: 1.15,
+      emissivePulse: 0.22,
+      midGlowScale: 1.55,
+      midGlowOpacity: 0.18,
+      outerHaloScale: 2.45,
+      outerHaloOpacity: 0.05,
+      ringDefs: [
+        { rx: Math.PI / 2, ry: 0, sc: 1.80, tb: 0.026, op: 0.30, ph: 0.0, sp: 1.25 },
+        { rx: Math.PI / 5, ry: Math.PI / 4, sc: 2.30, tb: 0.018, op: 0.18, ph: 0.8, sp: 0.95 },
+      ],
+      reticleColorKey: 'ring',
+      reticleOpacity: 0.42,
+      crossColorKey: 'core',
+      crossOpacity: 0.20,
+      sparkCount: 16,
+      sparkRadiusMin: 1.0,
+      sparkRadiusSpan: 0.95,
+      sparkSize: 0.20,
+      sparkOpacity: 0.18,
+      light1Intensity: 0.75,
+      light2Intensity: 0.22,
+      pulseMin: 0.82,
+      pulseAmp: 0.18,
+      lightPulseMin: 0.88,
+      lightPulseAmp: 0.12,
+      ringScalePulse: 0.035,
+      reticleSpin: 0.0045,
+      ringSpinZ: 0.0050,
+      ringSpinX: 0.0018,
+    },
+    reference: {
+      coreOpacity: 0.80,
+      emissiveIntensity: 0.92,
+      emissivePulse: 0.16,
+      midGlowScale: 1.45,
+      midGlowOpacity: 0.15,
+      outerHaloScale: 2.25,
+      outerHaloOpacity: 0.04,
+      ringDefs: [
+        { rx: Math.PI / 2, ry: 0, sc: 1.72, tb: 0.024, op: 0.24, ph: 0.0, sp: 1.05 },
+        { rx: Math.PI / 4, ry: Math.PI / 3, sc: 2.16, tb: 0.016, op: 0.14, ph: 1.0, sp: 0.80 },
+      ],
+      reticleColorKey: 'glow',
+      reticleOpacity: 0.34,
+      crossColorKey: 'ring',
+      crossOpacity: 0.16,
+      sparkCount: 12,
+      sparkRadiusMin: 1.0,
+      sparkRadiusSpan: 0.75,
+      sparkSize: 0.18,
+      sparkOpacity: 0.14,
+      light1Intensity: 0.52,
+      light2Intensity: 0.14,
+      pulseMin: 0.86,
+      pulseAmp: 0.14,
+      lightPulseMin: 0.90,
+      lightPulseAmp: 0.10,
+      ringScalePulse: 0.026,
+      reticleSpin: 0.0036,
+      ringSpinZ: 0.0042,
+      ringSpinX: 0.0012,
+    }
   };
 
   // ---- State ----
@@ -52,7 +119,7 @@
   // Model caching
   let cachedBrainModel = null;
   let cachedDetailBrainModel = null;
-  let currentModelType = 'normal'; // 'normal' or 'detail'
+  let currentModelType = 'detail'; // 'normal' or 'detail'
   let isLoadingModel = false;
 
   // Track scale factors for each model (for proper tumor alignment)
@@ -76,6 +143,45 @@
   let mouseOverTumor = false;
   let lastTumorHoverData = null;
 
+  const CLEAN_VIEW_OPTIONS = {
+    hoverTooltip: false,
+    tumorContour: false,
+    depthZoneLabels: false,
+    depthSummaryLabel: false,
+    anatomyLabel: false,
+    bboxLabel: false,
+    simplifiedTumorShell: true
+  };
+
+  function removeOverlayElement(id) {
+    const element = document.getElementById(id);
+    if (element) element.remove();
+  }
+
+  function clearTumorOverlayLabels() {
+    document.querySelectorAll('.depthZoneLabel').forEach(label => label.remove());
+    removeOverlayElement('tumorTooltip');
+    removeOverlayElement('depthVectorLabel');
+    removeOverlayElement('bboxSizeLabel');
+    removeOverlayElement('anatAnnotLabel');
+    tumorTooltip = null;
+    isTooltipVisible = false;
+    window.depthLabelElement = null;
+    window.depthLabelWorldPos = null;
+    window._depthZoneMarkers = [];
+  }
+
+  function notifyClinicalEnhancer(hookName, payload) {
+    try {
+      const enhancer = window.Brain3DClinicalEnhancer;
+      if (enhancer && typeof enhancer[hookName] === 'function') {
+        enhancer[hookName](payload || {});
+      }
+    } catch (err) {
+      console.warn('[Brain3D] Clinical enhancer hook failed:', hookName, err);
+    }
+  }
+
   // ---- Init ----
   window.initBrainViewer = function () {
     console.log('%c[Brain3D] 🧠 Initializing Enhanced Brain Viewer V4 (VIVID TUMOR)...', 'color: #ff1744; font-weight: bold;');
@@ -88,17 +194,17 @@
       return;
     }
 
-    // Scene with warmer background for medical feel
+    // Scene tuned for a calmer clinical viewing contrast
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0e1a);
-    scene.fog = new THREE.Fog(0x0a0e1a, 12, 25);
+    scene.background = new THREE.Color(0x0f1726);
+    scene.fog = new THREE.Fog(0x172235, 25, 80);
 
     // Camera
     const w = container.clientWidth;
     const h = container.clientHeight || 400;
-    camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
-    camera.position.set(0, 0.8, 5.0);
-    camera.lookAt(0, 0, 0);
+    camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 300);
+    camera.position.set(0, 0.0, 7.5);
+    camera.lookAt(0, -0.1, 0);
 
     // Renderer with enhanced settings for textures
     renderer = new THREE.WebGLRenderer({
@@ -112,7 +218,7 @@
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.3;  // Slightly brighter for tumor glow
+    renderer.toneMappingExposure = 1.12;
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.gammaFactor = 2.2;
 
@@ -125,7 +231,7 @@
     }
 
     // Load normal brain model first
-    loadBrainModel('normal');
+    loadBrainModel('detail');
 
     // Clock for animation
     clock = new THREE.Clock();
@@ -133,10 +239,30 @@
     // Event listeners
     setupEvents(container);
 
+    notifyClinicalEnhancer('onViewerReady', {
+      scene: scene,
+      camera: camera,
+      renderer: renderer,
+      viewerElement: container,
+      canvasElement: canvas,
+      getBrainMesh: () => brainMesh,
+      getRotation: () => ({ x: currentRotX, y: currentRotY }),
+      setRotation: (x, y) => {
+        targetRotX = x;
+        targetRotY = y;
+      },
+      getDiagnosisData: () => window.lastDiagnosisData,
+      getTumorPoints: () => currentTumorPoints,
+      getDepthMetrics: () => window.lastDepthMetrics,
+    });
+
     // Start render loop
     animate();
 
-    createTumorTooltip();
+    clearTumorOverlayLabels();
+    if (CLEAN_VIEW_OPTIONS.hoverTooltip) {
+      createTumorTooltip();
+    }
 
     // Resize handler
     window.addEventListener('resize', () => {
@@ -161,6 +287,7 @@
   }
 
   function createTumorTooltip() {
+    if (!CLEAN_VIEW_OPTIONS.hoverTooltip) return;
     console.log('[Brain3D] 🏷️  Creating tumor tooltip element...');
 
     const tooltip = document.createElement('div');
@@ -192,6 +319,7 @@
   }
 
   function showTumorTooltip(screenX, screenY, tumorData) {
+    if (!CLEAN_VIEW_OPTIONS.hoverTooltip) return;
     if (!tumorTooltip) {
       createTumorTooltip();
     }
@@ -333,6 +461,14 @@
     } else {
       showTumorTooltip(event.clientX, event.clientY, window.lastDiagnosisData?.detailed_metrics);
     }
+
+    notifyClinicalEnhancer('onTumorFocusRequested', {
+      event: event,
+      diagnosisData: window.lastDiagnosisData,
+      metrics: lastTumorHoverData || window.lastDiagnosisData?.detailed_metrics,
+      depthMetrics: window.lastDepthMetrics,
+      tumorPoints: currentTumorPoints,
+    });
   }
 
   // ===== TUMOR METRICS PANEL (DETAIL ANALYSIS) =====  
@@ -343,7 +479,7 @@
       left: 0;
       right: auto !important;
       top: 64px;
-      width: 335px;
+      width: 320px;
       height: calc(100vh - 64px);
       background: #ffffff;
       border-right: 0.5px solid #e2e8f0;
@@ -381,7 +517,7 @@
     flex-shrink:0;transition:all 0.15s;"
     onmouseover="this.style.background='#fee2e2';this.style.color='#ef4444';this.style.borderColor='#fca5a5';"
     onmouseout="this.style.background='transparent';this.style.color='#94a3b8';this.style.borderColor='#e2e8f0';">
-    ✕
+    <i class="fa-solid fa-xmark"></i>
   </button>
       </div>
 
@@ -393,7 +529,7 @@
         -webkit-overflow-scrolling: touch;
       ">
         <div style="padding:40px 20px;text-align:center;color:#94a3b8;">
-          <div style="font-size:32px;margin-bottom:8px;">🔬</div>
+          <div style="font-size:32px;margin-bottom:8px;"><i class="fa-solid fa-microscope"></i></div>
           <div style="font-size:12px;">Chạy chẩn đoán để xem phân tích chi tiết</div>
         </div>
       </div>
@@ -482,12 +618,12 @@
     const _gy = (_cy + _r * Math.sin(_toRad(gaugeAng))).toFixed(1);
 
     const clinicalNotes = {
-      OUTSIDE: '⚠️ Khối u có thể vượt qua ranh giới vỏ não. Cần đánh giá chuyên khoa ngay lập tức.',
-      SUPERFICIAL: '⚠️ Dưới 5mm từ vỏ não — nguy cơ xâm lấn cao. Tư vấn phẫu thuật thần kinh khẩn cấp.',
-      SHALLOW: '⚠️ 5–15mm từ vỏ não — nguy cơ trung bình. Cần lên kế hoạch phẫu thuật cẩn thận.',
-      INTERMEDIATE: '✓ 15–30mm — nguy cơ thấp với vỏ não. Theo dõi theo quy trình chuẩn.',
-      DEEP: '✓ 30–45mm — nguy cơ tối thiểu. Có thể xem xét sinh thiết định vị lập thể.',
-      VERY_DEEP: '✓ Trên 45mm — không đe dọa vỏ não. Vùng quanh não thất hoặc chất trắng sâu.'
+      OUTSIDE: '<i class="fa-solid fa-triangle-exclamation" style="color:#ef4444;margin-right:6px;"></i> Khối u có thể vượt qua ranh giới vỏ não. Cần đánh giá chuyên khoa ngay lập tức.',
+      SUPERFICIAL: '<i class="fa-solid fa-triangle-exclamation" style="color:#ef4444;margin-right:6px;"></i> Dưới 5mm từ vỏ não — nguy cơ xâm lấn cao. Tư vấn phẫu thuật thần kinh khẩn cấp.',
+      SHALLOW: '<i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;margin-right:6px;"></i> 5–15mm từ vỏ não — nguy cơ trung bình. Cần lên kế hoạch phẫu thuật cẩn thận.',
+      INTERMEDIATE: '<i class="fa-solid fa-check" style="color:#22c55e;margin-right:6px;"></i> 15–30mm — nguy cơ thấp với vỏ não. Theo dõi theo quy trình chuẩn.',
+      DEEP: '<i class="fa-solid fa-check" style="color:#22c55e;margin-right:6px;"></i> 30–45mm — nguy cơ tối thiểu. Có thể xem xét sinh thiết định vị lập thể.',
+      VERY_DEEP: '<i class="fa-solid fa-check" style="color:#22c55e;margin-right:6px;"></i> Trên 45mm — không đe dọa vỏ não. Vùng quanh não thất hoặc chất trắng sâu.'
     };
     const note = clinicalNotes[cat.category] || `Khối u ở độ sâu ${depth != null ? depth.toFixed(1) : '?'}mm từ vỏ não.`;
 
@@ -666,7 +802,7 @@
         </div>
         <div style="margin-top:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;
           border:0.5px solid #e2e8f0;font-size:9px;color:#94a3b8;line-height:1.6;text-align:center;">
-          ⚕️ Kết quả chỉ mang tính hỗ trợ.<br>Cần xác nhận từ bác sĩ chuyên khoa thần kinh.
+          <i class="fa-solid fa-staff-snake" style="margin-right:4px;"></i> Kết quả chỉ mang tính hỗ trợ.<br>Cần xác nhận từ bác sĩ chuyên khoa thần kinh.
         </div>
       </div>
     `;
@@ -675,9 +811,6 @@
     // Việc show/hide panel hoàn toàn do user quyết định qua nút toggle hoặc phím M.
     console.log('[Brain3D] ✅ Nội dung Phân Tích Chi Tiết đã cập nhật (panel không tự mở)');
   };
-
-
-
   // =========== NEW UPDATE 
   function createDepthVisualizationBar(depth) {
     const maxDepth = 55;  // Brain radius
@@ -732,15 +865,13 @@
     }
   }
 
-  // ---- Realistic Medical Lighting Setup (Enhanced Brightness) ----
+  // ---- Realistic Medical Lighting Setup ----
   function setupRealisticLighting() {
-    // Ambient light - warmer tone for medical feel
-    const ambientLight = new THREE.AmbientLight(0xffeedd, 0.8);  // Increased brightness
+    const ambientLight = new THREE.AmbientLight(0xf4f7fb, 0.92);
     scene.add(ambientLight);
 
-    // Key light - main illumination (slightly warm)
-    const keyLight = new THREE.DirectionalLight(0xfff5e6, 2.0);  // Increased intensity
-    keyLight.position.set(6, 10, 8);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.55);
+    keyLight.position.set(7, 9, 10);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 4096;
     keyLight.shadow.mapSize.height = 4096;
@@ -749,31 +880,27 @@
     keyLight.shadow.bias = -0.0001;
     scene.add(keyLight);
 
-    // Fill light - soft from side
-    const fillLight = new THREE.DirectionalLight(0xffe4d4, 0.7);  // Slightly brighter
-    fillLight.position.set(-5, 3, -3);
+    const fillLight = new THREE.DirectionalLight(0xd8e6f7, 0.58);
+    fillLight.position.set(-6, 2, -4);
     scene.add(fillLight);
 
-    // Rim light - for depth (cooler tone)
-    const rimLight = new THREE.DirectionalLight(0xe0f0ff, 0.8);  // Brighter
-    rimLight.position.set(0, -3, -6);
+    const rimLight = new THREE.DirectionalLight(0xa8c7ff, 0.82);
+    rimLight.position.set(1, -2, -7);
     scene.add(rimLight);
 
-    // Point lights for highlights
-    const pointLight1 = new THREE.PointLight(0xffd4c4, 0.7, 12);  // Brighter
+    const pointLight1 = new THREE.PointLight(0xffffff, 0.34, 12);
     pointLight1.position.set(4, 4, 4);
     scene.add(pointLight1);
 
-    const pointLight2 = new THREE.PointLight(0xffd4c4, 0.5, 10);  // Brighter
+    const pointLight2 = new THREE.PointLight(0xcfe5ff, 0.28, 10);
     pointLight2.position.set(-3, -2, 3);
     scene.add(pointLight2);
 
-    // Hemisphere light for subtle ambient occlusion feel
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.5);  // Brighter
+    const hemiLight = new THREE.HemisphereLight(0xf8fbff, 0x263449, 0.66);
     scene.add(hemiLight);
 
-    // SPECIAL: Tumor-specific red accent light
-    const tumorLight = new THREE.PointLight(0xFF0040, 0.6, 8);
+    // Gentle lesion accent so the tumor is visible without flooding the scene
+    const tumorLight = new THREE.PointLight(0xff8a65, 0.18, 5.5);
     tumorLight.position.set(0.5, 0.6, 0.5);
     scene.add(tumorLight);
   }
@@ -883,7 +1010,11 @@
     const size = box.getSize(new THREE.Vector3());
 
     const maxDim = Math.max(size.x, size.y, size.z);
-    const scale = 2.8 / maxDim;
+    // Scale to 1.15 so the full bounding-box diagonal fits
+    // inside the camera frustum at all rotation angles without clipping
+    const scale = 1.15 / maxDim;
+    // Store world size for dynamic tumor BRS calculation
+    window._brainWS = 1.15;
 
     // Track scale factor for this model (for tumor alignment)
     if (modelType === 'normal') {
@@ -918,16 +1049,20 @@
           if (child.material.type === 'MeshStandardMaterial' ||
             child.material.type === 'MeshPhongMaterial') {
 
-            child.material.metalness = 0.05;
-            child.material.roughness = 0.65;
+            if ('metalness' in child.material) child.material.metalness = 0.02;
+            if ('roughness' in child.material) child.material.roughness = 0.80;
+            if ('shininess' in child.material) child.material.shininess = 18;
+            if ('specular' in child.material) child.material.specular = new THREE.Color(0xc3d0dd);
 
             if (!child.material.map && child.material.color.getHex() === 0xffffff) {
               child.material.color.setHex(BRAIN_COLORS.healthy);
+            } else if (!child.material.map && child.material.color) {
+              child.material.color.lerp(new THREE.Color(BRAIN_COLORS.healthy), 0.16);
             }
 
-            if (!child.material.emissiveMap) {
-              child.material.emissive = new THREE.Color(0x221111);
-              child.material.emissiveIntensity = 0.03;
+            if (!child.material.emissiveMap && 'emissive' in child.material) {
+              child.material.emissive = new THREE.Color(0x202938);
+              child.material.emissiveIntensity = 0.06;
             }
 
             child.castShadow = true;
@@ -951,10 +1086,10 @@
             child.material = new THREE.MeshStandardMaterial({
               map: oldMaterial.map,
               color: oldMaterial.color.getHex() === 0xffffff ? BRAIN_COLORS.healthy : oldMaterial.color,
-              metalness: 0.05,
-              roughness: 0.65,
-              emissive: new THREE.Color(0x221111),
-              emissiveIntensity: 0.03
+              metalness: 0.02,
+              roughness: 0.80,
+              emissive: new THREE.Color(0x202938),
+              emissiveIntensity: 0.06
             });
 
             if (child.material.map) {
@@ -970,17 +1105,29 @@
 
     scene.add(brainMesh);
 
-    // Đánh dấu thông tin chuẩn đoán 
+    notifyClinicalEnhancer('onBrainModelChanged', {
+      scene: scene,
+      camera: camera,
+      renderer: renderer,
+      brainMesh: brainMesh,
+      modelType: modelType,
+      getRotation: () => ({ x: currentRotX, y: currentRotY }),
+      getDiagnosisData: () => window.lastDiagnosisData,
+      getTumorPoints: () => currentTumorPoints,
+      getDepthMetrics: () => window.lastDepthMetrics,
+    });
+
+    // Đánh dấu thông tin chuẩn đoán < --------------------------
     if (currentTumorPoints && currentTumorPoints.length > 0) {
       console.log(`%c[Brain3D] 🔄 Reapplying full tumor visualization for ${modelType} model...`, 'color: #ff9100; font-weight: bold;');
 
-      // Get the scale factor for the new model
+
       const currentScale = (modelType === 'normal') ? normalBrainScale : detailBrainScale;
       const previousScale = (modelType === 'normal') ? detailBrainScale : normalBrainScale;
       const scaleRatio = currentScale / previousScale;
       console.log(`[Brain3D] 🔧 Scale ratio: ${scaleRatio.toFixed(3)}`);
 
-      // ── Clean up previous enhanced overlays before rebuild ──
+
       tumorCoronaRings.forEach(r => scene.remove(r));
       tumorCoronaRings = [];
       if (tumorReticle) { scene.remove(tumorReticle); tumorReticle = null; }
@@ -990,6 +1137,7 @@
         scene.remove(window._brain3dEnhancedGroup);
         window._brain3dEnhancedGroup = null;
       }
+      clearTumorOverlayLabels();
 
       // ── Rebuild base tumor visuals ──
       highlightTumorRegion(currentTumorPoints);
@@ -997,6 +1145,7 @@
       buildTumorSpikes(currentTumorPoints);
       buildTumorContour(currentTumorPoints);
       if (lastTumorHoverData) buildCoordinateMarkers(currentTumorPoints, lastTumorHoverData);
+      buildTumorVolumetricShell(currentTumorPoints, window.lastDepthMetrics);
 
       // ── Rebuild enhanced overlay (corona rings / reticle / cone / halo) ──
       const depthMet = window.lastDepthMetrics;
@@ -1056,13 +1205,11 @@
             if (d < minDist) minDist = d;
           }
 
-          // VIVID TUMOR COLORING with aggressive falloff
-          if (minDist < 0.12) {
-            // Core tumor - intense neon red
+          // Keep the highlighted footprint tighter so the lesion reads precisely
+          if (minDist < 0.09) {
             colors.setXYZ(i, tumorColor.r, tumorColor.g, tumorColor.b);
-          } else if (minDist < 0.25) {
-            // Tumor edge gradient - sharp transition to orange
-            const t = (minDist - 0.12) / 0.13;
+          } else if (minDist < 0.18) {
+            const t = (minDist - 0.09) / 0.09;
             colors.setXYZ(i,
               edgeColor.r * (1 - t) + healthyColor.r * t,
               edgeColor.g * (1 - t) + healthyColor.g * t,
@@ -1098,6 +1245,11 @@
       tumorGlow.material.dispose();
     }
 
+    if (CLEAN_VIEW_OPTIONS.simplifiedTumorShell) {
+      tumorParticles = null;
+      tumorGlow = null;
+      return;
+    }
     if (!tumorPoints || tumorPoints.length === 0) return;
 
     // ===== MAIN TUMOR PARTICLES (Core) - SURFACE ATTACHED =====
@@ -1232,8 +1384,10 @@
       scene.remove(tumorSpikes);
       tumorSpikes.geometry.dispose();
       tumorSpikes.material.dispose();
+      tumorSpikes = null;
     }
 
+    if (CLEAN_VIEW_OPTIONS.simplifiedTumorShell) return;
     if (!tumorPoints || tumorPoints.length < 5) return;  // Only if enough points
 
     // Create cone geometry for spike markers
@@ -1302,8 +1456,10 @@
       scene.remove(tumorContour);
       tumorContour.geometry.dispose();
       tumorContour.material.dispose();
+      tumorContour = null;
     }
 
+    if (!CLEAN_VIEW_OPTIONS.tumorContour) return;
     if (!tumorPoints || tumorPoints.length < 10) return;
 
     // Create a convex hull or simplified boundary around tumor points
@@ -1416,8 +1572,8 @@
     const depth = depthMetrics.tumor_depth_mm;
     const category = depthMetrics.depth_category || {};
 
-    // Normalize to 3D space
-    const scale = 1.0 / 55;  // Brain radius ≈ 55mm
+    // Normalize to 3D space — scale with brain model (calibrated at 2.8)
+    const scale = (window._brainWS || 2.8) / (2.8 * 55);
 
     const tumorPos = new THREE.Vector3(
       centroid[0] * scale,
@@ -1603,6 +1759,7 @@
   // ---- Create HTML labels for depth zone markers ----
   function createDepthZoneHtmlLabels() {
     document.querySelectorAll('.depthZoneLabel').forEach(l => l.remove());
+    if (!CLEAN_VIEW_OPTIONS.depthZoneLabels) return;
     if (!window._depthZoneMarkers || !window._depthZoneMarkers.length) return;
     window._depthZoneMarkers.forEach((zm) => {
       const lbl = document.createElement('div');
@@ -1612,7 +1769,7 @@
         pointer-events: none;
         z-index: 17;
         font-family: 'Consolas', monospace;
-        font-size: 9px;
+        font-size: 8px;
         font-weight: 700;
         color: ${zm.color};
         background: rgba(4,8,22,0.90);
@@ -1658,6 +1815,11 @@
     // Remove old label
     const oldLabel = document.getElementById('depthVectorLabel');
     if (oldLabel) oldLabel.remove();
+    if (!CLEAN_VIEW_OPTIONS.depthSummaryLabel) {
+      window.depthLabelElement = null;
+      window.depthLabelWorldPos = null;
+      return;
+    }
 
     // Create label element
     const label = document.createElement('div');
@@ -1672,7 +1834,7 @@
       border-radius: 12px;
       padding: 14px 18px;
       font-family: 'Consolas', 'Courier New', monospace;
-      font-size: 13px;
+      font-size: 11px;
       color: #c1cfe8;
       font-weight: bold;
       box-shadow: 0 0 25px rgba(${hexToRgb(colorHex)}, 0.6);
@@ -1685,15 +1847,15 @@
 
     label.innerHTML = `
       <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="font-size: 18px;">${category.emoji || '📏'}</span>
+        <span style="font-size: 16px;">${category.emoji || '📏'}</span>
         <div>
-          <div style="color: ${colorCode}; font-size: 14px; font-weight: bold; letter-spacing: 0.5px;">
+          <div style="color: ${colorCode}; font-size: 12px; font-weight: bold; letter-spacing: 0.5px;">
             TUMOR DEPTH
           </div>
-          <div style="color: #5a7a99; font-size: 12px; margin-top: 3px;">
+          <div style="color: #5a7a99; font-size: 10px; margin-top: 3px;">
             ${depth.toFixed(1)} mm from cortex
           </div>
-          <div style="color: ${colorCode}; font-size: 11px; margin-top: 4px; text-transform: uppercase;">
+          <div style="color: ${colorCode}; font-size: 9px; margin-top: 4px; text-transform: uppercase;">
             ${category.label}
           </div>
         </div>
@@ -1731,14 +1893,15 @@
     }
     window.coordinateMarkers = [];
 
+    if (CLEAN_VIEW_OPTIONS.simplifiedTumorShell) return;
     const centroid = metrics.centroid_mm;
     if (!centroid) return;
 
-    // Normalize centroid to 3D space (-1 to 1)
-    const scale = 1.0;
-    const centerX = (centroid[0] / 55) * scale;  // 55mm ≈ brain radius
-    const centerY = (centroid[1] / 55) * scale;
-    const centerZ = (centroid[2] / 55) * scale;
+    // Normalize centroid to 3D space — scale with brain model (calibrated at 2.8)
+    const _brs = (window._brainWS || 2.8) / (2.8 * 55);
+    const centerX = centroid[0] * _brs;
+    const centerY = centroid[1] * _brs;
+    const centerZ = centroid[2] * _brs;
 
     // 1. CENTER SPHERE (Tumor centroid)
     const sphereGeom = new THREE.SphereGeometry(0.08, 16, 16);
@@ -1822,6 +1985,7 @@
     currentTumorPoints = tumorPoints;
     lastTumorHoverData = metrics;
     window.lastDepthMetrics = depthMetrics;
+    clearTumorOverlayLabels();
 
     // ── Clean up previous enhanced overlays ──
     tumorCoronaRings.forEach(r => scene.remove(r));
@@ -1835,8 +1999,8 @@
     buildTumorSpikes(tumorPoints);
     buildTumorContour(tumorPoints);
     buildCoordinateMarkers(tumorPoints, metrics);
-    buildTumorBoundingBox(tumorPoints, depthMetrics); // ✅ FIXED: Added missing call
-
+    buildTumorVolumetricShell(tumorPoints, depthMetrics);
+    buildTumorBoundingBox(tumorPoints, depthMetrics); 
     if (depthMetrics) {
       buildTumorDepthVector(depthMetrics);
       buildTumorEnhancedOverlay(tumorPoints, metrics, depthMetrics);
@@ -1848,6 +2012,18 @@
       try { renderer.render(scene, camera); return renderer.domElement.toDataURL('image/png'); }
       catch (e) { return null; }
     };
+
+    notifyClinicalEnhancer('onTumorUpdated', {
+      scene: scene,
+      camera: camera,
+      renderer: renderer,
+      tumorPoints: tumorPoints,
+      metrics: metrics,
+      depthMetrics: depthMetrics,
+      diagnosisData: window.lastDiagnosisData,
+      getBrainMesh: () => brainMesh,
+      getRotation: () => ({ x: currentRotX, y: currentRotY }),
+    });
     // NOTE: updateTumorMetrics is intentionally NOT called here.
     // It is called by app.js → update3DBrain() which has full diagnosis data.
   };
@@ -1857,9 +2033,14 @@
   //                           particle halo for main 3D brain
   // ════════════════════════════════════════════════════════════
   function buildTumorEnhancedOverlay(tumorPoints, metrics, depthMetrics) {
+    if (window._brain3dEnhancedGroup) {
+      scene.remove(window._brain3dEnhancedGroup);
+      window._brain3dEnhancedGroup = null;
+    }
+    if (CLEAN_VIEW_OPTIONS.simplifiedTumorShell) return;
     if (!tumorPoints || tumorPoints.length === 0 || !depthMetrics) return;
 
-    const BRS = 1.0 / 55;  // brain-space to world scale (55mm ≈ brain radius)
+    const BRS = (window._brainWS || 2.8) / (2.8 * 55);  // dynamic: scales with brain model
     const centroid = depthMetrics.centroid_3d || metrics?.centroid_mm || [0, 0, 0];
     const cortexPt = depthMetrics.nearest_cortex_point;
     const depthMm = depthMetrics.tumor_depth_mm || 20;
@@ -1878,7 +2059,8 @@
       const d = new THREE.Vector3(tp[0] * BRS, tp[1] * BRS, tp[2] * BRS).distanceTo(tc);
       if (d > maxR) maxR = d;
     }
-    const radius = Math.max(0.06, Math.min(0.35, maxR * 1.4));
+    const brainRatio = (window._brainWS || 2.8) / 2.8;
+    const radius = Math.max(0.06 * brainRatio, Math.min(0.35 * brainRatio, maxR * 1.4));
 
     // Depth-color
     const depthColors = {
@@ -1893,16 +2075,17 @@
     grp.rotation.y = currentRotY;
 
     // ── 1. PULSING CORONA RINGS ──
+    // Ring scales reduced to keep corona tight around tumor shell (was 2.0–3.6, too large after brain rescale)
     const ringDefs = [
-      { scale: 2.0, tube: 0.009, col: dCol, op: 0.80, rotX: Math.PI / 2, ph: 0.0, spd: 1.8 },
-      { scale: 2.8, tube: 0.007, col: dColGlow, op: 0.55, rotX: Math.PI / 6, ph: 1.1, spd: 1.3 },
-      { scale: 3.6, tube: 0.005, col: 0xffffff, op: 0.22, rotX: Math.PI / 4, ph: 2.2, spd: 1.0 },
-      { scale: 2.3, tube: 0.006, col: dCol, op: 0.45, rotX: 0, ph: 0.55, spd: 2.2 },
+      { scale: 1.1, tube: 0.009, col: dCol, op: 0.80, rotX: Math.PI / 2, ph: 0.0, spd: 1.8 },
+      { scale: 1.4, tube: 0.007, col: dColGlow, op: 0.55, rotX: Math.PI / 6, ph: 1.1, spd: 1.3 },
+      { scale: 1.8, tube: 0.005, col: 0xffffff, op: 0.22, rotX: Math.PI / 4, ph: 2.2, spd: 1.0 },
+      { scale: 1.2, tube: 0.006, col: dCol, op: 0.45, rotX: 0, ph: 0.55, spd: 2.2 },
     ];
     if (category === 'SUPERFICIAL' || category === 'SHALLOW' || category === 'OUTSIDE') {
       // Extra alert rings for surface-near tumors
-      ringDefs.push({ scale: 1.8, tube: 0.008, col: 0xff0000, op: 0.70, rotX: Math.PI / 2, ph: 0.3, spd: 3.0 });
-      ringDefs.push({ scale: 2.5, tube: 0.006, col: 0xff0000, op: 0.45, rotX: Math.PI / 3, ph: 0.9, spd: 3.5 });
+      ringDefs.push({ scale: 1.0, tube: 0.008, col: 0xff0000, op: 0.70, rotX: Math.PI / 2, ph: 0.3, spd: 3.0 });
+      ringDefs.push({ scale: 1.3, tube: 0.006, col: 0xff0000, op: 0.45, rotX: Math.PI / 3, ph: 0.9, spd: 3.5 });
     }
     const rings = [];
     ringDefs.forEach(rd => {
@@ -1932,11 +2115,11 @@
       );
       return l;
     };
-    reticleGrp.add(makeCircle(radius * 1.55, 0x00ffff, 0.80));
-    reticleGrp.add(makeCircle(radius * 2.50, 0x00ffff, 0.38));
+    reticleGrp.add(makeCircle(radius * 1.0, 0x00ffff, 0.80));
+    reticleGrp.add(makeCircle(radius * 1.5, 0x00ffff, 0.38));
     // cross segments
     [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
-      const inner = radius * 1.65, outer = radius * 2.7;
+      const inner = radius * 1.1, outer = radius * 1.6;
       const seg = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([
           new THREE.Vector3(dx * inner, dy * inner, 0),
@@ -1955,13 +2138,13 @@
       const cp = new THREE.Vector3(cortexPt[0] * BRS, cortexPt[1] * BRS, cortexPt[2] * BRS);
       const coneH = cp.distanceTo(tc);
       const coneGrp = new THREE.Group();
-      const coneGeo = new THREE.ConeGeometry(radius * 1.5, coneH, 20, 1, true);
+      const coneGeo = new THREE.ConeGeometry(radius * 0.8, coneH, 20, 1, true);
       const coneMat = new THREE.MeshBasicMaterial({
         color: dCol, transparent: true, opacity: 0.07,
         side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false
       });
       const coneMesh = new THREE.Mesh(coneGeo, coneMat);
-      const coneWireGeo = new THREE.ConeGeometry(radius * 1.5, coneH, 10, 1, true);
+      const coneWireGeo = new THREE.ConeGeometry(radius * 0.8, coneH, 10, 1, true);
       const coneWire = new THREE.Mesh(coneWireGeo,
         new THREE.MeshBasicMaterial({ color: dCol, wireframe: true, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false })
       );
@@ -1979,7 +2162,7 @@
 
       // Entry point marker at cortex
       const entryDot = new THREE.Mesh(
-        new THREE.SphereGeometry(0.025, 10, 10),
+        new THREE.SphereGeometry(0.015 * brainRatio, 10, 10),
         new THREE.MeshBasicMaterial({ color: 0xffdd00, transparent: true, opacity: 0.90, blending: THREE.AdditiveBlending })
       );
       entryDot.position.copy(cp);
@@ -1992,7 +2175,7 @@
     for (let i = 0; i < PC; i++) {
       const phi = Math.acos(2 * Math.random() - 1);
       const theta = Math.random() * Math.PI * 2;
-      const r = radius * (1.8 + Math.random() * 1.0);
+      const r = radius * (1.1 + Math.random() * 0.5);
       pPos[i * 3 + 0] = tc.x + r * Math.sin(phi) * Math.cos(theta);
       pPos[i * 3 + 1] = tc.y + r * Math.sin(phi) * Math.sin(theta);
       pPos[i * 3 + 2] = tc.z + r * Math.cos(phi);
@@ -2051,8 +2234,14 @@
       scene.remove(window._tumorBBoxGroup);
       window._tumorBBoxGroup = null;
     }
+    removeOverlayElement('bboxSizeLabel');
+    if (!isDetailView) {
+      window._bboxLabelPos = null;
+      window._bboxLabelText = '';
+      return;
+    }
 
-    const BRS = 1.0 / 55;
+    const BRS = (window._brainWS || 2.8) / (2.8 * 55);  // dynamic: scales with brain model
     const category = depthMetrics?.depth_category?.category || 'INTERMEDIATE';
     const depthColors = {
       OUTSIDE: 0xff2222, SUPERFICIAL: 0xff0040, SHALLOW: 0xff9100,
@@ -2131,24 +2320,30 @@
     window._bboxLabelText = `${sizeX}×${sizeY}×${sizeZ} mm`;
     window._bboxLabelColor = '#' + boxColor.toString(16).padStart(6, '0');
 
-    let bLbl = document.getElementById('bboxSizeLabel');
-    if (!bLbl) {
-      bLbl = document.createElement('div');
-      bLbl.id = 'bboxSizeLabel';
-      bLbl.style.cssText = `
+    if (!CLEAN_VIEW_OPTIONS.bboxLabel) {
+      removeOverlayElement('bboxSizeLabel');
+      window._bboxLabelPos = null;
+      window._bboxLabelText = '';
+    } else {
+      let bLbl = document.getElementById('bboxSizeLabel');
+      if (!bLbl) {
+        bLbl = document.createElement('div');
+        bLbl.id = 'bboxSizeLabel';
+        bLbl.style.cssText = `
         position:fixed; pointer-events:none; z-index:19;
-        font-family:'Consolas',monospace; font-size:11px; font-weight:700;
+        font-family:'Consolas',monospace; font-size:10px; font-weight:700;
         padding:3px 8px; border-radius:5px;
         background:rgba(4,8,22,0.88);
         display:none;
       `;
-      document.body.appendChild(bLbl);
+        document.body.appendChild(bLbl);
+      }
+      bLbl.style.color = window._bboxLabelColor;
+      bLbl.style.border = `1px solid ${window._bboxLabelColor}88`;
+      bLbl.style.boxShadow = `0 0 10px ${window._bboxLabelColor}55`;
+      bLbl.textContent = `📦 ${window._bboxLabelText}`;
+      bLbl.style.display = 'block';
     }
-    bLbl.style.color = window._bboxLabelColor;
-    bLbl.style.border = `1px solid ${window._bboxLabelColor}88`;
-    bLbl.style.boxShadow = `0 0 10px ${window._bboxLabelColor}55`;
-    bLbl.textContent = `📦 ${window._bboxLabelText}`;
-    bLbl.style.display = 'block';
 
     scene.add(grp);
     window._tumorBBoxGroup = grp;
@@ -2171,7 +2366,11 @@
       window._tumorShellGroup = null;
     }
 
-    const BRS = 1.0 / 55;
+    // ✅ FIX: Use dynamic BRS matching brain world scale (same as buildTumorEnhancedOverlay)
+    // Previously hardcoded 1.0/55 (= 2.8/(2.8*55)) which caused tumor shell to be
+    // ~2.4x too large after _brainWS was reduced from 2.8 → 1.15 to fix clipping.
+    const BRS = (window._brainWS || 2.8) / (2.8 * 55);
+    const brainRatio = (window._brainWS || 2.8) / 2.8; // < 1 when brain is smaller
     const category = depthMetrics?.depth_category?.category || 'INTERMEDIATE';
     const centroid = depthMetrics?.centroid_3d || [0, 0, 0];
     const tc = new THREE.Vector3(centroid[0] * BRS, centroid[1] * BRS, centroid[2] * BRS);
@@ -2181,65 +2380,103 @@
       const d = new THREE.Vector3(tp[0] * BRS, tp[1] * BRS, tp[2] * BRS).distanceTo(tc);
       if (d > maxR) maxR = d;
     }
-    const shellR = Math.max(0.08, Math.min(0.40, maxR * 1.6));
+    // Scale min/max clamps proportionally with brain world size
+    const shellR = Math.max(0.08 * brainRatio, Math.min(0.34 * brainRatio, maxR * 1.42));
 
-    const riskColors = {
-      OUTSIDE: [0xff2222, 0xff6666], SUPERFICIAL: [0xff0040, 0xff5577],
-      SHALLOW: [0xff9100, 0xffcc44], INTERMEDIATE: [0xffd600, 0xffee88],
-      DEEP: [0x00c853, 0x55ff99], VERY_DEEP: [0x00a3cc, 0x44ccee]
+    const depthAccentMap = {
+      OUTSIDE: 0xff6666,
+      SUPERFICIAL: 0xff5577,
+      SHALLOW: 0xffcc44,
+      INTERMEDIATE: 0xfff1a6,
+      DEEP: 0xb6f7d2,
+      VERY_DEEP: 0xb8ecff
     };
-    const [col1, col2] = riskColors[category] || [0xffd600, 0xffee88];
+    const colShell = 0xffb25c;
+    const colCore = 0xff4868;
+    const colRim = 0xfff2cf;
+    const colFocus = 0xfffbef;
+    const colAccent = depthAccentMap[category] || 0xfff1a6;
 
     const grp = new THREE.Group();
     grp.rotation.x = currentRotX;
     grp.rotation.y = currentRotY;
+    grp.renderOrder = 910;
 
     // Outer haze shell
     const outerGeo = new THREE.SphereGeometry(shellR * 1.35, 32, 32);
     const outerMat = new THREE.MeshBasicMaterial({
-      color: col1, transparent: true, opacity: 0.04,
-      side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false
+      color: colShell, transparent: true, opacity: 0.016,
+      side: THREE.BackSide, blending: THREE.NormalBlending, depthWrite: false, depthTest: true
     });
     const outer = new THREE.Mesh(outerGeo, outerMat);
     outer.position.copy(tc);
+    outer.renderOrder = 911;
     grp.add(outer);
 
     // Main shell (semi-transparent)
     const shellGeo = new THREE.SphereGeometry(shellR, 28, 28);
     const shellMat = new THREE.MeshBasicMaterial({
-      color: col1, transparent: true, opacity: 0.07,
-      side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false
+      color: colShell, transparent: true, opacity: 0.15,
+      side: THREE.DoubleSide, blending: THREE.NormalBlending, depthWrite: false, depthTest: true
     });
     const shell = new THREE.Mesh(shellGeo, shellMat);
     shell.position.copy(tc);
+    shell.renderOrder = 912;
     grp.add(shell);
 
     // Wireframe shell
     const wireGeo = new THREE.SphereGeometry(shellR * 1.05, 14, 10);
     const wireMat = new THREE.MeshBasicMaterial({
-      color: col2, wireframe: true, transparent: true, opacity: 0.22,
-      blending: THREE.AdditiveBlending, depthWrite: false
+      color: colRim, wireframe: true, transparent: true, opacity: 0.22,
+      blending: THREE.NormalBlending, depthWrite: false, depthTest: true
     });
     const wire = new THREE.Mesh(wireGeo, wireMat);
     wire.position.copy(tc);
+    wire.renderOrder = 913;
     grp.add(wire);
 
     // Inner core glow
     const coreGeo = new THREE.SphereGeometry(shellR * 0.45, 16, 16);
     const coreMat = new THREE.MeshBasicMaterial({
-      color: col1, transparent: true, opacity: 0.18,
-      blending: THREE.AdditiveBlending, depthWrite: false
+      color: colCore, transparent: true, opacity: 0.32,
+      blending: THREE.NormalBlending, depthWrite: false, depthTest: true
     });
     const core = new THREE.Mesh(coreGeo, coreMat);
     core.position.copy(tc);
+    core.renderOrder = 914;
     grp.add(core);
+
+    // Focus sphere at the tumor center for immediate visual lock-on
+    const focusGeo = new THREE.SphereGeometry(shellR * 0.18, 14, 14);
+    const focusMat = new THREE.MeshBasicMaterial({
+      color: colFocus, transparent: true, opacity: 0.96,
+      blending: THREE.NormalBlending, depthWrite: false, depthTest: true
+    });
+    const focus = new THREE.Mesh(focusGeo, focusMat);
+    focus.position.copy(tc);
+    focus.renderOrder = 915;
+    grp.add(focus);
+
+    // Thin accent rim to keep depth cue without turning the tumor blue/green
+    const accentGeo = new THREE.TorusGeometry(shellR * 0.74, Math.max(shellR * 0.035, 0.008), 10, 52);
+    const accentMat = new THREE.MeshBasicMaterial({
+      color: colAccent, transparent: true, opacity: 0.38,
+      blending: THREE.NormalBlending, depthWrite: false, depthTest: true
+    });
+    const accent = new THREE.Mesh(accentGeo, accentMat);
+    accent.position.copy(tc);
+    accent.rotation.x = Math.PI / 2;
+    accent.renderOrder = 916;
+    grp.add(accent);
 
     shell._isVolShell = true;
     wire._isVolWire = true;
+    accent._isVolAccent = true;
+    focus._isVolFocus = true;
 
     scene.add(grp);
     window._tumorShellGroup = grp;
-    window._tumorShellMeshes = { outer, shell, wire, core };
+    window._tumorShellMeshes = { outer, shell, wire, core, focus, accent };
     console.log('[Brain3D] ✅ Volumetric shell built, radius=' + shellR.toFixed(3));
   }
 
@@ -2257,14 +2494,16 @@
 
     if (!depthMetrics?.centroid_3d) return;
 
-    const BRS = 1.0 / 55;
+    // ✅ FIX: dynamic BRS — mirrors brain scale
+    const BRS = (window._brainWS || 2.8) / (2.8 * 55);
+    const brainRatio = (window._brainWS || 2.8) / 2.8;
     const centroid = depthMetrics.centroid_3d;
     const tc = new THREE.Vector3(centroid[0] * BRS, centroid[1] * BRS, centroid[2] * BRS);
 
     // Compute outward direction from brain center
     const outDir = tc.clone().normalize();
-    const arrowStart = tc.clone().addScaledVector(outDir, 0.15);
-    const arrowEnd = tc.clone().addScaledVector(outDir, 0.60);
+    const arrowStart = tc.clone().addScaledVector(outDir, 0.15 * brainRatio);
+    const arrowEnd = tc.clone().addScaledVector(outDir, 0.60 * brainRatio);
 
     const grp = new THREE.Group();
     grp.rotation.x = currentRotX;
@@ -2300,6 +2539,7 @@
     window._anatAnnotArrowEnd = arrowEnd;
     window._anatAnnotOutDir = outDir;
 
+    if (!CLEAN_VIEW_OPTIONS.anatomyLabel) return;
     // HTML label at arrow end
     const loc = (prediction?.location_hint || 'Brain Region').toUpperCase();
     const lbl = document.createElement('div');
@@ -2386,7 +2626,7 @@
 
     if (isDetailView) {
       switchBrainModel('detail');
-      // _showDetailInfoPanel();   ← đã tắt
+      // _showDetailInfoPanel(); 
       if (currentTumorPoints && currentTumorPoints.length > 0) {
         const dm = window.lastDepthMetrics;
         const pred = window.lastDiagnosisData?.prediction;
@@ -2396,7 +2636,7 @@
       }
     } else {
       switchBrainModel('normal');
-      // _hideDetailInfoPanel();   ← đã tắt (panel không còn được tạo)
+      // _hideDetailInfoPanel();  
       if (window._tumorBBoxGroup) { scene.remove(window._tumorBBoxGroup); window._tumorBBoxGroup = null; }
       if (window._tumorShellGroup) { scene.remove(window._tumorShellGroup); window._tumorShellGroup = null; }
       if (window._anatAnnotGroup) { scene.remove(window._anatAnnotGroup); window._anatAnnotGroup = null; }
@@ -2743,8 +2983,8 @@
     targetRotY = 0;
     isAutoRotating = true;
 
-    camera.position.set(0, 0.8, 5.0);
-    camera.lookAt(0, 0, 0);
+    camera.position.set(0, 0.0, 7.5);
+    camera.lookAt(0, -0.1, 0);
 
     document.querySelectorAll('.depthZoneLabel').forEach(l => l.remove());
     window._depthZoneMarkers = [];
@@ -2757,6 +2997,15 @@
       const indicator = document.getElementById('sliceIndicator');
       if (indicator) indicator.style.display = 'none';
     }
+
+    notifyClinicalEnhancer('onViewerReset', {
+      scene: scene,
+      camera: camera,
+      renderer: renderer,
+      getBrainMesh: () => brainMesh,
+      getRotation: () => ({ x: currentRotX, y: currentRotY }),
+      diagnosisData: window.lastDiagnosisData,
+    });
   };
 
   // ---- Toggle Auto-Rotate ----
@@ -2827,7 +3076,7 @@
     container.addEventListener('wheel', (e) => {
       e.preventDefault();
       camera.position.z += e.deltaY * 0.004;
-      camera.position.z = Math.max(2.5, Math.min(9.0, camera.position.z));
+      camera.position.z = Math.max(1.2, Math.min(12.0, camera.position.z));
     }, { passive: false });
   }
 
@@ -2931,16 +3180,31 @@
       // Pulse shell opacity
       if (window._tumorShellMeshes) {
         const sh = window._tumorShellMeshes;
-        if (sh.shell?.material) sh.shell.material.opacity = 0.05 + 0.05 * Math.sin(time * 1.8);
-        if (sh.wire?.material) sh.wire.material.opacity = 0.15 + 0.10 * Math.sin(time * 2.1);
-        if (sh.core?.material) sh.core.material.opacity = 0.12 + 0.10 * Math.abs(Math.sin(time * 2.5));
-        if (sh.outer?.material) sh.outer.material.opacity = 0.02 + 0.03 * Math.sin(time * 1.3);
+        if (sh.shell?.material) sh.shell.material.opacity = 0.15 + 0.015 * Math.sin(time * 1.05);
+        if (sh.wire?.material) sh.wire.material.opacity = 0.22 + 0.012 * Math.sin(time * 1.30);
+        if (sh.core?.material) sh.core.material.opacity = 0.32 + 0.02 * Math.abs(Math.sin(time * 1.55));
+        if (sh.outer?.material) sh.outer.material.opacity = 0.016 + 0.004 * Math.sin(time * 0.90);
+        if (sh.focus?.material) sh.focus.material.opacity = 0.94 + 0.03 * Math.abs(Math.sin(time * 1.90));
+        if (sh.accent?.material) sh.accent.material.opacity = 0.38 + 0.02 * Math.sin(time * 1.20);
+        if (sh.accent) sh.accent.rotation.z += 0.0035;
       }
     }
     if (window._anatAnnotGroup) {
       window._anatAnnotGroup.rotation.x = currentRotX;
       window._anatAnnotGroup.rotation.y = currentRotY;
     }
+
+    notifyClinicalEnhancer('onPostRender', {
+      time: time,
+      scene: scene,
+      camera: camera,
+      renderer: renderer,
+      getBrainMesh: () => brainMesh,
+      getRotation: () => ({ x: currentRotX, y: currentRotY }),
+      diagnosisData: window.lastDiagnosisData,
+      tumorPoints: currentTumorPoints,
+      depthMetrics: window.lastDepthMetrics,
+    });
 
     renderer.render(scene, camera);
   }
@@ -3042,7 +3306,7 @@
         background:#fee2e2;border:1px solid #ef444433;color:#ef4444;
         padding:9px 20px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:bold;
         transition:all 0.2s;" onmouseover="this.style.background='#fecaca';this.style.transform='scale(1.02)'"
-        onmouseout="this.style.background='#fee2e2';this.style.transform='scale(1)'">✕ Đóng Bảng</button>
+        onmouseout="this.style.background='#fee2e2';this.style.transform='scale(1)'">✕</button>
     </div>
 
     <!-- Grid -->
@@ -3112,6 +3376,823 @@
   // ════════════════════════════════════════════════════════════
   // HELPER: Suy ra vị trí giải phẫu từ filename / patient_id
   // ════════════════════════════════════════════════════════════
+  // Override legacy compare picker UI with the updated header, font, and pagination layout.
+  window.setComparePickerPage = function (page) {
+    const cases = window._similarCasesData || [];
+    const totalPages = Math.max(1, Math.ceil(cases.length / COMPARE_ITEMS_PER_PAGE));
+    window._comparePickerPage = Math.min(totalPages, Math.max(1, page));
+    window.openComparePicker();
+  };
+
+  function _buildComparePickerPageTokens(totalPages, currentPage) {
+    if (totalPages <= 4) {
+      return Array.from({ length: totalPages }, (_, idx) => idx + 1);
+    }
+
+    if (currentPage <= 3) {
+      return [1, 2, 3, 'ellipsis', totalPages];
+    }
+
+    if (currentPage >= totalPages - 2) {
+      return [1, 'ellipsis', totalPages - 2, totalPages - 1, totalPages];
+    }
+
+    return [1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages];
+  }
+
+  window.changeComparePickerPage = function (delta) {
+    const cases = window._similarCasesData || [];
+    const totalPages = Math.max(1, Math.ceil(cases.length / COMPARE_ITEMS_PER_PAGE));
+    const newPage = Math.min(totalPages, Math.max(1, (window._comparePickerPage || 1) + delta));
+    if (newPage !== window._comparePickerPage) {
+      window._comparePickerPage = newPage;
+    }
+    window.openComparePicker();
+  };
+
+  window.openComparePicker = function () {
+    const cases = window._similarCasesData;
+    const old = document.getElementById('comparePicker');
+    if (old) old.remove();
+
+    if (!cases || cases.length === 0) {
+      const note = document.createElement('div');
+      note.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:10001;' +
+        'background:rgba(255,145,0,0.15);border:1px solid #ff9100;border-radius:10px;' +
+        'padding:14px 24px;color:#ff9100;font-family:var(--font-main,"Google Sans",sans-serif);font-size:13px;' +
+        'text-align:center;backdrop-filter:blur(8px);animation:_fpIn 0.3s ease;';
+      note.innerHTML = '<style>@keyframes _fpIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}</style>' +
+        '⚠️ Chưa có dữ liệu ca bệnh tương tự.<br><small style="color:#8899b0">Hãy chạy chẩn đoán trước.</small>';
+      document.body.appendChild(note);
+      setTimeout(() => note.remove(), 3000);
+      return;
+    }
+
+    const totalPages = Math.max(1, Math.ceil(cases.length / COMPARE_ITEMS_PER_PAGE));
+    const currentPage = Math.min(totalPages, Math.max(1, window._comparePickerPage || 1));
+    const startIndex = (currentPage - 1) * COMPARE_ITEMS_PER_PAGE;
+    const endIndex = Math.min(startIndex + COMPARE_ITEMS_PER_PAGE, cases.length);
+    const pageItems = cases.slice(startIndex, endIndex);
+    const paginationTokens = _buildComparePickerPageTokens(totalPages, currentPage);
+
+    window._comparePickerPage = currentPage;
+
+    const picker = document.createElement('div');
+    picker.id = 'comparePicker';
+    picker.setAttribute('role', 'dialog');
+    picker.setAttribute('aria-modal', 'true');
+    picker.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(241,245,249,0.98);' +
+      'display:flex;flex-direction:column;font-family:var(--font-main,"Google Sans",sans-serif);' +
+      'backdrop-filter:blur(10px);animation:_cpIn 0.35s cubic-bezier(0.22,1,0.36,1);';
+
+    picker.innerHTML = `
+    <style>
+      @keyframes _cpIn { from { opacity:0; transform:scale(0.98); } to { opacity:1; transform:scale(1); } }
+      @keyframes _cpCard { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+      #comparePicker * { font-family:inherit; }
+      #comparePicker .cp-shell { display:flex; flex-direction:column; flex:1; min-height:0; }
+      #comparePicker .cp-header {
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:24px;
+        padding:28px 40px 24px;
+        background:#ffffff;
+        border-bottom:1px solid #dbe5f0;
+        box-shadow:0 10px 30px rgba(15,23,42,0.04);
+        flex-shrink:0;
+      }
+      #comparePicker .cp-title {
+        color:#24324b;
+        font-size:18px;
+        font-weight:700;
+        letter-spacing:0.02em;
+        margin-bottom:8px;
+      }
+      #comparePicker .cp-subtitle {
+        color:#6b7b91;
+        font-size:13px;
+        font-weight:500;
+      }
+      #comparePicker .cp-close {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:6px;
+        min-width:156px;
+        height:48px;
+        padding:0 20px;
+        border-radius:16px;
+        border:1px solid #fcb4b4;
+        background:#fff1f1;
+        color:#ef5350;
+        font-size:14px;
+        font-weight:700;
+        cursor:pointer;
+        transition:transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        box-shadow:0 8px 20px rgba(239,83,80,0.08);
+      }
+      #comparePicker .cp-close:hover {
+        transform:translateY(-1px);
+        background:#ffe7e7;
+        box-shadow:0 12px 24px rgba(239,83,80,0.14);
+      }
+      #comparePicker .cp-grid {
+        flex:1;
+        min-height:0;
+        overflow-y:auto;
+        padding:40px;
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+        gap:28px;
+        align-content:start;
+        background:linear-gradient(180deg,#edf3f8 0%,#eef3f8 100%);
+      }
+      #comparePicker .cp-card {
+        position:relative;
+        min-height:204px;
+        border-radius:24px;
+        border:1px solid rgba(15,23,42,0.08);
+        background:linear-gradient(180deg,#16213a 0%,#131c33 100%);
+        box-shadow:0 20px 40px rgba(15,23,42,0.12);
+        overflow:hidden;
+        cursor:pointer;
+        animation:_cpCard 0.4s ease both;
+        transition:transform 0.28s ease, box-shadow 0.28s ease;
+      }
+      #comparePicker .cp-card::before {
+        content:"";
+        position:absolute;
+        inset:0;
+        background:linear-gradient(180deg,rgba(255,255,255,0.04) 0%,rgba(255,255,255,0) 40%);
+        pointer-events:none;
+      }
+      #comparePicker .cp-card:hover {
+        transform:translateY(-5px);
+        box-shadow:0 28px 48px rgba(15,23,42,0.18);
+      }
+      #comparePicker .cp-card:hover .cp-img-wrap {
+        transform:scale(1.04);
+      }
+      #comparePicker .cp-card-body {
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        height:100%;
+        padding:18px 22px;
+      }
+      #comparePicker .cp-img-wrap {
+        width:100%;
+        height:100%;
+        min-height:168px;
+        border-radius:18px;
+        background:#090f1d;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        overflow:hidden;
+        transition:transform 0.35s ease;
+      }
+      #comparePicker .cp-img-wrap img {
+        width:100%;
+        height:100%;
+        object-fit:contain;
+        display:block;
+      }
+      #comparePicker .cp-rank {
+        position:absolute;
+        top:14px;
+        left:14px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        min-width:74px;
+        height:32px;
+        padding:0 12px;
+        border-radius:12px;
+        background:rgba(255,255,255,0.96);
+        color:#344256;
+        font-size:12px;
+        font-weight:800;
+        box-shadow:0 8px 18px rgba(15,23,42,0.16);
+        white-space:nowrap;
+      }
+      #comparePicker .cp-score {
+        position:absolute;
+        top:14px;
+        right:14px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        min-width:58px;
+        height:34px;
+        padding:0 14px;
+        border-radius:999px;
+        color:#ffffff;
+        font-size:12px;
+        font-weight:800;
+      }
+      #comparePicker .cp-empty {
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        width:100%;
+        height:100%;
+        color:#9fb0c6;
+        font-size:22px;
+        font-weight:600;
+        letter-spacing:0.08em;
+      }
+      #comparePicker .cp-footer {
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        gap:28px;
+        flex-wrap:wrap;
+        padding:18px 32px 22px;
+        background:#ffffff;
+        border-top:1px solid #dbe5f0;
+        box-shadow:0 -10px 30px rgba(15,23,42,0.03);
+        flex-shrink:0;
+      }
+      #comparePicker .cp-pagination {
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        gap:10px;
+        flex-wrap:wrap;
+      }
+      #comparePicker .cp-nav-btn,
+      #comparePicker .cp-page-btn {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        min-width:42px;
+        height:40px;
+        padding:0 14px;
+        border-radius:12px;
+        border:1px solid #d5e1ee;
+        background:#ffffff;
+        color:#42526b;
+        font-size:16px;
+        font-weight:600;
+        cursor:pointer;
+        transition:transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, background 0.2s ease;
+        box-shadow:0 4px 14px rgba(15,23,42,0.06);
+      }
+      #comparePicker .cp-nav-btn:disabled {
+        color:#c2ccda;
+        border-color:#e4ebf3;
+        background:#f8fafc;
+        box-shadow:none;
+        cursor:default;
+      }
+      #comparePicker .cp-nav-btn:not(:disabled):hover,
+      #comparePicker .cp-page-btn:not(.is-active):not(.is-ellipsis):hover {
+        transform:translateY(-1px);
+        border-color:#9cc7dc;
+        color:#0f172a;
+        box-shadow:0 10px 20px rgba(15,23,42,0.08);
+      }
+      #comparePicker .cp-page-btn.is-active {
+        border-color:#14b8d4;
+        background:linear-gradient(135deg,#14b8d4 0%,#0ea5c6 100%);
+        color:#ffffff;
+        box-shadow:0 12px 22px rgba(20,184,212,0.28);
+      }
+      #comparePicker .cp-page-btn.is-ellipsis {
+        min-width:auto;
+        padding:0 2px;
+        border:none;
+        background:transparent;
+        color:#a0aec0;
+        box-shadow:none;
+        cursor:default;
+      }
+      #comparePicker .cp-footer-meta {
+        display:flex;
+        align-items:center;
+        gap:16px;
+        color:#6b7b91;
+        font-size:13px;
+        font-weight:500;
+        flex-wrap:wrap;
+        justify-content:center;
+      }
+      #comparePicker .cp-divider {
+        width:1px;
+        height:18px;
+        background:#dbe5f0;
+      }
+      #comparePicker .cp-tip {
+        color:#8ea0b6;
+        font-style:italic;
+      }
+      @media (max-width: 960px) {
+        #comparePicker .cp-header { padding:24px; }
+        #comparePicker .cp-grid { padding:24px; gap:20px; }
+        #comparePicker .cp-footer { gap:16px; }
+      }
+      @media (max-width: 640px) {
+        #comparePicker .cp-header {
+          flex-direction:column;
+          align-items:stretch;
+          padding:20px 18px 18px;
+        }
+        #comparePicker .cp-close {
+          width:100%;
+          min-width:0;
+        }
+        #comparePicker .cp-grid {
+          padding:18px;
+          grid-template-columns:1fr;
+          gap:18px;
+        }
+        #comparePicker .cp-footer {
+          padding:16px 18px 18px;
+        }
+        #comparePicker .cp-footer-meta {
+          gap:10px;
+        }
+        #comparePicker .cp-divider {
+          display:none;
+        }
+      }
+    </style>
+
+    <div class="cp-shell">
+      <div class="cp-header">
+        <div>
+          <div class="cp-title">Chọn Ca Bệnh Tương Tự Để So Sánh 3D</div>
+          <div class="cp-subtitle">Tìm thấy <strong>${cases.length}</strong> ca bệnh phù hợp - hiển thị ${startIndex + 1} đến ${endIndex}</div>
+        </div>
+
+        <button class="cp-close" onclick="document.getElementById('comparePicker').remove()">&times; Đóng Bảng</button>
+      </div>
+
+      <div class="cp-grid">
+        ${pageItems.map((c, i) => {
+      const actualIdx = startIndex + i;
+      const sim = Math.round((c.similarity_score || 0) * 100);
+      const scoreBg = sim >= 80
+        ? 'linear-gradient(135deg,#34d399 0%,#10b981 100%)'
+        : sim >= 55
+          ? 'linear-gradient(135deg,#fbbf24 0%,#f59e0b 100%)'
+          : 'linear-gradient(135deg,#fb7185 0%,#ef4444 100%)';
+      const scoreShadow = sim >= 80 ? 'rgba(16,185,129,0.24)' : sim >= 55 ? 'rgba(245,158,11,0.24)' : 'rgba(239,68,68,0.22)';
+      const imageSrc = c.filename ? `/data/images/${c.filename}` : c.thumbnail;
+      const imgHTML = imageSrc
+        ? `<img src="${imageSrc}" alt="Ca bệnh ${c.case_id || actualIdx + 1}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"/><span class="cp-empty" style="display:none;">MRI</span>`
+        : '<span class="cp-empty">MRI</span>';
+      return `
+          <div class="cp-card" style="animation-delay:${i * 0.04}s;" onclick="const pC=document.getElementById('previewCanvas'); const iS=pC?pC.toDataURL('image/png'):null; document.getElementById('comparePicker').remove(); window.openDual3DCompare(window._similarCasesData[${actualIdx}], window.lastDiagnosisData, iS)">
+            <div class="cp-rank">#${c.rank || actualIdx + 1}</div>
+            <div class="cp-score" style="background:${scoreBg};box-shadow:0 12px 24px ${scoreShadow};">${sim}%</div>
+            <div class="cp-card-body">
+              <div class="cp-img-wrap">${imgHTML}</div>
+            </div>
+          </div>`;
+    }).join('')}
+      </div>
+
+      <div class="cp-footer">
+        <div class="cp-pagination">
+          <button class="cp-nav-btn" onclick="window.changeComparePickerPage(-1)" ${currentPage === 1 ? 'disabled' : ''} aria-label="Trang trước">&#8249;</button>
+          ${paginationTokens.map((token) => {
+      if (token === 'ellipsis') {
+        return '<span class="cp-page-btn is-ellipsis">...</span>';
+      }
+      const activeClass = token === currentPage ? ' is-active' : '';
+      return `<button class="cp-page-btn${activeClass}" onclick="window.setComparePickerPage(${token})">${token}</button>`;
+    }).join('')}
+          <button class="cp-nav-btn" onclick="window.changeComparePickerPage(1)" ${currentPage === totalPages ? 'disabled' : ''} aria-label="Trang sau">&#8250;</button>
+        </div>
+        <div class="cp-footer-meta">
+          <span>Trang <strong>${currentPage}</strong> / ${totalPages}</span>
+          <span class="cp-divider"></span>
+          <span class="cp-tip">Mẹo: Chọn ca bệnh có độ tương đồng cao để so sánh cấu trúc khối u</span>
+        </div>
+      </div>
+    </div>
+    `;
+
+    document.body.appendChild(picker);
+    console.log('[Brain3D] 🔍 Compare picker opened with', cases.length, 'cases, page', currentPage);
+  };
+
+  // Bottom-sheet compare picker that slides up and docks directly under the app header.
+  window.setComparePickerPage = function (page) {
+    const cases = window._similarCasesData || [];
+    const totalPages = Math.max(1, Math.ceil(cases.length / COMPARE_ITEMS_PER_PAGE));
+    window._comparePickerPage = Math.min(totalPages, Math.max(1, page));
+    window.openComparePicker();
+  };
+
+  function _buildComparePickerPageTokens(totalPages, currentPage) {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, idx) => idx + 1);
+    }
+
+    if (currentPage <= 3) {
+      return [1, 2, 3, 'ellipsis', totalPages];
+    }
+
+    if (currentPage >= totalPages - 2) {
+      return [1, 'ellipsis', totalPages - 2, totalPages - 1, totalPages];
+    }
+
+    return [1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages];
+  }
+
+  window.closeComparePicker = function (immediate) {
+    const picker = document.getElementById('comparePicker');
+    if (!picker) return;
+
+    if (immediate) {
+      picker.remove();
+      return;
+    }
+
+    picker.classList.remove('is-visible');
+    window.setTimeout(() => {
+      if (picker.parentNode) picker.remove();
+    }, 280);
+  };
+
+  window.changeComparePickerPage = function (delta) {
+    const cases = window._similarCasesData || [];
+    const totalPages = Math.max(1, Math.ceil(cases.length / COMPARE_ITEMS_PER_PAGE));
+    const newPage = Math.min(totalPages, Math.max(1, (window._comparePickerPage || 1) + delta));
+    if (newPage !== window._comparePickerPage) {
+      window._comparePickerPage = newPage;
+    }
+    window.openComparePicker();
+  };
+
+  window.openComparePicker = function () {
+    const cases = window._similarCasesData;
+    const old = document.getElementById('comparePicker');
+    const skipIntro = !!old;
+    if (old) old.remove();
+
+    if (!cases || cases.length === 0) {
+      const note = document.createElement('div');
+      note.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:10001;' +
+        'background:rgba(255,145,0,0.15);border:1px solid #ff9100;border-radius:10px;' +
+        'padding:14px 24px;color:#ff9100;font-family:var(--font-main,"Google Sans",sans-serif);font-size:13px;' +
+        'text-align:center;backdrop-filter:blur(8px);animation:_fpIn 0.3s ease;';
+      note.innerHTML = '<style>@keyframes _fpIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}</style>' +
+        '⚠️ Chưa có dữ liệu ca bệnh tương tự.<br><small style="color:#8899b0">Hãy chạy chẩn đoán trước.</small>';
+      document.body.appendChild(note);
+      setTimeout(() => note.remove(), 3000);
+      return;
+    }
+
+    const totalPages = Math.max(1, Math.ceil(cases.length / COMPARE_ITEMS_PER_PAGE));
+    const currentPage = Math.min(totalPages, Math.max(1, window._comparePickerPage || 1));
+    const startIndex = (currentPage - 1) * COMPARE_ITEMS_PER_PAGE;
+    const endIndex = Math.min(startIndex + COMPARE_ITEMS_PER_PAGE, cases.length);
+    const pageItems = cases.slice(startIndex, endIndex);
+    const paginationTokens = _buildComparePickerPageTokens(totalPages, currentPage);
+    const header = document.querySelector('.header');
+    const topOffset = header ? Math.round(header.getBoundingClientRect().height || 64) : 64;
+
+    window._comparePickerPage = currentPage;
+
+    const picker = document.createElement('div');
+    picker.id = 'comparePicker';
+    picker.setAttribute('role', 'dialog');
+    picker.setAttribute('aria-modal', 'true');
+    picker.style.cssText = `position:fixed;top:${topOffset}px;left:0;right:0;bottom:0;z-index:999;pointer-events:none;font-family:var(--font-main,"Google Sans",sans-serif);`;
+
+    picker.innerHTML = `
+    <style>
+      @keyframes _cpCard {
+        from { opacity:0; transform:translateY(18px); }
+        to { opacity:1; transform:translateY(0); }
+      }
+      #comparePicker * { font-family:inherit; box-sizing:border-box; }
+      #comparePicker .cp-backdrop {
+        position:absolute;
+        inset:0;
+        background:rgba(226,232,240,0.52);
+        opacity:0;
+        pointer-events:auto;
+        transition:opacity 0.26s ease;
+      }
+      #comparePicker .cp-panel {
+        position:absolute;
+        inset:0;
+        display:flex;
+        flex-direction:column;
+        background:linear-gradient(180deg,#ffffff 0%,#eef3f8 18%,#edf3f8 100%);
+        border-top:1px solid rgba(209,221,232,0.96);
+        box-shadow:0 -18px 44px rgba(15,23,42,0.10);
+        transform:translateY(100%);
+        transition:transform 0.34s cubic-bezier(0.22,1,0.36,1);
+        pointer-events:auto;
+        overflow:hidden;
+      }
+      #comparePicker.is-visible .cp-backdrop { opacity:1; }
+      #comparePicker.is-visible .cp-panel { transform:translateY(0); }
+      #comparePicker .cp-topbar {
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:20px;
+        padding:18px 26px 16px;
+        background:rgba(255,255,255,0.96);
+        border-bottom:1px solid #dbe5f0;
+        flex-shrink:0;
+      }
+      #comparePicker .cp-title {
+        color:#24324b;
+        font-size:18px;
+        font-weight:700;
+        letter-spacing:0.01em;
+        margin-bottom:6px;
+      }
+      #comparePicker .cp-subtitle {
+        color:#71839a;
+        font-size:13px;
+        font-weight:500;
+      }
+      #comparePicker .cp-close {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        width:42px;
+        height:42px;
+        border:1px solid #f7b6b6;
+        border-radius:14px;
+        background:#fff1f1;
+        color:#ef5350;
+        font-size:18px;
+        font-weight:700;
+        line-height:1;
+        cursor:pointer;
+        transition:background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+        box-shadow:0 8px 18px rgba(239,83,80,0.10);
+      }
+      #comparePicker .cp-close:hover {
+        background:#ffe5e5;
+        transform:translateY(-1px);
+      }
+      #comparePicker .cp-body {
+        flex:1;
+        min-height:0;
+        overflow-y:auto;
+        padding:24px 26px;
+      }
+      #comparePicker .cp-grid {
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(290px,1fr));
+        gap:22px;
+        align-content:start;
+      }
+      #comparePicker .cp-card {
+        position:relative;
+        min-height:210px;
+        border-radius:22px;
+        border:1px solid rgba(19,28,51,0.08);
+        background:linear-gradient(180deg,#16213a 0%,#131c33 100%);
+        overflow:hidden;
+        cursor:pointer;
+        box-shadow:0 16px 30px rgba(15,23,42,0.12);
+        transition:transform 0.24s ease, box-shadow 0.24s ease;
+        animation:_cpCard 0.36s ease both;
+      }
+      #comparePicker .cp-card:hover {
+        transform:translateY(-4px);
+        box-shadow:0 24px 38px rgba(15,23,42,0.16);
+      }
+      #comparePicker .cp-card-body {
+        padding:18px 22px;
+        height:100%;
+      }
+      #comparePicker .cp-img-wrap {
+        width:100%;
+        height:100%;
+        min-height:172px;
+        border-radius:18px;
+        background:#0a1120;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        overflow:hidden;
+      }
+      #comparePicker .cp-img-wrap img {
+        width:100%;
+        height:100%;
+        object-fit:contain;
+        display:block;
+      }
+      #comparePicker .cp-empty {
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        width:100%;
+        height:100%;
+        color:#a6b5c7;
+        font-size:22px;
+        font-weight:600;
+        letter-spacing:0.08em;
+      }
+      #comparePicker .cp-rank {
+        position:absolute;
+        top:14px;
+        left:14px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        min-width:42px;
+        height:30px;
+        padding:0 10px;
+        border-radius:10px;
+        background:rgba(255,255,255,0.96);
+        color:#344256;
+        font-size:11px;
+        font-weight:800;
+        box-shadow:0 8px 18px rgba(15,23,42,0.16);
+      }
+      #comparePicker .cp-score {
+        position:absolute;
+        top:14px;
+        right:14px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        min-width:58px;
+        height:34px;
+        padding:0 14px;
+        border-radius:999px;
+        color:#ffffff;
+        font-size:12px;
+        font-weight:800;
+      }
+      #comparePicker .cp-footer {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:20px;
+        flex-wrap:wrap;
+        padding:16px 26px 18px;
+        background:#ffffff;
+        border-top:1px solid #dbe5f0;
+        flex-shrink:0;
+      }
+      #comparePicker .cp-meta {
+        color:#71839a;
+        font-size:13px;
+        font-weight:500;
+      }
+      #comparePicker .cp-pagination {
+        display:flex;
+        align-items:center;
+        gap:10px;
+        flex-wrap:wrap;
+      }
+      #comparePicker .cp-nav-btn,
+      #comparePicker .cp-page-btn {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        min-width:42px;
+        height:40px;
+        padding:0 14px;
+        border-radius:12px;
+        border:1px solid #d5e1ee;
+        background:#ffffff;
+        color:#42526b;
+        font-size:15px;
+        font-weight:600;
+        cursor:pointer;
+        transition:transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        box-shadow:0 4px 14px rgba(15,23,42,0.06);
+      }
+      #comparePicker .cp-nav-btn:disabled {
+        color:#c2ccda;
+        border-color:#e4ebf3;
+        background:#f8fafc;
+        box-shadow:none;
+        cursor:default;
+      }
+      #comparePicker .cp-nav-btn:not(:disabled):hover,
+      #comparePicker .cp-page-btn:not(.is-active):not(.is-ellipsis):hover {
+        transform:translateY(-1px);
+        border-color:#9cc7dc;
+        box-shadow:0 10px 20px rgba(15,23,42,0.08);
+      }
+      #comparePicker .cp-page-btn.is-active {
+        border-color:#14b8d4;
+        background:linear-gradient(135deg,#14b8d4 0%,#0ea5c6 100%);
+        color:#ffffff;
+        box-shadow:0 12px 22px rgba(20,184,212,0.28);
+      }
+      #comparePicker .cp-page-btn.is-ellipsis {
+        min-width:auto;
+        padding:0 2px;
+        border:none;
+        background:transparent;
+        color:#a0aec0;
+        box-shadow:none;
+        cursor:default;
+      }
+      @media (max-width: 900px) {
+        #comparePicker .cp-topbar,
+        #comparePicker .cp-body,
+        #comparePicker .cp-footer {
+          padding-left:18px;
+          padding-right:18px;
+        }
+        #comparePicker .cp-grid {
+          grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+          gap:18px;
+        }
+      }
+      @media (max-width: 640px) {
+        #comparePicker .cp-topbar {
+          flex-direction:column;
+          align-items:stretch;
+        }
+        #comparePicker .cp-close {
+          width:100%;
+        }
+        #comparePicker .cp-grid {
+          grid-template-columns:1fr;
+        }
+        #comparePicker .cp-footer {
+          justify-content:center;
+        }
+      }
+    </style>
+
+    <div class="cp-backdrop" onclick="window.closeComparePicker()"></div>
+    <div class="cp-panel">
+      <div class="cp-topbar">
+        <div>
+          <div class="cp-title">Chọn Ca Bệnh Tương Tự Để So Sánh 3D</div>
+          <div class="cp-subtitle">Tìm thấy <strong>${cases.length}</strong> ca bệnh phù hợp - hiển thị ${startIndex + 1} đến ${endIndex}</div>
+        </div>
+        <button class="cp-close" type="button" aria-label="Đóng bảng" onclick="window.closeComparePicker()">X</button>
+      </div>
+
+      <div class="cp-body">
+        <div class="cp-grid">
+          ${pageItems.map((c, i) => {
+      const actualIdx = startIndex + i;
+      const rankValue = Number(c.rank || (actualIdx + 1));
+      const rankLabel = rankValue <= 3 ? `Mẫu ca ${rankValue}` : 'Tương tự';
+      const sim = Math.round((c.similarity_score || 0) * 100);
+      const scoreBg = sim >= 80
+        ? 'linear-gradient(135deg,#34d399 0%,#10b981 100%)'
+        : sim >= 55
+          ? 'linear-gradient(135deg,#fbbf24 0%,#f59e0b 100%)'
+          : 'linear-gradient(135deg,#fb7185 0%,#ef4444 100%)';
+      const scoreShadow = sim >= 80 ? 'rgba(16,185,129,0.24)' : sim >= 55 ? 'rgba(245,158,11,0.24)' : 'rgba(239,68,68,0.22)';
+      const imageSrc = c.filename ? `/data/images/${c.filename}` : c.thumbnail;
+      const imgHTML = imageSrc
+        ? `<img src="${imageSrc}" alt="Ca bệnh ${c.case_id || actualIdx + 1}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"/><span class="cp-empty" style="display:none;">MRI</span>`
+        : '<span class="cp-empty">MRI</span>';
+      return `
+          <div class="cp-card" style="animation-delay:${i * 0.04}s;" onclick="const pC=document.getElementById('previewCanvas'); const iS=pC?pC.toDataURL('image/png'):null; window.closeComparePicker(true); window.openDual3DCompare(window._similarCasesData[${actualIdx}], window.lastDiagnosisData, iS)">
+            <div class="cp-rank">${rankLabel}</div>
+            <div class="cp-score" style="background:${scoreBg};box-shadow:0 12px 24px ${scoreShadow};">${sim}%</div>
+            <div class="cp-card-body">
+              <div class="cp-img-wrap">${imgHTML}</div>
+            </div>
+          </div>`;
+    }).join('')}
+        </div>
+      </div>
+
+      <div class="cp-footer">
+      
+        <div class="cp-pagination">
+          <button class="cp-nav-btn" onclick="window.changeComparePickerPage(-1)" ${currentPage === 1 ? 'disabled' : ''} aria-label="Trang trước">&#8249;</button>
+          ${paginationTokens.map((token) => {
+      if (token === 'ellipsis') {
+        return '<span class="cp-page-btn is-ellipsis">...</span>';
+      }
+      const activeClass = token === currentPage ? ' is-active' : '';
+      return `<button class="cp-page-btn${activeClass}" onclick="window.setComparePickerPage(${token})">${token}</button>`;
+    }).join('')}
+          <button class="cp-nav-btn" onclick="window.changeComparePickerPage(1)" ${currentPage === totalPages ? 'disabled' : ''} aria-label="Trang sau">&#8250;</button>
+        </div>
+      </div>
+    </div>
+    `;
+
+    document.body.appendChild(picker);
+    if (skipIntro) {
+      picker.classList.add('is-visible');
+    } else {
+      requestAnimationFrame(() => picker.classList.add('is-visible'));
+    }
+
+    console.log('[Brain3D] 🔍 Compare picker opened with', cases.length, 'cases, page', currentPage);
+  };
+
   function _inferLocationFromCase(caseItem) {
     // Map from patient/file range to approximate lobe (based on LGG dataset patient ordering)
     const pid = caseItem.patient_id || '';
@@ -3294,7 +4375,7 @@
   }
 
   // ════════════════════════════════════════════════════════════ 
-  // DUAL 3D COMPARE — 2 bên đều tương tác đầy đủ (rotate + zoom)
+  // DUAL 3D COMPARE — 2 bên đều tương tác đầy đủ (rotate + zoom) 
   // ════════════════════════════════════════════════════════════
   window.openDual3DCompare = function (caseItem, diagData, currentImgSrc) {
     console.log('[Brain3D] 🔍 openDual3DCompare', { caseId: caseItem.case_id, hasImg: !!currentImgSrc });
@@ -3525,7 +4606,7 @@
       </div>
     </div>
 
-    <!-- ── Body: Top Row (3D Views) ── -->
+    <!-- ── Body: Top Row (3D Views) ── -->  
     <div id="dual3DTopRow" style="display:flex; height:38vh; min-height:100px; flex-shrink:0;">
       <!-- LEFT TOP -->
       <div class="d3-col-top">
@@ -3706,6 +4787,14 @@
 
     document.body.appendChild(modal);
 
+    notifyClinicalEnhancer('onCompareModalOpened', {
+      modal: modal,
+      diagData: diagData,
+      caseItem: caseItem,
+      similarity: similarity,
+      refLocKey: refLocKey,
+    });
+
     // ✅ Trigger bar animations after appending (Added)
     setTimeout(() => {
       modal.querySelectorAll('.fill').forEach((el, idx) => {
@@ -3857,6 +4946,23 @@
         tumorGroup = _buildDualTumorRef(brainGroup, caseItem, similarity, BRS, locKey);
       }
 
+      notifyClinicalEnhancer('onDualSceneReady', {
+        canvasId: canvasId,
+        canvas: canvas,
+        wrap: wrap,
+        scene: sc,
+        camera: cam,
+        renderer: rdr,
+        brainGroup: brainGroup,
+        getModelRoot: () => brainGroup.children[0] || null,
+        getTumorGroup: () => tumorGroup,
+        isLeft: isLeft,
+        diagData: diagData,
+        caseItem: caseItem,
+        similarity: similarity,
+        locKey: locKey,
+      });
+
       // ── Interaction State ──────────────────────────────────
       let rotX = 0.12, rotY = isLeft ? 0.3 : -0.3;
       let velX = 0, velY = 0.003;
@@ -3927,16 +5033,7 @@
 
         // Animate tumor pulses
         if (tumorGroup) {
-          tumorGroup.traverse(obj => {
-            if (obj._pulse && obj.material) {
-              const ph = obj._ph || 0, sp = obj._sp || 1.5;
-              obj.material.opacity = (obj._op || 0.5) * (0.45 + 0.55 * Math.abs(Math.sin(t * sp + ph)));
-              obj.scale.setScalar(1 + 0.06 * Math.sin(t * sp * 1.3 + ph));
-            }
-            if (obj._emissive && obj.material) {
-              obj.material.emissiveIntensity = (obj._baseEmi || 0.6) + 0.28 * Math.sin(t * 2.0);
-            }
-          });
+          _animateTumorGroup(tumorGroup, t);
         }
 
         rdr.render(sc, cam);
@@ -3979,16 +5076,17 @@
   }
 
   function _depthColors(depthMm) {
-    if (!depthMm || depthMm < 5) return { core: 0xff2020, em: 0xff0000, glow: 0xff6644, ring: 0xff1100 };
-    if (depthMm < 15) return { core: 0xff8800, em: 0xff6600, glow: 0xffbb44, ring: 0xff9900 };
-    if (depthMm < 30) return { core: 0xffee00, em: 0xffcc00, glow: 0xffff88, ring: 0xffdd00 };
-    if (depthMm < 45) return { core: 0x00ff77, em: 0x00ee55, glow: 0x88ffbb, ring: 0x00ff66 };
-    return { core: 0x00ddff, em: 0x00bbff, glow: 0x88eeff, ring: 0x00ccff };
+    if (!depthMm || depthMm < 5) return { core: 0xdc2626, em: 0x991b1b, glow: 0xfb7185, ring: 0xf97316 };
+    if (depthMm < 15) return { core: 0xe11d48, em: 0x9f1239, glow: 0xfb7185, ring: 0xfb923c };
+    if (depthMm < 30) return { core: 0xe11d48, em: 0x9f1239, glow: 0xf59e0b, ring: 0xfacc15 };
+    if (depthMm < 45) return { core: 0xbe123c, em: 0x881337, glow: 0xfb7185, ring: 0xfdba74 };
+    return { core: 0x9f1239, em: 0x881337, glow: 0xf9a8d4, ring: 0xfbcfe8 };
   }
 
   // ─── Core builder: tất cả effects tại (tx,ty,tz) ─────────────────────────────
 
   function _buildTumorAtPosition(tx, ty, tz, radius, colors, isPrimary) {
+    const style = isPrimary ? COMPARE_TUMOR_STYLES.current : COMPARE_TUMOR_STYLES.reference;
     const g = new THREE.Group();
     // Group position = tâm tumor
     g.position.set(tx, ty, tz);
@@ -4000,69 +5098,91 @@
       new THREE.MeshStandardMaterial({
         color: colors.core,
         emissive: new THREE.Color(colors.em),
-        emissiveIntensity: 4.0,
+        emissiveIntensity: style.emissiveIntensity,
         transparent: true,
-        opacity: 1.0,
+        opacity: style.coreOpacity,
         depthTest: false,
         depthWrite: false,
         metalness: 0.0,
-        roughness: 0.10,
+        roughness: 0.18,
       })
     );
     core.renderOrder = 999;
-    core._emissive = true; core._baseEmi = 4.0;
+    core._emissive = true;
+    core._baseEmi = style.emissiveIntensity;
+    core._pulse = true;
+    core._ph = 0.15;
+    core._sp = 1.2;
+    core._op = style.coreOpacity;
+    core._pulseMin = 0.94;
+    core._pulseAmp = 0.06;
+    core._emissivePulseAmp = style.emissivePulse;
     g.add(core);
 
     // ─── 2. MID GLOW — sphere lớn hơn, semi-transparent ─────────────────────
     const midGlow = new THREE.Mesh(
-      new THREE.SphereGeometry(radius * 2.0, 28, 28),
+      new THREE.SphereGeometry(radius * style.midGlowScale, 28, 28),
       new THREE.MeshBasicMaterial({
         color: colors.glow,
-        transparent: true, opacity: 0.50,
-        blending: THREE.AdditiveBlending,
+        transparent: true, opacity: style.midGlowOpacity,
+        blending: THREE.NormalBlending,
         depthTest: false, depthWrite: false,
         side: THREE.BackSide,
       })
     );
     midGlow.renderOrder = 998;
-    midGlow._pulse = true; midGlow._ph = 0.0; midGlow._sp = 1.8; midGlow._op = 0.50;
+    midGlow._pulse = true;
+    midGlow._ph = 0.0;
+    midGlow._sp = 1.15;
+    midGlow._op = style.midGlowOpacity;
+    midGlow._pulseMin = style.pulseMin;
+    midGlow._pulseAmp = style.pulseAmp;
     g.add(midGlow);
 
     // ─── 3. OUTER HALO ────────────────────────────────────────────────────────
     const outerHalo = new THREE.Mesh(
-      new THREE.SphereGeometry(radius * 3.8, 22, 22),
+      new THREE.SphereGeometry(radius * style.outerHaloScale, 22, 22),
       new THREE.MeshBasicMaterial({
         color: colors.glow,
-        transparent: true, opacity: 0.18,
-        blending: THREE.AdditiveBlending,
+        transparent: true, opacity: style.outerHaloOpacity,
+        blending: THREE.NormalBlending,
         depthTest: false, depthWrite: false,
         side: THREE.BackSide,
       })
     );
     outerHalo.renderOrder = 997;
-    outerHalo._pulse = true; outerHalo._ph = Math.PI; outerHalo._sp = 1.1; outerHalo._op = 0.18;
+    outerHalo._pulse = true;
+    outerHalo._ph = Math.PI;
+    outerHalo._sp = 0.85;
+    outerHalo._op = style.outerHaloOpacity;
+    outerHalo._pulseMin = style.pulseMin;
+    outerHalo._pulseAmp = style.pulseAmp * 0.8;
     g.add(outerHalo);
 
     // ─── 4. CORONA RINGS — xoay quanh tâm tumor, depthTest:false ────────────
     // 3 vòng ở các mặt phẳng khác nhau: XY, XZ, YZ
-    [
-      { rx: Math.PI / 2, ry: 0, sc: 2.2, tb: 0.042, op: 0.88, ph: 0.0, sp: 2.4 },
-      { rx: Math.PI / 6, ry: Math.PI / 4, sc: 3.0, tb: 0.028, op: 0.65, ph: 1.0, sp: 1.7 },
-      { rx: Math.PI / 3, ry: Math.PI / 2, sc: 3.9, tb: 0.016, op: 0.38, ph: 2.0, sp: 1.1 },
-    ].forEach((rd, i) => {
+    style.ringDefs.forEach((rd, i) => {
       const ring = new THREE.Mesh(
         new THREE.TorusGeometry(radius * rd.sc, radius * rd.tb, 12, 96),
         new THREE.MeshBasicMaterial({
           color: i === 0 ? colors.ring : colors.glow,
           transparent: true, opacity: rd.op,
-          blending: THREE.AdditiveBlending,
+          blending: THREE.NormalBlending,
           depthTest: false, depthWrite: false,
         })
       );
       ring.rotation.x = rd.rx;
       ring.rotation.y = rd.ry;
       ring.renderOrder = 990 - i;
-      ring._pulse = true; ring._ph = rd.ph; ring._sp = rd.sp; ring._op = rd.op;
+      ring._pulse = true;
+      ring._ph = rd.ph;
+      ring._sp = rd.sp;
+      ring._op = rd.op;
+      ring._pulseMin = style.pulseMin;
+      ring._pulseAmp = style.pulseAmp;
+      ring._ringScalePulse = style.ringScalePulse;
+      ring._ringSpinZ = style.ringSpinZ;
+      ring._ringSpinX = style.ringSpinX;
       ring._isRing = true;
       g.add(ring);
     });
@@ -4076,18 +5196,24 @@
     const reticle = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints(rPts),
       new THREE.LineBasicMaterial({
-        color: isPrimary ? 0x00ffee : 0xee88ff,
-        transparent: true, opacity: 0.92,
+        color: colors[style.reticleColorKey] || colors.ring,
+        transparent: true, opacity: style.reticleOpacity,
         depthTest: false,
       })
     );
     reticle.renderOrder = 995;
-    reticle._pulse = true; reticle._ph = 0.5; reticle._sp = 2.8; reticle._op = 0.92;
+    reticle._pulse = true;
+    reticle._ph = 0.5;
+    reticle._sp = 1.45;
+    reticle._op = style.reticleOpacity;
+    reticle._pulseMin = style.pulseMin;
+    reticle._pulseAmp = style.pulseAmp * 0.8;
+    reticle._reticleSpin = style.reticleSpin;
     reticle._isReticle = true;
     g.add(reticle);
 
     // ─── 6. CROSS HAIR — 2 đường thẳng qua tâm ──────────────────────────────
-    const crossLen = radius * 4.0;
+    const crossLen = radius * 3.15;
     [
       [new THREE.Vector3(-crossLen, 0, 0), new THREE.Vector3(crossLen, 0, 0)],
       [new THREE.Vector3(0, -crossLen, 0), new THREE.Vector3(0, crossLen, 0)],
@@ -4095,24 +5221,29 @@
       const cross = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(pts),
         new THREE.LineBasicMaterial({
-          color: isPrimary ? 0x00ffcc : 0xcc88ff,
-          transparent: true, opacity: 0.70,
+          color: colors[style.crossColorKey] || colors.core,
+          transparent: true, opacity: style.crossOpacity,
           depthTest: false,
-          blending: THREE.AdditiveBlending,
+          blending: THREE.NormalBlending,
         })
       );
       cross.renderOrder = 993;
-      cross._pulse = true; cross._ph = i * Math.PI / 2; cross._sp = 1.6; cross._op = 0.70;
+      cross._pulse = true;
+      cross._ph = i * Math.PI / 2;
+      cross._sp = 1.0;
+      cross._op = style.crossOpacity;
+      cross._pulseMin = style.pulseMin;
+      cross._pulseAmp = style.pulseAmp * 0.7;
       g.add(cross);
     });
 
     // ─── 7. SPARKLE PARTICLES — hạt sáng quanh tâm ───────────────────────────
-    const N = 40;
+    const N = style.sparkCount;
     const pos = new Float32Array(N * 3);
     for (let i = 0; i < N; i++) {
       const phi = Math.acos(2 * Math.random() - 1);
       const theta = Math.random() * Math.PI * 2;
-      const r = radius * (1.1 + Math.random() * 1.8);
+      const r = radius * (style.sparkRadiusMin + Math.random() * style.sparkRadiusSpan);
       pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
       pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
       pos[i * 3 + 2] = r * Math.cos(phi);
@@ -4122,26 +5253,35 @@
     const sparks = new THREE.Points(pGeo,
       new THREE.PointsMaterial({
         color: colors.glow,
-        size: radius * 0.45,
-        transparent: true, opacity: 0.82,
-        blending: THREE.AdditiveBlending,
+        size: radius * style.sparkSize,
+        transparent: true, opacity: style.sparkOpacity,
+        blending: THREE.NormalBlending,
         depthTest: false, depthWrite: false,
         sizeAttenuation: true,
       })
     );
     sparks.renderOrder = 992;
-    sparks._pulse = true; sparks._ph = 1.2; sparks._sp = 3.0; sparks._op = 0.82;
+    sparks._pulse = true;
+    sparks._ph = 1.2;
+    sparks._sp = 1.25;
+    sparks._op = style.sparkOpacity;
+    sparks._pulseMin = style.pulseMin;
+    sparks._pulseAmp = style.pulseAmp;
     g.add(sparks);
 
     // ─── 8. POINT LIGHTS — ánh sáng phát ra, chiếu sáng bề mặt não ──────────
     // Light 1: mạnh, gần — chiếu sáng vùng não quanh tumor
-    const light1 = new THREE.PointLight(colors.glow, isPrimary ? 5.0 : 4.0, radius * 20);
+    const light1 = new THREE.PointLight(colors.glow, style.light1Intensity, radius * 13);
     light1._isLight = true;
+    light1._lightPulseMin = style.lightPulseMin;
+    light1._lightPulseAmp = style.lightPulseAmp;
     g.add(light1);
 
     // Light 2: vừa, xa hơn — tạo vùng sáng rộng hơn trên bề mặt não
-    const light2 = new THREE.PointLight(colors.em, 2.5, radius * 35);
+    const light2 = new THREE.PointLight(colors.em, style.light2Intensity, radius * 20);
     light2._isLight = true;
+    light2._lightPulseMin = style.lightPulseMin;
+    light2._lightPulseAmp = style.lightPulseAmp;
     g.add(light2);
 
     return g;
@@ -4154,25 +5294,29 @@
     group.traverse(obj => {
       if (!obj._pulse) return;
       const ph = obj._ph || 0, sp = obj._sp || 1.5, op = obj._op || 0.5;
-      const b = 0.35 + 0.65 * Math.abs(Math.sin(t * sp + ph));
+      const pulseMin = obj._pulseMin ?? 0.80;
+      const pulseAmp = obj._pulseAmp ?? 0.20;
+      const b = pulseMin + pulseAmp * Math.abs(Math.sin(t * sp + ph));
       if (obj.material) {
         if (obj.type === 'Line' || obj.type === 'Points') obj.material.opacity = op * b;
         else if (obj.type === 'Mesh' && obj.material.transparent) obj.material.opacity = op * b;
       }
-      if (obj._isRing) obj.scale.setScalar(1.0 + 0.07 * Math.sin(t * sp * 1.3 + ph));
+      if (obj._isRing) obj.scale.setScalar(1.0 + (obj._ringScalePulse ?? 0.03) * Math.sin(t * sp * 1.3 + ph));
       if (obj._emissive && obj.material?.emissiveIntensity !== undefined) {
-        obj.material.emissiveIntensity = (obj._baseEmi || 4.0) + 1.5 * Math.abs(Math.sin(t * 2.5 + ph));
+        obj.material.emissiveIntensity = (obj._baseEmi || 1.0) + (obj._emissivePulseAmp ?? 0.18) * Math.abs(Math.sin(t * 2.1 + ph));
       }
       if (obj._isLight && obj.intensity !== undefined) {
         if (!obj._baseInt) obj._baseInt = obj.intensity;
-        obj.intensity = obj._baseInt * (0.55 + 0.45 * Math.abs(Math.sin(t * 1.9 + ph)));
+        const lightMin = obj._lightPulseMin ?? 0.90;
+        const lightAmp = obj._lightPulseAmp ?? 0.10;
+        obj.intensity = obj._baseInt * (lightMin + lightAmp * Math.abs(Math.sin(t * 1.6 + ph)));
       }
     });
     group.traverse(obj => {
-      if (obj._isReticle) obj.rotation.z += 0.009;
+      if (obj._isReticle) obj.rotation.z += obj._reticleSpin || 0.004;
       if (obj._isRing && obj.rotation) {
-        obj.rotation.z += 0.010;
-        obj.rotation.x += 0.003;
+        obj.rotation.z += obj._ringSpinZ || 0.004;
+        obj.rotation.x += obj._ringSpinX || 0.0015;
       }
     });
   }
@@ -4224,12 +5368,13 @@
     let ty = base.y + ((seed * 3) % 9 - 4) * 0.010;
     let tz = base.z + ((seed * 7) % 11 - 5) * 0.011;
 
+    //====================VỊ TRÍ==================== 
     const c = _clampInsideBrain(tx, ty, tz);
     tx = c.tx; ty = c.ty; tz = c.tz;
 
     const simFrac = Math.max(0.40, Math.min(1.0, similarity / 100));
     const tumorRadius = Math.max(0.045, Math.min(0.130, 0.065 + (1 - simFrac) * 0.035));
-    const colors = { core: 0xdd22ff, em: 0xbb00ee, glow: 0xee88ff, ring: 0xcc44ff };
+    const colors = { core: 0xa855f7, em: 0x7e22ce, glow: 0xe9d5ff, ring: 0xc084fc };
 
     const g = _buildTumorAtPosition(tx, ty, tz, tumorRadius, colors, false);
     brainGroup.add(g);

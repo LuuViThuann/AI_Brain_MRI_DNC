@@ -12,13 +12,13 @@
 (function () {
   "use strict";
 
-  const API_BASE = "";         
-  const PER_PAGE = 10;
+  const API_BASE = "";
+  const PER_PAGE = 8;
 
   // ── State ──────────────────────────────────────────────────────────────────
-  let currentPage  = 1;
-  let totalPages   = 1;
-  let cachedItems  = [];
+  let currentPage = 1;
+  let totalPages = 1;
+  let cachedItems = [];
   let activeDetail = null;      // currently open detail record
 
   // ── DOM refs (assigned after DOMContentLoaded) ────────────────────────────
@@ -35,7 +35,7 @@
       // Force reflow
       panel.offsetHeight;
       panel.classList.add("active");
-      
+
       // Load only if empty or explicitly needed
       if (cachedItems.length === 0) {
         loadPage(1);
@@ -93,89 +93,93 @@
     panel = document.getElementById("historyPanel");
     if (!panel) return;
 
-    panel.style.display   = "none";
+    panel.style.display = "none";
 
     panel.innerHTML = `
       <!-- Toolbar -->
       <div id="historyToolbar" style="
-        display:flex; align-items:center; justify-content:space-between;
-        padding:0 24px; height:52px;
-        background:var(--bg-panel); border-bottom:1px solid var(--border);
-        flex-shrink:0; gap:16px;">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <span style="font-size:18px;font-weight:800;color:var(--cyan);letter-spacing:-0.5px;">
-            <i class="fa-solid fa-clock-rotate-left" style="margin-right:8px;"></i> Lịch Sử Chẩn Đoán
-          </span>
-          <span id="historyCount" style="
-            font-size:11px;font-weight:700;
-            padding:3px 10px;border-radius:12px;
-            background:rgba(0,151,180,0.12);color:var(--cyan);
-            border:1px solid rgba(0,151,180,0.3);">
-            0 ca
-          </span>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <!-- Search -->
-          <div style="position:relative;">
-            <input id="historySearch" type="text" placeholder="Tìm kiếm..." style="
-              height:32px; padding:0 12px 0 32px; border-radius:8px;
-              border:1px solid var(--border); background:var(--bg-card);
-              color:var(--text-primary); font-size:12px; outline:none;
-              width:180px; transition:all 0.2s;">
-            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);
-              font-size:12px;color:var(--text-dim);"><i class="fa-solid fa-magnifying-glass"></i></span>
+        width: 100%; background: var(--bg-panel); border-bottom: 1px solid var(--border);
+        flex-shrink: 0;">
+        <div style="max-width: 1400px; margin: 0 auto; padding: 0 24px; height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 18px; font-weight: 600; color: var(--cyan); letter-spacing: -0.5px;">
+              <i class="fa-solid fa-clock-rotate-left" style="margin-right: 8px;"></i> Lịch Sử Chẩn Đoán
+            </span>
+            <span id="historyCount" style="
+              font-size: 11px; font-weight: 700;
+              padding: 3px 10px; border-radius: 12px;
+              background: rgba(0, 151, 180, 0.12); color: var(--cyan);
+              border: 1px solid rgba(0, 151, 180, 0.3);">
+              0 ca
+            </span>
           </div>
-          <!-- Clear all -->
-          <button id="btnClearHistory" style="
-            height:32px; padding:0 14px; border-radius:8px;
-            border:1px solid rgba(255,82,82,0.35); background:rgba(255,82,82,0.08);
-            color:#ff7070; font-size:12px; font-weight:600; cursor:pointer;
-            transition:all 0.2s;">
-            <i class="fa-solid fa-trash-can" style="margin-right:5px;"></i> Xóa Tất Cả
-          </button>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <div style="position: relative;">
+              <input id="historySearch" type="text" placeholder="Tìm kiếm..." style="
+                height: 32px; padding: 0 12px 0 32px; border-radius: 8px;
+                border: 1px solid var(--border); background: var(--bg-card);
+                color: var(--text-primary); font-size: 12px; outline: none;
+                width: 180px; transition: all 0.2s;">
+              <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+                font-size: 12px; color: var(--text-dim);"><i class="fa-solid fa-magnifying-glass"></i></span>
+            </div>
+            <button id="btnClearHistory" style="
+              height: 32px; padding: 0 14px; border-radius: 8px;
+              border: 1px solid rgba(255, 82, 82, 0.35); background: rgba(255, 82, 82, 0.08);
+              color: #ff7070; font-size: 12px; font-weight: 600; cursor: pointer;
+              transition: all 0.2s;">
+              <i class="fa-solid fa-trash-can" style="margin-right: 5px;"></i> Xóa Tất Cả
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- Empty state -->
-      <div id="historyEmpty" style="
-        display:none; flex:1; flex-direction:column;
-        align-items:center; justify-content:center; gap:16px;
-        color:var(--text-dim);">
-        <div style="font-size:60px;opacity:0.25;"><i class="fa-solid fa-microscope"></i></div>
-        <p style="font-size:15px;font-weight:600;">Chưa có lịch sử chẩn đoán</p>
-        <p style="font-size:12px;opacity:0.7;">Chạy chẩn đoán MRI để bắt đầu lưu lịch sử.</p>
-      </div>
+      <div style="flex: 1; overflow-y: auto; width: 100%;">
+        <div style="max-width: 1400px; margin: 0 auto; width: 100%; min-height: 100%; display: flex; flex-direction: column;">
+          
+          <!-- Empty state -->
+          <div id="historyEmpty" style="
+            display: none; flex: 1; flex-direction: column;
+            align-items: center; justify-content: center; gap: 16px;
+            color: var(--text-dim); padding: 60px 0;">
+            <div style="font-size: 60px; opacity: 0.25;"><i class="fa-solid fa-microscope"></i></div>
+            <p style="font-size: 15px; font-weight: 600;">Chưa có lịch sử chẩn đoán</p>
+            <p style="font-size: 12px; opacity: 0.7;">Chạy chẩn đoán MRI để bắt đầu lưu lịch sử.</p>
+          </div>
 
-      <!-- Loading -->
-      <div id="historyLoading" style="
-        display:none; flex:1; align-items:center; justify-content:center;
-        flex-direction:column; gap:14px; color:var(--text-dim);">
-        <div style="
-          width:36px;height:36px;border-radius:50%;
-          border:3px solid var(--border);border-top-color:var(--cyan);
-          animation:spin 0.8s linear infinite;"></div>
-        <span style="font-size:13px;">Đang tải lịch sử...</span>
-      </div>
+          <!-- Loading -->
+          <div id="historyLoading" style="
+            display: none; flex: 1; align-items: center; justify-content: center;
+            flex-direction: column; gap: 14px; color: var(--text-dim); padding: 60px 0;">
+            <div style="
+              width: 36px; height: 36px; border-radius: 50%;
+              border: 3px solid var(--border); border-top-color: var(--cyan);
+              animation: spin 0.8s linear infinite;"></div>
+            <span style="font-size: 13px;">Đang tải lịch sử...</span>
+          </div>
 
-      <div id="historyList" style="
-        flex:1; overflow-y:auto; padding:20px 24px 60px 24px;
-        display:grid;
-        grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
-        gap:16px; align-content:start;">
+          <div id="historyList" style="
+            padding: 20px 24px 60px 24px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px; align-content: start;">
+          </div>
+        </div>
       </div>
 
       <!-- Pagination -->
       <div id="historyPager" style="
-        display:none; flex-shrink:0;
-        padding:12px 24px; background:var(--bg-panel);
-        border-top:1px solid var(--border);
-        display:flex; align-items:center; justify-content:center; gap:8px;">
+        display: none; width: 100%; background: var(--bg-panel); border-top: 1px solid var(--border);
+        flex-shrink: 0;">
+        <div style="max-width: 1400px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <!-- Content will be injected -->
+        </div>
       </div>
     `;
 
-    listEl    = panel.querySelector("#historyList");
-    pagerEl   = panel.querySelector("#historyPager");
-    emptyEl   = panel.querySelector("#historyEmpty");
+    listEl = panel.querySelector("#historyList");
+    pagerEl = panel.querySelector("#historyPager");
+    emptyEl = panel.querySelector("#historyEmpty");
     loadingEl = panel.querySelector("#historyLoading");
 
     // Events
@@ -241,12 +245,12 @@
       const params = new URLSearchParams({ page, per_page: PER_PAGE });
       if (search) params.append("search", search);
 
-      const res  = await fetch(`${API_BASE}/api/history?${params}`);
+      const res = await fetch(`${API_BASE}/api/history?${params}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
-      cachedItems  = data.items || [];
-      totalPages   = data.pages || 1;
+      cachedItems = data.items || [];
+      totalPages = data.pages || 1;
 
       panel.querySelector("#historyCount").textContent = `${data.total} ca`;
       renderList(cachedItems);
@@ -268,13 +272,13 @@
 
     if (!items || items.length === 0) {
       emptyEl.style.display = "flex";
-      listEl.style.display  = "none";
+      listEl.style.display = "none";
       pagerEl.style.display = "none";
       return;
     }
 
     emptyEl.style.display = "none";
-    listEl.style.display  = "grid";
+    listEl.style.display = "grid";
     // Smoothly show items
     listEl.style.opacity = "0";
     listEl.offsetHeight; // force reflow
@@ -288,7 +292,7 @@
   }
 
   function buildCard(item, idx) {
-    const card = document.createElement("div"); 
+    const card = document.createElement("div");
     card.className = "history-card";
     card.style.cssText = `
       display:flex; flex-direction:column; min-height:380px;
@@ -298,19 +302,19 @@
       animation: historyCardIn 0.3s ease both;
       animation-delay: ${idx * 30}ms;`;
 
-    const detected  = item.tumor_detected;
-    const conf      = Math.round((item.confidence || 0) * 100);
-    const area      = (item.tumor_area_pct || 0).toFixed(2);
-    const severity  = item.severity || "—";
-    const ts        = item.timestamp ? new Date(item.timestamp).toLocaleString("vi-VN") : "—";
-    const fname     = item.image_filename || "unknown.png";
-    const patName   = item.patient_name || "";
-    const loc_vn    = translateLocation(item.location_hint || "—");
+    const detected = item.tumor_detected;
+    const conf = Math.round((item.confidence || 0) * 100);
+    const area = (item.tumor_area_pct || 0).toFixed(2);
+    const severity = item.severity || "—";
+    const ts = item.timestamp ? new Date(item.timestamp).toLocaleString("vi-VN") : "—";
+    const fname = item.image_filename || "unknown.png";
+    const patName = item.patient_name || "";
+    const loc_vn = translateLocation(item.location_hint || "—");
 
     const severityColor = {
-      high:   "#ff5252",
+      high: "#ff5252",
       medium: "#ff9800",
-      low:    "#00c853",
+      low: "#00c853",
     }[severity?.toLowerCase()] || "var(--text-dim)";
 
     const thumbHTML = item.image_base64
@@ -391,14 +395,14 @@
 
     // Hover effect
     card.addEventListener("mouseenter", () => {
-      card.style.borderColor   = "var(--cyan-dim)";
-      card.style.boxShadow     = "0 4px 20px rgba(0,151,180,0.15)";
-      card.style.transform     = "translateY(-2px)";
+      card.style.borderColor = "var(--cyan-dim)";
+      card.style.boxShadow = "0 4px 20px rgba(0,151,180,0.15)";
+      card.style.transform = "translateY(-2px)";
     });
     card.addEventListener("mouseleave", () => {
-      card.style.borderColor   = "var(--border)";
-      card.style.boxShadow     = "0 2px 8px rgba(0,0,0,0.07)";
-      card.style.transform     = "";
+      card.style.borderColor = "var(--border)";
+      card.style.boxShadow = "0 2px 8px rgba(0,0,0,0.07)";
+      card.style.transform = "";
     });
 
     card.querySelector(".card-btn-detail").addEventListener("click", (e) => {
@@ -414,69 +418,107 @@
     return card;
   }
 
-  function renderPager(total) {
+  function renderPager() {
     if (!pagerEl) return;
-    if (totalPages <= 1) { pagerEl.style.display = "none"; return; }
+    if (totalPages < 1) {
+      pagerEl.style.display = "none";
+      return;
+    }
 
-    pagerEl.style.display = "flex";
-    pagerEl.innerHTML = "";
+    pagerEl.style.display = "block";
+    // We target the inner container with max-width 1400px
+    const innerContainer = pagerEl.querySelector("div");
+    if (!innerContainer) return;
+    innerContainer.innerHTML = "";
 
     const makeBtn = (label, page, disabled = false, active = false) => {
+      const isNum = !isNaN(label);
       const btn = document.createElement("button");
       btn.innerHTML = label;
+      btn.disabled = disabled;
+      
       btn.style.cssText = `
-        height:36px;min-width:36px;padding:0 14px;border-radius:8px;
-        border:1px solid ${active ? "var(--cyan)" : "var(--border)"};
-        background:${active ? "var(--cyan)" : "var(--bg-card)"};
-        color:${active ? "#fff" : "var(--text-sec)"};
-        font-size:13px; font-weight: 700; cursor:${disabled ? "default" : "pointer"};
-        opacity:${disabled ? 0.4 : 1};transition:all 0.2s;
-        display:flex; align-items:center; justify-content:center; gap:6px;`;
-      
+        min-width: 36px; height: 36px; padding: ${isNum ? '0' : '0 12px'}; 
+        background: ${active ? 'var(--cyan)' : 'var(--bg-card)'}; 
+        border: 1px solid ${active ? 'var(--cyan)' : 'var(--border)'}; 
+        border-radius: 8px; cursor: ${disabled || active ? 'default' : 'pointer'};
+        color: ${active ? '#ffffff' : (disabled ? 'var(--text-dim)' : 'var(--text-sec)')}; 
+        font-weight: 700; font-size: 13px; transition: all 0.2s;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: ${active ? '0 4px 12px rgba(0, 151, 180, 0.2)' : 'none'};
+      `;
+
       if (!disabled && !active) {
-        btn.onmouseover = () => { btn.style.borderColor = "var(--cyan)"; btn.style.background = "var(--cyan-glow)"; };
-        btn.onmouseout  = () => { btn.style.borderColor = "var(--border)"; btn.style.background = "var(--bg-card)"; };
+        btn.onmouseover = () => { 
+          btn.style.borderColor = 'var(--cyan)'; 
+          btn.style.color = 'var(--cyan)'; 
+          btn.style.background = 'var(--cyan-glow)'; 
+        };
+        btn.onmouseout = () => { 
+          btn.style.borderColor = 'var(--border)'; 
+          btn.style.color = 'var(--text-sec)'; 
+          btn.style.background = 'var(--bg-card)'; 
+        };
+        btn.onclick = () => {
+          loadPage(page, searchTerm);
+          // Scroll list to top
+          const scrollContainer = panel.querySelector("div[style*='overflow-y: auto']");
+          if (scrollContainer) scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+        };
       }
-      
-      if (!disabled) btn.addEventListener("click", () => {
-        loadPage(page, searchTerm);
-        // Scroll to top of list
-        panel.querySelector("#historyList").scrollTo({ top: 0, behavior: 'smooth' });
-      });
       return btn;
     };
 
-    pagerEl.appendChild(makeBtn('<i class="fa-solid fa-chevron-left"></i> Trước', currentPage - 1, currentPage <= 1));
+    // Previous
+    innerContainer.appendChild(makeBtn('<i class="fa-solid fa-chevron-left"></i>', currentPage - 1, currentPage === 1));
 
-    const start = Math.max(1, currentPage - 2);
-    const end   = Math.min(totalPages, currentPage + 2);
-    
-    if (start > 1) {
-      pagerEl.appendChild(makeBtn("1", 1));
-      if (start > 2) {
+    // Page logic - Show all buttons if totalPages is small
+    if (totalPages <= 8) {
+      for (let i = 1; i <= totalPages; i++) {
+        innerContainer.appendChild(makeBtn(i.toString(), i, false, currentPage === i));
+      }
+    } else {
+      const delta = 2;
+      const range = [];
+      for (let i = Math.max(2, currentPage - delta); i <= Math.min(totalPages - 1, currentPage + delta); i++) {
+        range.push(i);
+      }
+
+      if (currentPage - delta > 2) {
+        innerContainer.appendChild(makeBtn('1', 1, false, currentPage === 1));
         const dots = document.createElement("span");
         dots.textContent = "...";
-        dots.style.color = "var(--text-dim)";
-        pagerEl.appendChild(dots);
+        dots.style.cssText = "color: var(--text-dim); padding: 0 4px; font-weight: 600;";
+        innerContainer.appendChild(dots);
+      } else {
+        const limit = range.length > 0 ? range[0] : totalPages + 1;
+        for (let i = 1; i < limit; i++) {
+          innerContainer.appendChild(makeBtn(i.toString(), i, false, currentPage === i));
+        }
+      }
+
+      range.forEach(i => {
+        innerContainer.appendChild(makeBtn(i.toString(), i, false, currentPage === i));
+      });
+
+      if (currentPage + delta < totalPages - 1) {
+        const dots = document.createElement("span");
+        dots.textContent = "...";
+        dots.style.cssText = "color: var(--text-dim); padding: 0 4px; font-weight: 600;";
+        innerContainer.appendChild(dots);
+        innerContainer.appendChild(makeBtn(totalPages.toString(), totalPages, false, currentPage === totalPages));
+      } else {
+        const start = range.length > 0 ? range[range.length - 1] + 1 : (currentPage > 1 ? currentPage + 1 : 2);
+        for (let i = start; i <= totalPages; i++) {
+          innerContainer.appendChild(makeBtn(i.toString(), i, false, currentPage === i));
+        }
       }
     }
 
-    for (let p = start; p <= end; p++) {
-      pagerEl.appendChild(makeBtn(p, p, false, p === currentPage));
-    }
-
-    if (end < totalPages) {
-      if (end < totalPages - 1) {
-        const dots = document.createElement("span");
-        dots.textContent = "...";
-        dots.style.color = "var(--text-dim)";
-        pagerEl.appendChild(dots);
-      }
-      pagerEl.appendChild(makeBtn(totalPages, totalPages));
-    }
-
-    pagerEl.appendChild(makeBtn('Sau <i class="fa-solid fa-chevron-right"></i>', currentPage + 1, currentPage >= totalPages));
+    // Next
+    innerContainer.appendChild(makeBtn('<i class="fa-solid fa-chevron-right"></i>', currentPage + 1, currentPage === totalPages));
   }
+
 
   // ══════════════════════════════════════════════════════════════════════════
   // DETAIL MODAL
@@ -493,7 +535,7 @@
       </div>`;
 
     try {
-      const res  = await fetch(`${API_BASE}/api/history/${id}`);
+      const res = await fetch(`${API_BASE}/api/history/${id}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       activeDetail = await res.json();
       renderDetailBody(activeDetail);
@@ -504,18 +546,18 @@
   }
 
   function renderDetailBody(rec) {
-    const modal   = detailModal;
-    const ts      = rec.timestamp ? new Date(rec.timestamp).toLocaleString("vi-VN") : "—";
-    const report  = rec.report_data || {};
-    const pred    = rec.prediction_data || {};
-    const xai     = rec.xai_data || {};
-    const rules   = xai.rule_based || {};
+    const modal = detailModal;
+    const ts = rec.timestamp ? new Date(rec.timestamp).toLocaleString("vi-VN") : "—";
+    const report = rec.report_data || {};
+    const pred = rec.prediction_data || {};
+    const xai = rec.xai_data || {};
+    const rules = xai.rule_based || {};
 
-    modal.querySelector("#modalTitle").textContent   = rec.image_filename || "Chi Tiết";
-    modal.querySelector("#modalSubtitle").textContent= `ID: ${rec.id} • ${ts}`;
+    modal.querySelector("#modalTitle").textContent = rec.image_filename || "Chi Tiết";
+    modal.querySelector("#modalSubtitle").textContent = `ID: ${rec.id} • ${ts}`;
 
     const findings = Array.isArray(report.findings) ? report.findings : [report.findings].filter(Boolean);
-    const recs     = Array.isArray(report.recommendations) ? report.recommendations : [];
+    const recs = Array.isArray(report.recommendations) ? report.recommendations : [];
 
     modal.querySelector("#modalBody").innerHTML = `
       <div style="display:grid;grid-template-columns:200px 1fr;gap:20px;">
@@ -525,8 +567,8 @@
           <div style="border-radius:10px;overflow:hidden;background:#000;
             border:1px solid var(--border);margin-bottom:12px;">
             ${rec.image_base64
-              ? `<img src="${rec.image_base64}" style="width:100%;display:block;" alt="MRI">`
-              : `<div style="height:160px;display:flex;align-items:center;justify-content:center;
+        ? `<img src="${rec.image_base64}" style="width:100%;display:block;" alt="MRI">`
+        : `<div style="height:160px;display:flex;align-items:center;justify-content:center;
                   font-size:40px;opacity:0.2;"><i class="fa-solid fa-brain"></i></div>`}
           </div>
 
@@ -536,23 +578,23 @@
             <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;
               letter-spacing:0.8px;margin-bottom:6px;">Độ Tin Cậy</div>
             <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
-              <div style="height:100%;width:${Math.round((rec.confidence||0)*100)}%;
+              <div style="height:100%;width:${Math.round((rec.confidence || 0) * 100)}%;
                 background:linear-gradient(90deg,var(--cyan),var(--green));
                 border-radius:3px;"></div>
             </div>
             <div style="text-align:right;font-size:14px;font-weight:800;color:var(--cyan);
               margin-top:4px;font-family:var(--font-mono);">
-              ${Math.round((rec.confidence||0)*100)}%
+              ${Math.round((rec.confidence || 0) * 100)}%
             </div>
           </div>
 
           <!-- Stats list -->
           ${statItem("Trạng Thái", rec.tumor_detected ? '<i class="fa-solid fa-circle-exclamation" style="margin-right:4px;color:#ff5252;"></i> Phát hiện u' : '<i class="fa-solid fa-circle-check" style="margin-right:4px;color:#00c853;"></i> Không có u',
-              rec.tumor_detected ? "#ff5252" : "#00c853")}
-          ${statItem("Diện Tích", `${(rec.tumor_area_pct||0).toFixed(2)}%`)}
+          rec.tumor_detected ? "#ff5252" : "#00c853")}
+          ${statItem("Diện Tích", `${(rec.tumor_area_pct || 0).toFixed(2)}%`)}
           ${statItem("Vị Trí", translateLocation(rec.location_hint || "—"))}
           ${statItem("Mức Độ", (rec.severity || "—").toUpperCase().replace("HIGH", "CAO").replace("MEDIUM", "TRUNG BÌNH").replace("LOW", "THẤP"))}
-          ${statItem("Xử Lý", `${(rec.processing_time||0).toFixed(2)}s`)}
+          ${statItem("Xử Lý", `${(rec.processing_time || 0).toFixed(2)}s`)}
           ${rules.risk_level ? statItem("Mức độ rủi ro", rules.risk_level.replace("High", "Cao").replace("Medium", "Trung bình").replace("Low", "Thấp"), rules.risk_level === "High" ? "#ff5252" : rules.risk_level === "Low" ? "#00c853" : "#ff9800") : ""}
 
           <!-- Notes editor -->
@@ -601,14 +643,14 @@
               padding-bottom:6px;border-bottom:1px solid var(--border);">Phát Hiện</div>
             <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px;">
               ${findings.map(f => {
-                const cleanF = f.replace(/^[•\-\*\d\.\s]+/, '').trim();
-                return `
+            const cleanF = f.replace(/^[•\-\*\d\.\s]+/, '').trim();
+            return `
                   <li style="padding:4px 0 4px 22px;position:relative;font-size:12.5px;
                     color:var(--text-sec);line-height:1.6;">
                     <span style="position:absolute;left:4px;top:6px;color:var(--cyan);font-weight:700;"><i class="fa-solid fa-chevron-right" style="font-size:10px;"></i></span>
                     ${cleanF}
                   </li>`;
-              }).join("")}
+          }).join("")}
             </ul>
           </div>` : ""}
 
@@ -621,14 +663,14 @@
               padding-bottom:6px;border-bottom:1px solid var(--border);">Khuyến Nghị</div>
             <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px;">
               ${recs.map(r => {
-                const cleanR = r.replace(/^[•\-\*\d\.\s\>→]+/, '').trim();
-                return `
+            const cleanR = r.replace(/^[•\-\*\d\.\s\>→]+/, '').trim();
+            return `
                   <li style="padding:4px 0 4px 22px;position:relative;font-size:12.5px;
                     color:var(--text-sec);line-height:1.6;">
                     <span style="position:absolute;left:4px;top:6px;color:var(--green);font-weight:700;"><i class="fa-solid fa-check"></i></span>
                     ${cleanR}
                   </li>`;
-              }).join("")}
+          }).join("")}
             </ul>
           </div>` : ""}
 
@@ -656,9 +698,9 @@
 
     // Events on modal body
     modal.querySelector("#btnSaveNotes").addEventListener("click", async (e) => {
-      const id    = e.target.dataset.id;
+      const id = e.target.dataset.id;
       const notes = modal.querySelector("#modalNotes").value;
-      const name  = modal.querySelector("#modalPatientName").value;
+      const name = modal.querySelector("#modalPatientName").value;
       await saveNotes(id, name, notes);
     });
 
@@ -690,7 +732,7 @@
    */
   function translateInsight(text) {
     if (!text) return "";
-    
+
     const mapping = {
       "Confidence: CNN shows high confidence in identified tumor region": "Độ tin cậy: CNN cho thấy độ tin cậy cao đối với vùng u được xác định",
       "Warning: CNN attention is diffuse - prediction may be uncertain": "Cảnh báo: Sự tập trung của CNN bị phân tán - dự đoán có thể không chắc chắn",
@@ -706,12 +748,12 @@
       "Risk: High risk classification:": "Rủi ro: Phân loại rủi ro CAO:",
       "tumor detected": "khối u được phát hiện",
       "Info: Low risk classification: Small tumor": "Thông tin: Phân loại rủi ro THẤP: Khối u nhỏ",
-      "⚠ Very large tumor detected": "⚠ Phát hiện khối u rất lớn",
-      "⚠ Extensive brain involvement": "⚠ Sự xâm lấn não diện rộng",
-      "⚠ Frontal lobe involvement": "⚠ Liên quan thùy trán",
-      "⚠ Temporal lobe involvement": "⚠ Liên quan thùy thái dương",
-      "⚠ Highly irregular shape detected": "⚠ Phát hiện hình dạng rất không đều",
-      "⚠ Irregular boundaries suggest infiltrative growth": "⚠ Ranh giới không đều gợi ý sự phát triển xâm lấn"
+      "Very large tumor detected": "<i class=\"fa-solid fa-triangle-exclamation\" style=\"color:#f59e0b; margin-right:4px;\"></i> Phát hiện khối u rất lớn",
+      "Extensive brain involvement": "<i class=\"fa-solid fa-triangle-exclamation\" style=\"color:#f59e0b; margin-right:4px;\"></i> Sự xâm lấn não diện rộng",
+      "Frontal lobe involvement": "<i class=\"fa-solid fa-triangle-exclamation\" style=\"color:#f59e0b; margin-right:4px;\"></i> Liên quan thùy trán",
+      "Temporal lobe involvement": "<i class=\"fa-solid fa-triangle-exclamation\" style=\"color:#f59e0b; margin-right:4px;\"></i> Liên quan thùy thái dương",
+      "Highly irregular shape detected": "<i class=\"fa-solid fa-triangle-exclamation\" style=\"color:#f59e0b; margin-right:4px;\"></i> Phát hiện hình dạng rất không đều",
+      "Irregular boundaries suggest infiltrative growth": "<i class=\"fa-solid fa-triangle-exclamation\" style=\"color:#f59e0b; margin-right:4px;\"></i> Ranh giới không đều gợi ý sự phát triển xâm lấn"
     };
 
     let translated = text;
@@ -720,19 +762,19 @@
         translated = translated.replace(en, vi);
       }
     }
-    
+
     // Cleanup if legacy "Feature:" prefix exists
     if (translated.startsWith("Feature: ")) {
-        translated = translated.replace("Feature: ", "Đặc trưng: ");
+      translated = translated.replace("Feature: ", "Đặc trưng: ");
     }
     if (translated.startsWith("Risk: ")) {
-        translated = translated.replace("Risk: ", "Rủi ro: ");
+      translated = translated.replace("Risk: ", "Rủi ro: ");
     }
     if (translated.startsWith("Info: ")) {
-        translated = translated.replace("Info: ", "Thông tin: ");
+      translated = translated.replace("Info: ", "Thông tin: ");
     }
     if (translated.startsWith("Location: ")) {
-        translated = translated.replace("Location: ", "Vị trí: ");
+      translated = translated.replace("Location: ", "Vị trí: ");
     }
 
     return translated;
@@ -743,7 +785,7 @@
    */
   function translateLocation(loc) {
     if (!loc || loc === "—" || loc === "unknown") return loc;
-    
+
     return loc.toLowerCase()
       .replace("middle", "giữa")
       .replace("left", "trái")
@@ -767,7 +809,7 @@
 
     const rec = activeDetail;
     console.log('[History] Restoring case:', rec.id);
-    
+
     // 1. Normalize data structure to match what app.js expects from /diagnose API
     const normalizedRec = {
       prediction: rec.prediction_data,
@@ -791,7 +833,7 @@
         window.lastXAIData = normalizedRec.xai;
       }
     }
-    
+
     // 3. Switch to brain3d tab
     document.querySelector('.pill[data-tab="brain3d"]')?.click();
     closeDetail();
@@ -804,7 +846,7 @@
         console.log('[History] Calling displayReport');
         window.App.displayReport(normalizedRec);
       }
-      
+
       if (window.App && window.App.update3DBrain) {
         console.log('[History] Calling update3DBrain');
         window.App.update3DBrain(normalizedRec);
@@ -826,12 +868,12 @@
             canvas.height = 256;
             ctx.clearRect(0, 0, 256, 256);
             ctx.drawImage(img, 0, 0, 256, 256);
-            
+
             // Show preview elements
             const previewWrap = document.getElementById('previewWrap');
             const reportPlaceholder = document.getElementById('reportPlaceholder');
             const reportContent = document.getElementById('reportContent');
-            
+
             if (previewWrap) previewWrap.style.display = 'block';
             if (reportPlaceholder) reportPlaceholder.style.display = 'none';
             if (reportContent) reportContent.style.display = 'block';
@@ -844,7 +886,7 @@
           img.src = rec.image_base64;
         }
       }
- 
+
       // 5. Force refresh other tab contents if they exist (Data already synced via globals)
       if (window.XAISimilarUI && window.XAISimilarUI.renderXAIDashboard && normalizedRec.xai) {
         console.log('[History] Pre-rendering XAI Dashboard in background');
@@ -870,7 +912,7 @@
           .then(blob => {
             const file = new File([blob], "restored_mri.png", { type: "image/png" });
             window._lastUploadedBlob = file; // Sync with app.js
-            
+
             // Re-fetch similar cases to populate the "Compare" button and badge
             if (window.XAISimilarUI && window.XAISimilarUI.fetchSimilarCases) {
               console.log('[History] Re-fetching similar cases for full synchronization...');
@@ -884,12 +926,12 @@
                   btnCompare.style.display = 'flex';
                   if (badge) {
                     badge.textContent = count;
-                    badge.style.display = 'block'; 
+                    badge.style.display = 'block';
                   }
                   // Sync global for 3D viewer
                   window._similarCasesData = similarData.similar_cases;
-                  
-                  // ✅ FIX: Hide the panel that was forced visible by fetchSimilarCases
+
+
                   const similarPanel = document.getElementById('similarPanel');
                   if (similarPanel) similarPanel.style.display = 'none';
                 }
@@ -913,16 +955,16 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       if (cardEl) {
-        cardEl.style.opacity   = "0";
+        cardEl.style.opacity = "0";
         cardEl.style.transform = "scale(0.9)";
-        cardEl.style.transition= "all 0.25s";
+        cardEl.style.transition = "all 0.25s";
         setTimeout(() => { cardEl.remove(); checkEmpty(); }, 260);
       } else {
         loadPage(currentPage);
       }
-      showToast("🗑 Đã xóa ca chẩn đoán.");
+      showToast("<i class=\"fa-solid fa-trash-can\"></i> Đã xóa ca chẩn đoán.");
     } catch (err) {
-      showToast("❌ Lỗi xóa: " + err.message, true);
+      showToast("<i class=\"fa-solid fa-circle-xmark\"></i> Lỗi xóa: " + err.message, true);
     }
   }
 
@@ -934,24 +976,24 @@
     try {
       const res = await fetch(`${API_BASE}/api/history`, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      showToast("🗑 Đã xóa tất cả lịch sử.");
+      showToast("<i class=\"fa-solid fa-trash-can\"></i> Đã xóa tất cả lịch sử.");
       loadPage(1);
     } catch (err) {
-      showToast("❌ Lỗi: " + err.message, true);
+      showToast("<i class=\"fa-solid fa-circle-xmark\"></i> Lỗi: " + err.message, true);
     }
   }
 
   async function saveNotes(id, patientName, notes) {
     try {
       const res = await fetch(`${API_BASE}/api/history/${id}`, {
-        method:  "PATCH",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ patient_name: patientName, notes }),
+        body: JSON.stringify({ patient_name: patientName, notes }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      showToast("💾 Đã lưu ghi chú.");
+      showToast("<i class=\"fa-solid fa-floppy-disk\"></i> Đã lưu ghi chú.");
     } catch (err) {
-      showToast("❌ Lỗi lưu: " + err.message, true);
+      showToast("<i class=\"fa-solid fa-circle-xmark\"></i> Lỗi lưu: " + err.message, true);
     }
   }
 
@@ -979,14 +1021,14 @@
   function checkEmpty() {
     if (listEl && listEl.children.length === 0) {
       emptyEl.style.display = "flex";
-      listEl.style.display  = "none";
+      listEl.style.display = "none";
     }
   }
 
   function showError(msg) {
     if (!listEl) return;
-    listEl.style.display  = "flex";
-    listEl.innerHTML      = `
+    listEl.style.display = "flex";
+    listEl.innerHTML = `
       <div style="grid-column:1/-1;text-align:center;padding:40px;color:#ff7070;font-size:13px;">
         ⚠ ${msg}
       </div>`;
@@ -1005,11 +1047,11 @@
         box-shadow:0 4px 16px rgba(0,0,0,0.3);`;
       document.body.appendChild(toast);
     }
-    toast.textContent      = msg;
+    toast.textContent = msg;
     toast.style.background = isError ? "rgba(255,82,82,0.92)" : "rgba(10,14,26,0.92)";
-    toast.style.color      = isError ? "#fff" : "var(--cyan)";
-    toast.style.border     = `1px solid ${isError ? "#ff5252" : "var(--cyan-dim)"}`;
-    toast.style.opacity    = "1";
+    toast.style.color = isError ? "#fff" : "var(--cyan)";
+    toast.style.border = `1px solid ${isError ? "#ff5252" : "var(--cyan-dim)"}`;
+    toast.style.opacity = "1";
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { toast.style.opacity = "0"; }, 2800);
   }

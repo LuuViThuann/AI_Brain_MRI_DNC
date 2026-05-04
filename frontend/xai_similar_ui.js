@@ -131,7 +131,6 @@
           window.lastXAIData = event.detail.xaiData;
 
           this.renderXAIDashboard(event.detail.xaiData);
-          this.showXAIPanel();
         }
 
         if (event.detail && event.detail.similarData) {
@@ -160,7 +159,6 @@
 
         if (diagnosisData.xai) {
           window.XAISimilarUI.renderXAIDashboard(diagnosisData.xai);
-          window.XAISimilarUI.showXAIPanel();
         }
 
         if (diagnosisData.similar_cases) {
@@ -169,7 +167,6 @@
             search_time_ms: diagnosisData.search_time_ms || 0,
             total_cases: diagnosisData.total_cases || 0
           });
-          window.XAISimilarUI.showSimilarPanel();
         }
       };
     },
@@ -225,6 +222,35 @@
       }
     },
 
+    // ===== ACCORDION HELPER =====
+    _wrapAccordion: function (id, title, icon, content, openByDefault) {
+      const bodyDisplay = openByDefault ? 'block' : 'none';
+      const chevronRotate = openByDefault ? 'rotate(180deg)' : 'rotate(0deg)';
+      const headerBg = openByDefault ? 'linear-gradient(90deg,#f0f9ff,#f8fafc)' : '#f8fafc';
+      const headerBorder = openByDefault ? '#e2e8f0' : 'transparent';
+      return `
+        <div class="xai-accordion-item ${openByDefault ? 'open' : ''}" id="acc-${id}">
+          <div class="xai-accordion-header"
+            onclick="window._xaiToggleAccordion('acc-${id}')"
+            style="
+              background: ${headerBg};
+              border-bottom: 1px solid ${headerBorder};
+            ">
+            <div class="xai-accordion-header-main">
+              <span class="xai-accordion-icon"><i class="fa-solid ${icon}"></i></span>
+              <span class="xai-accordion-title">${title}</span>
+            </div>
+            <span id="acc-chev-${id}" class="xai-accordion-chevron" style="transform: ${chevronRotate};"><i class="fa-solid fa-chevron-down"></i></span>
+          </div>
+          <div class="xai-accordion-body" id="acc-body-${id}" style="display: ${bodyDisplay}; overflow: hidden;">
+            <div style="padding: 0;">
+              ${content}
+            </div>
+          </div>
+        </div>
+      `;
+    },
+
     // ===== RENDER XAI DASHBOARD =====
     renderXAIDashboard: function (xaiData) {
       const panel = document.getElementById('xaiPanel');
@@ -234,10 +260,9 @@
         return;
       }
 
-      log('📊 Rendering XAI Dashboard', xaiData);
+      log('📊 Rendering XAI Dashboard (Accordion Mode)', xaiData);
 
       if (!xaiData) {
-        // If no data provided, try to load latest from history
         if (!this.state.historyItems || this.state.historyItems.length === 0) {
           this.loadHistoryAndRefresh();
           return;
@@ -265,47 +290,203 @@
         insights: hasInsights
       });
 
+      // --- Build accordion content for each section ---
+      const clinicalReportHTML = this.renderClinicalReportCard() || '';
+      const gradcamHTML = hasGradCAM ? this.renderGradCAMCard(xaiData.gradcam) : '';
+      const tumorGradingHTML = (window.lastDiagnosisData && typeof this.renderTumorGradingCard === 'function')
+        ? this.renderTumorGradingCard(window.lastDiagnosisData) : '';
+      const ruleBasedHTML = hasRuleBased ? this.renderRuleBasedCard(xaiData.rule_based) : '';
+      const shapHTML = hasSHAP ? this.renderSHAPCard(xaiData.shap) : '';
+      const integratedHTML = this.renderIntegratedReport(xaiData, window.lastDiagnosisData) || '';
+
+      // "Trực quan hóa" = chỉ GradCAM; Tumor Grading tách riêng
+      const visualContent = gradcamHTML;
+
+      const accordionSections = `
+        ${(clinicalReportHTML || ruleBasedHTML) ? this._wrapAccordion('ai-analysis', 'Phân Tích AI Có Giải Thích', 'fa-brain', clinicalReportHTML + ruleBasedHTML, true) : ''}
+        ${visualContent ? this._wrapAccordion('ai-visual', 'Trực Quan Hóa AI — Chi Tiết Chẩn Đoán', 'fa-images', visualContent, false) : ''}
+        ${tumorGradingHTML ? this._wrapAccordion('color-struct', 'Phân Lớp Màu Cấu Trúc', 'fa-palette', tumorGradingHTML, false) : ''}
+        ${shapHTML ? this._wrapAccordion('shap-contrib', 'Tỷ Trọng Đóng Góp Vào Chẩn Đoán', 'fa-chart-bar', shapHTML, false) : ''}
+        ${integratedHTML ? this._wrapAccordion('integrated-report', 'Báo Cáo Kết Luận Tổng Hợp', 'fa-file-waveform', integratedHTML, false) : ''}
+      `;
+
       const html = `
+        <style>
+          .xai-accordion-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+          }
+          .xai-accordion-item {
+            width: 100%;
+            margin: 0 !important;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #ffffff;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            box-sizing: border-box;
+            transition: box-shadow 0.25s ease;
+          }
+          .xai-accordion-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            min-height: 72px;
+            padding: 16px 20px;
+            cursor: pointer;
+            user-select: none;
+            box-sizing: border-box;
+            transition: background 0.2s ease, border-color 0.2s ease;
+          }
+          .xai-accordion-header-main {
+            min-width: 0;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+          }
+          .xai-accordion-icon {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            color: #3b82f6;
+            font-size: 14px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 10px;
+          }
+          .xai-accordion-title {
+            display: block;
+            color: #1e293b;
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.35;
+            letter-spacing: -0.2px;
+          }
+          .xai-accordion-chevron {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            font-size: 13px;
+            transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+          }
+          .xai-accordion-item:hover { box-shadow: 0 4px 16px rgba(0,151,180,0.1) !important; }
+          .xai-accordion-item.open { box-shadow: 0 4px 18px rgba(59,130,246,0.1) !important; }
+          @keyframes xaiSlideDown {
+            from { opacity: 0; transform: translateY(-6px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+          .xai-accordion-body.animating-in {
+            animation: xaiSlideDown 0.3s cubic-bezier(0.4,0,0.2,1) forwards;
+          }
+
+          /* ── Flatten inner cards inside accordion bodies ── */
+          .xai-accordion-body .xai-card {
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            margin-bottom: 0 !important;
+            padding: 20px 24px !important;
+          }
+          /* Separator between stacked inner cards */
+          .xai-accordion-body .xai-card + .xai-card {
+            border-top: 1px solid #f1f5f9 !important;
+          }
+          /* Inner sub-boxes keep their light background but no heavy shadow */
+          .xai-accordion-body .xai-card .xai-card {
+            border: 1px solid #e8ecf2 !important;
+            border-radius: 8px !important;
+            box-shadow: none !important;
+          }
+          /* GradCAM card: remove its own header padding clash */
+          .xai-accordion-body .gradcam-clinical-card {
+            padding: 0 !important;
+          }
+        </style>
+
         <div class="xai-container" style="${this.styles.container}">
-          
           <div class="xai-layout">
             ${this.renderXAISidebar(this.state.historyItems)}
-
             <div class="xai-content-main">
-              <!-- Header -->
               <div class="xai-header" style="${this.styles.header}">
-                <h2 style="${this.styles.title}">Phân Tích AI Có Giải Thích</h2>
-                <p style="${this.styles.subtitle}">Phân tích đa phương pháp để hiểu quyết định của AI</p>
+                <h2 style="${this.styles.title}">Giải Thích AI</h2>
+                <p style="${this.styles.subtitle}">Nhấn vào từng mục để xem chi tiết phân tích</p>
               </div>
-              
-              <!-- Clinical Diagnosis Report -->
-              ${this.renderClinicalReportCard()}
-
-              <!-- Cards Grid -->
-              <div class="xai-grid" style="${this.styles.grid}">
-            
-                ${hasGradCAM ? this.renderGradCAMCard(xaiData.gradcam) : ''}
-                  ${window.lastDiagnosisData ? this.renderTumorGradingCard(window.lastDiagnosisData) : ''}
-                ${hasRuleBased ? this.renderRuleBasedCard(xaiData.rule_based) : ''}
-                ${hasSHAP ? this.renderSHAPCard(xaiData.shap) : ''}
-              
-                <!-- Integrated Final Report (Inside Grid) -->
-                <div id="integratedReportArea" style="width: 100%; margin-top: 10px;">
-                  ${this.renderIntegratedReport(xaiData, window.lastDiagnosisData)}
-                </div>
+              <div class="xai-accordion-list">
+                ${accordionSections}
               </div>
-              
-             
-
             </div>
           </div>
         </div>
+
       `;
 
-      panel.innerHTML = html;
-      this.showXAIPanel();
+      // ===== DEFINE ACCORDION TOGGLE (must be in real JS, not innerHTML) =====
+      window._xaiToggleAccordion = function (accId) {
+        var item = document.getElementById(accId);
+        if (!item) return;
+        var suffix = accId.replace('acc-', '');
+        var body = document.getElementById('acc-body-' + suffix);
+        var chevron = document.getElementById('acc-chev-' + suffix);
+        var header = item.querySelector('.xai-accordion-header');
+        var isOpen = item.classList.contains('open');
 
-      log('✅ XAI dashboard rendered successfully');
+        if (isOpen) {
+          // ── COLLAPSE ──
+          body.style.maxHeight = body.scrollHeight + 'px';
+          body.style.overflow = 'hidden';
+          body.style.transition = 'max-height 0.32s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease';
+          body.offsetHeight; // force reflow
+          body.style.maxHeight = '0px';
+          body.style.opacity = '0';
+          setTimeout(function () {
+            body.style.display = 'none';
+            body.style.maxHeight = '';
+            body.style.opacity = '';
+            body.style.overflow = '';
+            body.style.transition = '';
+          }, 340);
+          item.classList.remove('open');
+          if (chevron) chevron.style.transform = 'rotate(0deg)';
+          if (header) {
+            header.style.background = '#f8fafc';
+            header.style.borderBottomColor = 'transparent';
+          }
+        } else {
+          // ── EXPAND ──
+          body.style.display = 'block';
+          body.style.overflow = 'hidden';
+          body.style.maxHeight = '0px';
+          body.style.opacity = '0';
+          body.style.transition = 'max-height 0.38s cubic-bezier(0.4,0,0.2,1), opacity 0.28s ease';
+          body.offsetHeight; // force reflow
+          body.style.maxHeight = body.scrollHeight + 'px';
+          body.style.opacity = '1';
+          setTimeout(function () {
+            body.style.maxHeight = 'none';
+            body.style.overflow = '';
+            body.style.opacity = '';
+            body.style.transition = '';
+          }, 420);
+          item.classList.add('open');
+          if (chevron) chevron.style.transform = 'rotate(180deg)';
+          if (header) {
+            header.style.background = 'linear-gradient(90deg,#f0f9ff,#f8fafc)';
+            header.style.borderBottomColor = '#e2e8f0';
+          }
+        }
+      };
+
+      panel.innerHTML = html;
+
+      log('✅ XAI dashboard rendered with accordion');
     },
 
     // ===== GRAD-CAM CARD — MINIMALIST CLINICAL v3 =====
@@ -315,7 +496,7 @@
       // Fix N/A issue: Get data from the actual diagnosis record
       const diag = window.lastDiagnosisData || {};
       const xai = diag.xai || {};
-      
+
       // ✅ FIX: Merge clinical meta from ALL possible sources including nested gradcam in xai_data
       let clinMeta = gradcam.clinical_meta
         || xai.gradcam?.clinical_meta
@@ -327,22 +508,22 @@
         log('🛠️ Re-computing clinical meta-analysis from prediction data');
         clinMeta = this.computeClinicalMeta(diag);
       }
-      
-      clinMeta = clinMeta || {};
-      
-      const attScore       = Math.round((gradcam.attention_score || 0) * 100);
-      const anatomy        = gradcam.anatomical_location || {};
-      const dims           = gradcam.lesion_dimensions_mm || {};
-      const area_cm2       = gradcam.lesion_area_cm2 || 0;
-      const uncertainty    = gradcam.uncertainty || {};
-      const classProbs     = gradcam.class_probabilities || {};
-      const aiDesc         = gradcam.ai_description || '';
 
-      const malignancy     = clinMeta.malignancy_risk || {};
-      const edema          = clinMeta.edema_assessment || {};
-      const massEffect     = clinMeta.mass_effect_signs || {};
-      const nextRecs       = clinMeta.next_recommendations || [];
-      const ruleBased      = xai.rule_based || gradcam.rule_based || {};
+      clinMeta = clinMeta || {};
+
+      const attScore = Math.round((gradcam.attention_score || 0) * 100);
+      const anatomy = gradcam.anatomical_location || {};
+      const dims = gradcam.lesion_dimensions_mm || {};
+      const area_cm2 = gradcam.lesion_area_cm2 || 0;
+      const uncertainty = gradcam.uncertainty || {};
+      const classProbs = gradcam.class_probabilities || {};
+      const aiDesc = gradcam.ai_description || '';
+
+      const malignancy = clinMeta.malignancy_risk || {};
+      const edema = clinMeta.edema_assessment || {};
+      const massEffect = clinMeta.mass_effect_signs || {};
+      const nextRecs = clinMeta.next_recommendations || [];
+      const ruleBased = xai.rule_based || gradcam.rule_based || {};
 
       const probsMap = {
         'U màng não': { key: 'meningioma', color: '#0ea5e9' },
@@ -360,10 +541,10 @@
       // ✅ FIX: Provide meaningful fallback labels
       const malLevel = malignancy.level || (Object.keys(malignancy).length === 0 ? 'Phân tích...' : 'N/A');
       const malColor = malignancy.color || '#64748b';
-      const edLevel  = edema.level  || (Object.keys(edema).length === 0 ? 'Phân tích...' : 'N/A');
-      const edColor  = edema.color  || '#64748b';
+      const edLevel = edema.level || (Object.keys(edema).length === 0 ? 'Phân tích...' : 'N/A');
+      const edColor = edema.color || '#64748b';
       const meSeverity = massEffect.severity || 'Bình thường';
-      const meColor    = massEffect.color    || '#64748b';
+      const meColor = massEffect.color || '#64748b';
 
       const img1 = gradcam.overlay_base64 || '';
       const img2 = gradcam.heatmap_base64 || '';
@@ -380,24 +561,7 @@
       return `
         <div class="xai-card xai-animate delay-2 gradcam-clinical-card" style="${this.styles.card}; padding: 0; overflow: hidden;">
 
-          <!-- ══ HEADER BANNER — CLEAN LIGHT ══ -->
-          <div style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 18px 24px; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap;">
-            <div>
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <span style="background: #eff6ff; color: #3b82f6; padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 600; letter-spacing: 0.4px; border: 1px solid #bfdbfe;">
-                  <i class="fa-solid fa-brain" style="margin-right: 5px;"></i>GRAD-CAM PHÂN TÍCH LÂM SÀNG
-                </span>
-              </div>
-              <h3 style="color: #1e293b; margin: 0 0 5px 0; font-size: 16px; font-weight: 500;">Trực Quan Hóa AI — Chi Tiết Chẩn Đoán</h3>
-              <p style="color: #64748b; margin: 0; font-size: 12px; line-height: 1.5;">${this.escapeHtml(aiDesc)}</p>
-            </div>
-            <!-- Malignancy badge — light card style -->
-            <div style="text-align: center; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 18px; min-width: 130px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-              <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 500;">NGUY CƠ ÁC TÍNH</div>
-              <div style="color: ${malColor}; font-size: 16px; font-weight: 500; margin-bottom: 3px;">${malLevel}</div>
-              <div style="font-size: 9px; color: #94a3b8; margin-top: 3px;">Điểm: ${malScoreDisplay}</div>
-            </div>
-          </div>
+         
 
           <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
 
@@ -413,7 +577,7 @@
               </div>
               <div style="text-align: right; font-size: 10px; color: #64748b;">
                 <div>Bán cầu: <strong style="color:#1e293b; font-weight: 500;">${anatomy.hemisphere || 'N/A'}</strong></div>
-                <div style="margin-top: 4px;">Tọa độ: <code style="background:#f1f5f9; padding:2px 5px; border-radius:3px; font-size:9px; color:#475569;">(${(anatomy.coordinates_norm || ['-','-']).map(v => typeof v === 'number' ? v.toFixed(2) : v).join(', ')})</code></div>
+                <div style="margin-top: 4px;">Tọa độ: <code style="background:#f1f5f9; padding:2px 5px; border-radius:3px; font-size:9px; color:#475569;">(${(anatomy.coordinates_norm || ['-', '-']).map(v => typeof v === 'number' ? v.toFixed(2) : v).join(', ')})</code></div>
               </div>
             </div>
 
@@ -427,7 +591,7 @@
                 ${this._metricBox('Dài × Rộng', (dims.length_mm && dims.width_mm) ? dims.length_mm + ' × ' + dims.width_mm + ' mm' : 'N/A', 'Mặt cắt ngang', '#8b5cf6')}
                 ${this._metricBox('Chiều dày lát cắt', dims.height_mm ? dims.height_mm + ' mm' : '5 mm', '(1 slice MRI)', '#06b6d4')}
                 ${this._metricBox('Diện tích lát cắt', area_cm2 ? area_cm2 + ' cm²' : 'N/A', 'Trên lát cắt hiện tại', '#10b981')}
-                ${this._metricBox('Thể tích ước tính', volCm3 ? volCm3 + ' cm³' : (ruleBased.tumor_volume_mm3 ? (ruleBased.tumor_volume_mm3/1000).toFixed(2)+' cm³' : 'N/A'), 'Tính theo 1 lát cắt', '#f59e0b')}
+                ${this._metricBox('Thể tích ước tính', volCm3 ? volCm3 + ' cm³' : (ruleBased.tumor_volume_mm3 ? (ruleBased.tumor_volume_mm3 / 1000).toFixed(2) + ' cm³' : 'N/A'), 'Tính theo 1 lát cắt', '#f59e0b')}
                 ${this._metricBox('Vùng não bị bao phủ', ruleBased.tumor_ratio ? ruleBased.tumor_ratio.toFixed(1) + ' %' : 'N/A', 'Diện tích lát cắt', '#ef4444')}
               </div>
             </div>
@@ -441,9 +605,9 @@
                   <i class="fa-solid fa-chart-bar" style="color: #64748b; margin-right: 6px;"></i>Xác Suất Loại U
                 </div>
                 ${Object.entries(probsMap).map(([label, cfg]) => {
-                  const pct = Math.round((classProbs[cfg.key] || 0) * 100);
-                  const isDom = classProbs.dominant_key === cfg.key;
-                  return `
+        const pct = Math.round((classProbs[cfg.key] || 0) * 100);
+        const isDom = classProbs.dominant_key === cfg.key;
+        return `
                     <div style="margin-bottom: 10px;">
                       <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
                         <span style="font-size: 12px; color: #334155; font-weight: ${isDom ? '500' : '400'};">${isDom ? '• ' : ''}${label}</span>
@@ -453,7 +617,7 @@
                         <div style="height: 100%; width: ${pct}%; background: ${cfg.color}; border-radius: 4px; transition: width 0.6s ease;"></div>
                       </div>
                     </div>`;
-                }).join('')}
+      }).join('')}
                 ${classProbs.note ? `<div style="font-size: 9px; color: #9ca3af; margin-top: 8px; font-style: italic;">${this.escapeHtml(classProbs.note)}</div>` : ''}
               </div>
 
@@ -464,7 +628,7 @@
                   <div style="font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
                     <i class="fa-solid fa-shield-halved" style="color: ${confColor}; margin-right: 5px;"></i>Độ Tin Cậy Chẩn Đoán
                   </div>
-                  <div style="font-size: 32px; font-weight: 500; color: ${confColor};">${confScore}%</div>
+                  <div style="font-size: 28px; font-weight: 500; color: ${confColor};">${confScore}%</div>
                   <div style="height: 6px; background: #f1f5f9; border-radius: 3px; margin: 8px 0; overflow: hidden;">
                     <div style="height: 100%; width: ${confScore}%; background: ${confColor}; border-radius: 3px;"></div>
                   </div>
@@ -479,7 +643,7 @@
                     <i class="fa-solid fa-wave-square" style="color: #94a3b8; margin-right: 5px;"></i>MỨC ĐỘ KHÔNG CHẮC CHẮN
                   </div>
                   <div style="font-size: 18px; font-weight: 500; color: #64748b;">${uncLevel}</div>
-                  <div style="font-size: 10px; color: #94a3b8; margin-top: 4px;">Chỉ số Entropy: ${uncertainty.score || 'N/A'}</div>
+                  <div style="font-size: 9px; color: #94a3b8; margin-top: 4px;">Chỉ số Entropy: ${uncertainty.score || 'N/A'}</div>
                   ${uncertainty.warning ? `
                     <div style="margin-top: 8px; padding: 6px 10px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 10px; color: #374151; font-weight: 500;">
                       ${this.escapeHtml(uncertainty.warning)}
@@ -490,7 +654,7 @@
 
             <!-- ══ PANEL D: 3 ảnh + opacity slider ══ -->
             <div>
-              <div style="font-size: 11px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
+              <div style="font-size: 16px; font-weight: 700; color: #374151; text-transform: uppercase; margin-bottom: 10px;">
                 <i class="fa-solid fa-images" style="color: #0097b4; margin-right: 6px;"></i>Bản Đồ Heatmap & Segmentation
               </div>
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 12px;">
@@ -515,17 +679,6 @@
                     <p style="color:#64748b;font-size:11px;margin:8px 0 0;">Hình ảnh Grad-CAM không có sẵn cho bản ghi lịch sử cũ.</p>
                   </div>` : ''}
               </div>
-              <!-- Opacity slider -->
-              ${img1 ? `
-              <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px;">
-                <i class="fa-solid fa-sliders" style="color:#0097b4;"></i>
-                <span style="font-size:11px;color:#6b7280;white-space:nowrap;">Độ trong suốt overlay:</span>
-                <input type="range" min="0" max="100" value="70" id="gcam-opacity-slider"
-                  style="flex:1;height:4px;accent-color:#0097b4;cursor:pointer;"
-                  oninput="(function(v){var img=document.getElementById('gcam-overlay-img');if(img)img.style.opacity=(v/100);})(this.value)">
-                <span id="gcam-opacity-val" style="font-size:11px;color:#0097b4;font-weight:700;min-width:30px;">70%</span>
-              </div>
-              <script>(function(){var sl=document.getElementById('gcam-opacity-slider');if(sl)sl.addEventListener('input',function(){var v=document.getElementById('gcam-opacity-val');if(v)v.textContent=this.value+'%';});}());<\/script>` : ''}
             </div>
 
             <!-- ══ PANEL E: Dấu hiệu lâm sàng (Phù não + Chèn ép) ══ -->
@@ -557,7 +710,7 @@
  
             <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                <div style="font-size: 12px; font-weight: 700; color: #1e293b; text-transform: uppercase; letter-spacing: 0.8px; display:flex; align-items:center; gap:8px;">
+                <div style="font-size: 16px; font-weight: 700; color: #1e293b; text-transform: uppercase; display:flex; align-items:center; gap:8px;">
                   <i class="fa-solid fa-chart-line" style="color: #0ea5e9;"></i>BIỂU ĐỒ TIẾN TRIỂN KHỐI U
                 </div>
                 <div style="font-size: 10px; color: #64748b; background: #f1f5f9; padding: 4px 10px; border-radius: 20px; border: 1px solid #e2e8f0;">
@@ -606,9 +759,9 @@
                   </div>
                 </div>
 
-                <div style="margin-top:15px; padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0; font-size:10px; color:#64748b; line-height:1.5;">
-                  <i class="fa-solid fa-circle-info" style="color:#0ea5e9; margin-right:6px;"></i>
-                  <strong>Ghi chú chẩn đoán:</strong> Biểu đồ hiển thị kích thước tương đối so với thang đo lâm sàng. Cần thêm các lần chụp trong tương lai để xác định tốc độ tăng trưởng (doubling time).
+                <div style="margin-top:15px; padding:12px; background: #f0f9ff; border-radius:10px; border: 1px solid #e0f2fe; font-size: 11px; color: #0c4a6e; line-height:1.6; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                  <i class="fa-solid fa-circle-info" style="color: #0ea5e9; margin-right:8px; font-size: 12px;"></i>
+                  <strong style="color: #0369a1;">Ghi chú chẩn đoán:</strong> Biểu đồ hiển thị kích thước tương đối so với thang đo lâm sàng. Cần thêm các lần chụp trong tương lai để xác định tốc độ tăng trưởng (doubling time).
                 </div>
               ` : `
                 <div style="text-align:center; padding:30px; color:#94a3b8; font-size:12px;">
@@ -618,33 +771,7 @@
               `}
             </div>
 
-            <!-- ══ PANEL G: Khuyến nghị tiếp theo ══ -->
-            ${nextRecs.length > 0 ? `
-            <div style="background: linear-gradient(135deg, #fff7ed, #fffbf5); border: 1px solid #fed7aa; border-radius: 10px; padding: 14px;">
-              <div style="font-size: 11px; font-weight: 700; color: #7c2d12; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">
-                <i class="fa-solid fa-list-check" style="color: #ea580c; margin-right: 6px;"></i>Khuyến Nghị Tiếp Theo
-              </div>
-              <div style="display: flex; flex-direction: column; gap: 8px;">
-                ${nextRecs.map(rec => {
-                  const isHigh = rec.priority === 'urgent' || rec.priority === 'high';
-                  const pBg = isHigh ? '#ef4444' : '#10b981';
-                  const pText = '#ffffff';
-                  const pLabel = rec.priority === 'urgent' ? 'KHẨN CẤP' : (rec.priority === 'high' ? 'QUAN TRỌNG' : 'THÔNG THƯỜNG');
-                  const pIconColor = isHigh ? '#ef4444' : '#10b981';
-                  
-                  return `
-                    <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#ffffff;border-radius:10px;border:1px solid ${isHigh ? '#fee2e2' : '#dcfce7'}; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
-                      <div style="width:32px; height:32px; border-radius:50%; background:${isHigh ? '#fef2f2' : '#f0fdf4'}; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                        <i class="fa-solid ${rec.icon}" style="color:${pIconColor}; font-size:14px;"></i>
-                      </div>
-                      <span style="font-size:13px; color:#1e293b; flex:1; font-weight:500;">${this.escapeHtml(rec.text)}</span>
-                      <span style="font-size:9px; font-weight:800; color:${pText}; background:${pBg}; padding:4px 8px; border-radius:6px; letter-spacing:0.5px; box-shadow: 0 2px 4px ${pBg}44;">
-                        ${pLabel}
-                      </span>
-                    </div>`;
-                }).join('')}
-              </div>
-            </div>` : ''}
+           
 
             <!-- ══ PANEL H: Colorbar legend ══ -->
             ${this.renderConfidenceColorbar()}
@@ -655,7 +782,7 @@
     },
 
     // Helper: small metric box
-    _metricBox: function(label, value, sub, color) {
+    _metricBox: function (label, value, sub, color) {
       return `
         <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;text-align:center;">
           <div style="font-size:9px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">${label}</div>
@@ -671,8 +798,8 @@
         <div style="margin: 16px 0; padding: 14px; background: rgba(0, 151, 180, 0.03); 
           border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);">
           
-          <div style="color: #475569; font-size: 11px; text-transform: uppercase; 
-            letter-spacing: 0.6px; margin-bottom: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+          <div style="color: #475569; font-size: 16px; text-transform: uppercase; 
+             margin-bottom: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
             <i class="fa-solid fa-palette" style="color: #0097b4;"></i> Thang Màu Confidence Chẩn Đoán
           </div>
           
@@ -724,7 +851,7 @@
 
       // --- Left column: risk + measurements ---
       const leftContent = `
-        <div style="padding: 12px; border: 1px solid #e2e8f0; background: #ffffff; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid ${riskColor.bg};">
+        <div style="padding: 12px; border: 1px solid #e2e8f0; background: #ffffff; border-radius: 8px; margin-bottom: 10px;">
           <div style="color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600;">Mức Độ Rủi Ro</div>
           <div style="color: ${riskColor.bg}; font-size: 26px; font-weight: 700;">${riskColor.vi}</div>
         </div>
@@ -841,25 +968,32 @@
 
       // --- Left column: explanation + legend ---
       const leftContent = `
-        <div style="background: #f8fafc; padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #e2e8f0;">
-          <div style="color: #64748b; font-size: 11px; line-height: 1.6;">
-            <i class="fa-solid fa-circle-info" style="color: #94a3b8; margin-right: 5px;"></i>
-            % đóng góp <strong>tương đối</strong> của mỗi tính năng vào dự đoán cuối cùng.
+        <div style="background: #f0f9ff; padding: 14px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #e0f2fe; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+          <div style="color: #0c4a6e; font-size: 11.5px; line-height: 1.6;">
+            <i class="fa-solid fa-circle-info" style="color: #0ea5e9; margin-right: 8px; font-size: 13px;"></i>
+            % đóng góp <strong style="color: #0369a1;">tương đối</strong> của mỗi tính năng vào dự đoán cuối cùng.
             Chỉ số cao hơn cho thấy tầm quan trọng lớn hơn đối với kết quả AI.
           </div>
         </div>
+        
         <div style="display: flex; flex-direction: column; gap: 8px;">
-          <div style="padding: 10px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
-            <span style="color: #334155; font-size: 10px; font-weight: 500;"><i class="fa-solid fa-circle" style="font-size: 8px; margin-right: 8px; color: #64748b;"></i> Yếu tố chính</span>
-            <span style="color: #94a3b8; font-size: 9px; margin-left: 8px;">&gt; 40%</span>
+          <div style="padding: 10px 14px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #334155; font-size: 11px; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-circle" style="font-size: 8px; color: #64748b;"></i> Yếu tố chính
+            </span>
+            <span style="color: #0369a1; font-size: 11px; font-weight: 600; background: #e0f2fe; padding: 2px 8px; border-radius: 12px;">&gt; 40%</span>
           </div>
-          <div style="padding: 10px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
-            <span style="color: #334155; font-size: 10px; font-weight: 500;"><i class="fa-solid fa-circle" style="font-size: 8px; margin-right: 8px; color: #94a3b8;"></i> Quan trọng</span>
-            <span style="color: #94a3b8; font-size: 9px; margin-left: 8px;">20–40%</span>
+          <div style="padding: 10px 14px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #334155; font-size: 11px; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-circle" style="font-size: 8px; color: #94a3b8;"></i> Quan trọng
+            </span>
+            <span style="color: #0369a1; font-size: 11px; font-weight: 600; background: #e0f2fe; padding: 2px 8px; border-radius: 12px;">20–40%</span>
           </div>
-          <div style="padding: 10px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
-            <span style="color: #334155; font-size: 10px; font-weight: 500;"><i class="fa-solid fa-circle" style="font-size: 8px; margin-right: 8px; color: #cbd5e1;"></i> Yếu tố phụ</span>
-            <span style="color: #94a3b8; font-size: 9px; margin-left: 8px;">&lt; 20%</span>
+          <div style="padding: 10px 14px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #334155; font-size: 11px; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-circle" style="font-size: 8px; color: #cbd5e1;"></i> Yếu tố phụ
+            </span>
+            <span style="color: #64748b; font-size: 11px; font-weight: 600; background: #f1f5f9; padding: 2px 8px; border-radius: 12px;">&lt; 20%</span>
           </div>
         </div>
       `;
@@ -887,7 +1021,7 @@
                       <div style="font-size: 9px; color: #94a3b8;">${this.escapeHtml(feature)}</div>
                     </div>
                     <div style="text-align: right; margin-left: 12px;">
-                      <div style="color: #475569; font-size: 18px; font-weight: 500;">${importancePercent}%</div>
+                      <div style="color: #475569; font-size: 16px; font-weight: 500;">${importancePercent}%</div>
                     </div>
                   </div>
                   <div style="${this.styles.progressBar}; margin-bottom: 8px;">
@@ -908,10 +1042,7 @@
 
       return `
         <div class="xai-card xai-animate delay-5" style="${this.styles.card}">
-          <div style="${this.styles.cardHeader}">
-            <h3 style="${this.styles.cardTitle}">Tỷ Trọng Đóng Góp Vào Chẩn Đoán</h3>
-          
-          </div>
+         
           <div style="display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;">
             <div style="flex: 0.8; min-width: 220px;">${leftContent}</div>
             <div style="flex: 1.2; min-width: 240px;">${rightContent}</div>
@@ -937,37 +1068,7 @@
 
       return `
         <div class="xai-card clinical-report-card xai-animate delay-1" style="${this.styles.card}; margin-bottom: 5px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-          <div style="${this.styles.cardHeader}; border-bottom: 1px solid #edf2f7; padding-bottom: 15px; margin-bottom: 20px; justify-content: space-between; align-items: center;">
-            <div style="display: flex; align-items: center; gap: 15px;">
-              <div style="width: 45px; height: 45px; background: #f1f5f9; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #475569; border: 1px solid #e2e8f0;">
-                <i class="fa-solid fa-file-medical"></i>
-              </div>
-              <div>
-                <h3 style="${this.styles.cardTitle}; font-size: 20px; color: #1a202c;">Báo Cáo Chẩn Đoán AI Tổng Hợp</h3>
-                <div style="display: flex; gap: 10px; margin-top: 4px;">
-                   <span style="font-size: 11px; color: #718096; text-transform: uppercase; font-weight: 600;">Hồ sơ: #MRI-${Math.floor(Math.random() * 900000 + 100000)}</span>
-                   <span style="font-size: 11px; color: #718096; font-weight: 600;">•</span>
-                   <span style="font-size: 11px; color: #718096; font-weight: 600;">${new Date().toLocaleDateString('vi-VN')}</span>
-                </div>
-              </div>
-            </div>
-            <div style="
-              background: #f1f5f9;
-              color: #475569;
-              padding: 6px 16px;
-              border-radius: 20px;
-              font-size: 12px;
-              font-weight: 500;
-              border: 1px solid #e2e8f0;
-              text-transform: uppercase;
-              display: flex;
-              align-items: center;
-              gap: 8px;
-            ">
-              <i class="fa-solid fa-triangle-exclamation"></i>
-              MỨC ĐỘ: ${report.severity || 'Trung Bình'}
-            </div>
-          </div>
+         
 
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px;">
             <!-- Column 1: AI Summary & Findings -->
@@ -1000,24 +1101,7 @@
               </div>
             </div>
 
-            <!-- Column 2: Recommendations -->
-            <div style="background: #fffaf0; padding: 18px; border-radius: 12px; border: 1px solid #feebc8;">
-              <h4 style="margin: 0 0 15px 0; font-size: 14px; color: #7b341e; display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-lightbulb" style="color: #f6ad55;"></i> Khuyến Nghị Xử Lý
-              </h4>
-              <ul class="d3-report-list" style="margin: 0; padding: 0; list-style: none;">
-                ${(report.recommendations || []).map(r => {
-        // Clean leading bullets/dashes/dots/arrows
-        const cleanR = r.replace(/^[•\-\*\d\.\s\>→]+/, '').trim();
-        return `
-                    <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 10px; line-height: 1.6; color: #7b341e; font-size: 13.5px;">
-                      <i class="fa-solid fa-arrow-right" style="color: #f6ad55; margin-top: 3px; font-size: 14px; flex-shrink: 0;"></i>
-                      <span>${cleanR}</span>
-                    </li>
-                  `;
-      }).join('')}
-              </ul>
-            </div>
+          
 
             <!-- Column 3: Vision Analysis -->
             <div style="background: #f8fafc; padding: 0; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; display: flex; flex-direction: column;">
@@ -1056,10 +1140,10 @@
       const stats = diagnosisData.multiclass_stats || {};
       const gradcam = xaiData.gradcam || {};
       const rules = xaiData.rule_based || {};
-      
+
       const ncrPct = stats.total_tumor_pixels > 0 ? (stats.ncr_count / stats.total_tumor_pixels * 100) : 0;
-      const etPct  = stats.total_tumor_pixels > 0 ? (stats.et_count  / stats.total_tumor_pixels * 100) : 0;
-      const edPct  = stats.total_tumor_pixels > 0 ? (stats.ed_count  / stats.total_tumor_pixels * 100) : 0;
+      const etPct = stats.total_tumor_pixels > 0 ? (stats.et_count / stats.total_tumor_pixels * 100) : 0;
+      const edPct = stats.total_tumor_pixels > 0 ? (stats.ed_count / stats.total_tumor_pixels * 100) : 0;
 
       // Integrated Conclusion Text Logic
       const generateContent = () => {
@@ -1068,20 +1152,20 @@
         const area = (rules.tumor_area_mm2 || 0).toFixed(1);
         const location = prediction.location_hint || 'Không rõ vị trí';
         const attention = gradcam.attention_score ? (gradcam.attention_score * 100).toFixed(1) : (stats.gradcam_attention ? (stats.gradcam_attention * 100).toFixed(1) : 'N/A');
-        
+
         content += `<p style="margin-bottom: 12px; font-weight: 400; color: #475569;">Dựa trên phân tích đa tầng từ mô hình <strong>CNN Deep Learning</strong> và hệ thống giải thích <strong>XAI</strong>, hệ thống ghi nhận các phát hiện chính sau:</p>`;
-        
+
         content += `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 5px;">`;
-        
+
         // Point 1: Detection & Confidence
         content += `
           <div style="background: #ffffff; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
             <div style="font-size: 11px; color: #94a3b8; font-weight: 500; text-transform: uppercase; margin-bottom: 6px;">Độ tin cậy chuẩn đoán</div>
-            <div style="font-size: 20px; font-weight: 500; color: #475569;">${confidence}%</div>
+            <div style="font-size: 18px; font-weight: 500; color: #475569;">${confidence}%</div>
             <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;"><i class="fa-solid fa-check-double" style="margin-right: 4px;"></i> Xác nhận sự diện diện khối u</div>
           </div>
         `;
-        
+
         // Point 2: Location
         content += `
           <div style="background: #ffffff; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
@@ -1119,7 +1203,7 @@
         let verdict = '';
         let verdictColor = '#0097b4';
         const risk = rules.risk_level || 'Trung bình';
-        
+
         if (risk.toLowerCase().includes('cao') || ncrPct > 25) {
           verdict = `<strong>Đánh giá rủi ro:</strong> Khối u có dấu hiệu ác tính cao (Grade IV) với tỷ lệ hoại tử ${ncrPct.toFixed(1)}%. Cần can thiệp phẫu thuật khẩn cấp và làm sinh thiết giải phẫu bệnh.`;
           verdictColor = '#ef4444';
@@ -1142,22 +1226,13 @@
       };
 
       return `
-        <div class="xai-card integrated-report-card xai-animate delay-6" style="width: 100%; background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.08); margin-bottom: 5px; position: relative; overflow: hidden; box-sizing: border-box;">
+        <div style="padding: 20px 24px; position: relative; overflow: hidden;">
           <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: rgba(0, 151, 180, 0.03); border-radius: 50%; z-index: 0;"></div>
-          
-          <!-- Header -->
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; position: relative; z-index: 1;">
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <div style="width: 50px; height: 50px; background: #f1f5f9; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 24px; border: 1px solid #e2e8f0;">
-                <i class="fa-solid fa-file-waveform"></i>
-              </div>
-              <div>
-                <h3 style="margin: 0; color: #334155; font-size: 20px; font-weight: 500; letter-spacing: -0.5px;">Báo Cáo Kết Luận Tổng Hợp</h3>
-                <p style="margin: 0; color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 500;">AI Clinical Assessment</p>
-              </div>
-            </div>
+
+          <!-- ID CHẨN ĐOÁN row -->
+          <div style="display: flex; justify-content: flex-end; margin-bottom: 16px; position: relative; z-index: 1;">
             <div style="text-align: right;">
-              <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">ID CHẨN ĐOÁN</div>
+              <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">ID CHẨN ĐOÁN</div>
               <div style="font-family: 'Consolas', monospace; font-size: 13px; font-weight: 700; color: #475569;">#${diagnosisData.history_id?.substring(0, 8) || 'LIVE-XAI'}</div>
             </div>
           </div>
@@ -1167,28 +1242,18 @@
             ${generateContent()}
           </div>
 
-          <!-- Footer -->
-          <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 1;">
-            <div style="display: flex; gap: 10px;">
-               <span style="font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 6px;">
-                Hệ thống chẩn đoán NeuroScanAI v2.0
-               </span>
-               <span style="font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 6px;">
-                  <i class="fa-solid fa-fingerprint"></i> Xác thực số: AI-${Math.floor(Math.random()*1000)}
-               </span>
-            </div>
-           
-          </div>
+        
+          
         </div>
       `;
     },
-    
+
     // Helper to translate location hints to medical Vietnamese
-    translateMedicalLocation: function(location) {
+    translateMedicalLocation: function (location) {
       if (!location) return 'Không rõ vị trí';
-      
+
       const loc = location.toLowerCase();
-      
+
       const map = {
         'inferior': 'Cực dưới',
         'superior': 'Cực trên',
@@ -1204,25 +1269,25 @@
         'temporal': 'Thùy thái dương',
         'frontal': 'Thùy trán'
       };
-      
+
       // Order of processing: directional then anatomical
       let translated = location;
-      
+
       if (loc.includes('inferior left')) translated = 'Cực dưới thùy ' + (loc.includes('occipital') ? 'chẩm' : loc.includes('parietal') ? 'đỉnh' : loc.includes('temporal') ? 'thái dương' : 'trán') + ' trái';
       else if (loc.includes('inferior right')) translated = 'Cực dưới thùy ' + (loc.includes('occipital') ? 'chẩm' : loc.includes('parietal') ? 'đỉnh' : loc.includes('temporal') ? 'thái dương' : 'trán') + ' phải';
       else if (loc.includes('superior left')) translated = 'Cực trên thùy ' + (loc.includes('occipital') ? 'chẩm' : loc.includes('parietal') ? 'đỉnh' : loc.includes('temporal') ? 'thái dương' : 'trán') + ' trái';
       else if (loc.includes('superior right')) translated = 'Cực trên thùy ' + (loc.includes('occipital') ? 'chẩm' : loc.includes('parietal') ? 'đỉnh' : loc.includes('temporal') ? 'thái dương' : 'trán') + ' phải';
       else if (loc.includes('middle left')) translated = 'Vùng giữa thùy ' + (loc.includes('occipital') ? 'chẩm' : loc.includes('parietal') ? 'đỉnh' : loc.includes('temporal') ? 'thái dương' : 'trán') + ' trái';
       else if (loc.includes('middle right')) translated = 'Vùng giữa thùy ' + (loc.includes('occipital') ? 'chẩm' : loc.includes('parietal') ? 'đỉnh' : loc.includes('temporal') ? 'thái dương' : 'trán') + ' phải';
-      
+
       // Fallback for simple matches
       if (translated === location) {
-         Object.entries(map).forEach(([eng, vi]) => {
-           const reg = new RegExp(eng, 'gi');
-           translated = translated.replace(reg, vi);
-         });
+        Object.entries(map).forEach(([eng, vi]) => {
+          const reg = new RegExp(eng, 'gi');
+          translated = translated.replace(reg, vi);
+        });
       }
-      
+
       return translated;
     },
 
@@ -1269,7 +1334,7 @@
       log(`Pagination: Page ${currentPage}/${totalPages}, items ${startIndex}-${endIndex}`);
 
       const html = `
-        <div class="xai-animate" style="padding: 20px 30px; background: transparent; border-radius: 12px; max-width: 1400px; margin: 0 auto;">
+        <div class="xai-animate" style="padding: 20px 24px; background: transparent; border-radius: 12px; max-width: 1400px; margin: 0 auto;">
           
           <!-- Header -->
           <div style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end;">
@@ -1294,7 +1359,7 @@
         const originalIdx = similarData.similar_cases.findIndex(c => c.case_id === caseItem.case_id);
         // Use mod 8 for delay cycles (since itemsPerPage is 8)
         const delayIdx = (idx % 8) + 1;
-        return this.renderCaseCard(caseItem, originalIdx, delayIdx);
+        return this.renderCaseCard(caseItem, originalIdx, delayIdx, startIndex + idx);
       }).join('')}
           </div>
 
@@ -1303,11 +1368,7 @@
             ${this.renderPaginationUI(currentPage, totalPages)}
           </div>
           
-          <!-- Footer Info -->
-          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #d1dde8; 
-            text-align: center; color: #4a5568; font-size: 11px;">
-            <i class="fa-solid fa-circle-check" style="color: #00c853; margin-right: 5px;"></i> Hiển thị ${startIndex + 1}-${endIndex} / ${totalItems} ca bệnh | ${new Date().toLocaleTimeString('vi-VN')}
-          </div>
+         
         </div>
       `;
 
@@ -1315,40 +1376,83 @@
       window._similarCasesData = similarData.similar_cases;
 
       panel.innerHTML = html;
-      this.showSimilarPanel();
 
       log('✅ Similar cases rendered successfully');
     },
 
     // ===== RENDER PAGINATION UI =====
     renderPaginationUI: function (currentPage, totalPages) {
-      if (totalPages <= 1) return '';
+      if (totalPages < 1) return '';
 
-      return `
-        <div style="display: flex; align-items: center; gap: 12px; font-family: Segoe UI, sans-serif;">
-          <button onclick="window.XAISimilarUI.goToPage(${currentPage - 1})" 
-            ${currentPage === 1 ? 'disabled' : ''}
-            style="padding: 6px 12px; background: ${currentPage === 1 ? '#e2e8f0' : '#ffffff'}; 
-            border: 1px solid #d1dde8; border-radius: 6px; cursor: ${currentPage === 1 ? 'default' : 'pointer'};
-            color: ${currentPage === 1 ? '#a0aec0' : '#0097b4'}; font-weight: bold; font-size: 12px; transition: all 0.2s;">
-            ← Trước
+      const makeBtn = (label, page, disabled = false, active = false) => {
+        const isNum = !isNaN(label);
+        return `
+          <button onclick="window.XAISimilarUI.goToPage(${page})" 
+            ${disabled ? 'disabled' : ''}
+            style="min-width: 36px; height: 36px; padding: ${isNum ? '0' : '0 12px'}; 
+            background: ${active ? '#0097b4' : '#ffffff'}; 
+            border: 1px solid ${active ? '#0097b4' : '#d1dde8'}; 
+            border-radius: 8px; cursor: ${disabled || active ? 'default' : 'pointer'};
+            color: ${active ? '#ffffff' : (disabled ? '#cbd5e1' : '#475569')}; 
+            font-weight: 600; font-size: 12px; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: ${active ? '0 4px 12px rgba(0, 151, 180, 0.2)' : 'none'};"
+            onmouseover="if(!${disabled || active}) { this.style.borderColor='#0097b4'; this.style.color='#0097b4'; this.style.background='#f0f9ff'; }"
+            onmouseout="if(!${disabled || active}) { this.style.borderColor='#d1dde8'; this.style.color='#475569'; this.style.background='#ffffff'; }">
+            ${label}
           </button>
-          
-          <span style="color: #4a5568; font-size: 13px; font-weight: 500;">
-            Trang <strong style="color: #0097b4;">${currentPage}</strong> / ${totalPages}
-          </span>
-          
-          <button onclick="window.XAISimilarUI.goToPage(${currentPage + 1})" 
-            ${currentPage === totalPages ? 'disabled' : ''}
-            style="padding: 6px 12px; background: ${currentPage === totalPages ? '#e2e8f0' : '#ffffff'}; 
-            border: 1px solid #d1dde8; border-radius: 6px; cursor: ${currentPage === totalPages ? 'default' : 'pointer'};
-            color: ${currentPage === totalPages ? '#a0aec0' : '#0097b4'}; font-weight: bold; font-size: 12px; transition: all 0.2s;">
-            Sau →
-          </button>
-        </div>
-      `;
+        `;
+      };
+
+      let html = `<div style="display: flex; align-items: center; gap: 8px; font-family: 'Inter', sans-serif;">`;
+
+      // Previous button
+      html += makeBtn('<i class="fa-solid fa-chevron-left"></i>', currentPage - 1, currentPage === 1);
+
+      // Page numbers logic - Show all buttons if totalPages is small
+      if (totalPages <= 8) {
+        for (let i = 1; i <= totalPages; i++) {
+          html += makeBtn(i.toString(), i, false, currentPage === i);
+        }
+      } else {
+        const delta = 2;
+        const range = [];
+        for (let i = Math.max(2, currentPage - delta); i <= Math.min(totalPages - 1, currentPage + delta); i++) {
+          range.push(i);
+        }
+
+        if (currentPage - delta > 2) {
+          html += makeBtn('1', 1, false, currentPage === 1);
+          html += `<span style="color: #94a3b8; padding: 0 4px;">...</span>`;
+        } else {
+          for (let i = 1; i < (range.length > 0 ? range[0] : totalPages + 1); i++) {
+            html += makeBtn(i.toString(), i, false, currentPage === i);
+          }
+        }
+
+        range.forEach(i => {
+          html += makeBtn(i.toString(), i, false, currentPage === i);
+        });
+
+        if (currentPage + delta < totalPages - 1) {
+          html += `<span style="color: #94a3b8; padding: 0 4px;">...</span>`;
+          html += makeBtn(totalPages.toString(), totalPages, false, currentPage === totalPages);
+        } else {
+          const start = range.length > 0 ? range[range.length - 1] + 1 : (currentPage > 1 ? currentPage + 1 : 2);
+          for (let i = start; i <= totalPages; i++) {
+            html += makeBtn(i.toString(), i, false, currentPage === i);
+          }
+        }
+      }
+
+      // Next button
+      html += makeBtn('<i class="fa-solid fa-chevron-right"></i>', currentPage + 1, currentPage === totalPages);
+
+      html += `</div>`;
+      return html;
     },
 
+    // -------------------------------------------------------------------------------
     // ===== GO TO PAGE =====
     goToPage: function (page) {
       if (!this.state.currentSimilarData) return;
@@ -1362,18 +1466,47 @@
       this.state.currentPage = page;
       this.renderSimilarCases(this.state.currentSimilarData);
 
-      // ✅ Scroll ONLY the panel content, NOT the whole window
+      // Scroll ONLY the panel content, NOT the whole window
       const panel = document.getElementById('similarPanel');
       if (panel) panel.scrollTo({ top: 0, behavior: 'smooth' });
     },
 
     // ===== RENDER CASE CARD =====
-    renderCaseCard: function (caseItem, caseIndex, delayIdx = 1) {
+    renderCaseCard: function (caseItem, caseIndex, delayIdx = 1, globalIdx = 0) {
       const similarity = Math.round((caseItem.similarity_score || 0) * 100);
       const simColor = similarity >= 80 ? '#10b981' : similarity >= 55 ? '#f59e0b' : '#ef4444';
       const statusColor = caseItem.has_tumor ? '#ef4444' : '#10b981';
       const statusIcon = caseItem.has_tumor ? '<i class="fa-solid fa-circle" style="font-size: 10px; margin-right: 8px;"></i>' : '<i class="fa-solid fa-circle" style="font-size: 10px; margin-right: 8px;"></i>';
       const statusText = caseItem.has_tumor ? `${statusIcon} Phát hiện khối u` : `${statusIcon} Không có khối u`;
+
+      // Badge Logic: Top 3 show rank, others show "Xem thêm"
+      let rankBadgeHtml = '';
+      let badgeStyle = '';
+      let badgeText = '';
+
+      if (globalIdx === 0) {
+
+        badgeStyle = 'background: #f4be0bff; color: #ffffff; box-shadow: 0 4px 12px rgba(0, 151, 180, 0.25); border: none;';
+        badgeText = `MẪU CA 1`;
+      } else if (globalIdx === 1) {
+
+        badgeStyle = 'background: #00a846; color: #ffffff; box-shadow: 0 4px 12px rgba(0, 168, 70, 0.2); border: none;';
+        badgeText = `MẪU CA 2`;
+      } else if (globalIdx === 2) {
+
+        badgeStyle = 'background: #7cc89cff; color: #ffffff; box-shadow: 0 4px 12px rgba(100, 116, 139, 0.2); border: none;';
+        badgeText = `MẪU CA 3`;
+      } else {
+
+        badgeStyle = 'background: #94a3b8; color: #ffffff; box-shadow: 0 2px 8px rgba(148, 163, 184, 0.15); border: none;';
+        badgeText = 'Tương tự';
+      }
+
+      rankBadgeHtml = `
+        <div style="position: absolute; top: 16px; right: 16px; ${badgeStyle} padding: 6px 14px; border-radius: 8px; font-size: 11px; font-weight: 800; z-index: 10; display: flex; align-items: center; letter-spacing: 0.5px; text-transform: uppercase;">
+          ${badgeText}
+        </div>
+      `;
 
       return `
         <div class="similar-case-card similar-animate delay-${delayIdx}" style="padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; 
@@ -1384,11 +1517,7 @@
           </style>
           
           <!-- Rank Badge -->
-          <div style="position: absolute; top: 16px; right: 16px; background: #f1f5f9; 
-            color: #475569; padding: 4px 10px; border-radius: 6px; font-size: 11px; 
-            font-weight: 500; border: 1px solid #e2e8f0;">
-            HẠNG #${caseItem.rank || '?'}
-          </div>
+          ${rankBadgeHtml}
            
           <!-- Thumbnail -->
           <div class="case-image-container" style="width: 100%; height: 200px; background: #050c1a; border-radius: 6px; 
@@ -1476,10 +1605,10 @@
               onclick="window.XAISimilarUI.open3DCompare(${caseIndex})"
               style="flex:1;padding:9px;
               background:#ffffff;
-              border:1px solid #7e57c2;border-radius:6px;color:#7e57c2;
-              font-size:11px;font-weight:bold;cursor:pointer;transition:all 0.2s;box-shadow:0 2px 4px rgba(126,87,194,0.1);"
-              onmouseover="this.style.background='#7e57c2'; this.style.color='#ffffff';"
-              onmouseout="this.style.background='#ffffff'; this.style.color='#7e57c2';">
+              border:1px solid #0097b4;border-radius:6px;color:#0097b4;
+              font-size:11px;font-weight:bold;cursor:pointer;transition:all 0.2s;box-shadow:0 2px 4px rgba(0, 151, 180, 0.1);"
+              onmouseover="this.style.background='#0097b4'; this.style.color='#ffffff';"
+              onmouseout="this.style.background='#ffffff'; this.style.color='#0097b4';">
               So Sánh 3D
             </button>
           </div>
@@ -1800,7 +1929,7 @@
       const slices = diagnosisData.slices;
 
       let segmentationImg = slices?.axial?.segmentation_b64;
-      
+
       // Fallback: If no slice image, generate from mask array
       if (!segmentationImg) {
         log('Generating fallback segmentation image from mask data');
@@ -1809,7 +1938,7 @@
 
       if (!segmentationImg && !mask) return '';
 
-      // ✅ Chỉ dùng dữ liệu thực từ AI — KHÔNG có giá trị cố định
+      // Chỉ dùng dữ liệu thực từ AI — KHÔNG có giá trị cố định
       let ncrPct = 0, edPct = 0, etPct = 0;
       let ncrPixels = 0, edPixels = 0, etPixels = 0, totalPixels = 0;
       let hasRealStats = false;
@@ -1817,56 +1946,56 @@
       if (stats && stats.total_tumor_pixels > 0) {
         totalPixels = stats.total_tumor_pixels;
         ncrPixels = stats.ncr_count || 0;
-        edPixels  = stats.ed_count  || 0;
-        etPixels  = stats.et_count  || 0;
+        edPixels = stats.ed_count || 0;
+        etPixels = stats.et_count || 0;
         ncrPct = ncrPixels / totalPixels * 100;
-        edPct  = edPixels  / totalPixels * 100;
-        etPct  = etPixels  / totalPixels * 100;
+        edPct = edPixels / totalPixels * 100;
+        etPct = etPixels / totalPixels * 100;
         hasRealStats = true;
       }
 
       const PX2 = 0.884;
-      const ncrMm2  = (ncrPixels * PX2).toFixed(1);
-      const etMm2   = (etPixels  * PX2).toFixed(1);
-      const edMm2   = (edPixels  * PX2).toFixed(1);
-      const totMm2  = (totalPixels * PX2).toFixed(1);
+      const ncrMm2 = (ncrPixels * PX2).toFixed(1);
+      const etMm2 = (etPixels * PX2).toFixed(1);
+      const edMm2 = (edPixels * PX2).toFixed(1);
+      const totMm2 = (totalPixels * PX2).toFixed(1);
 
       const getStatusBadge = (pct, type) => {
-        if (pct === 0) return {l:'Không phát hiện', c:'#64748b', b:'#f1f5f9'};
+        if (pct === 0) return { l: 'Không phát hiện', c: '#64748b', b: '#f1f5f9' };
         if (type === 'NCR') {
-          if (pct < 10) return {l:'Nhẹ', c:'#22c55e', b:'#f0fdf4'};
-          if (pct < 25) return {l:'Trung bình', c:'#f59e0b', b:'#fffbeb'};
-          return {l:'Cao (Nguy cơ u ác)', c:'#ef4444', b:'#fef2f2'};
+          if (pct < 10) return { l: 'Nhẹ', c: '#22c55e', b: '#f0fdf4' };
+          if (pct < 25) return { l: 'Trung bình', c: '#f59e0b', b: '#fffbeb' };
+          return { l: 'Cao (Nguy cơ u ác)', c: '#ef4444', b: '#fef2f2' };
         }
         if (type === 'ET') {
-          if (pct < 20) return {l:'Thấp', c:'#22c55e', b:'#f0fdf4'};
-          if (pct < 45) return {l:'Trung bình', c:'#f59e0b', b:'#fffbeb'};
-          return {l:'Cao (U tiến triển)', c:'#ef4444', b:'#fef2f2'};
+          if (pct < 20) return { l: 'Thấp', c: '#22c55e', b: '#f0fdf4' };
+          if (pct < 45) return { l: 'Trung bình', c: '#f59e0b', b: '#fffbeb' };
+          return { l: 'Cao (U tiến triển)', c: '#ef4444', b: '#fef2f2' };
         }
         if (type === 'ED') {
-          if (pct < 30) return {l:'Nhẹ', c:'#22c55e', b:'#f0fdf4'};
-          if (pct < 60) return {l:'Trung bình', c:'#f59e0b', b:'#fffbeb'};
-          return {l:'Nặng (Hiệu ứng khối)', c:'#ef4444', b:'#fef2f2'};
+          if (pct < 30) return { l: 'Nhẹ', c: '#22c55e', b: '#f0fdf4' };
+          if (pct < 60) return { l: 'Trung bình', c: '#f59e0b', b: '#fffbeb' };
+          return { l: 'Nặng (Hiệu ứng khối)', c: '#ef4444', b: '#fef2f2' };
         }
-        return {l:'N/A', c:'#64748b', b:'#f1f5f9'};
+        return { l: 'N/A', c: '#64748b', b: '#f1f5f9' };
       };
 
       const ncrStatus = getStatusBadge(ncrPct, 'NCR');
-      const etStatus  = getStatusBadge(etPct, 'ET');
-      const edStatus  = getStatusBadge(edPct, 'ED');
+      const etStatus = getStatusBadge(etPct, 'ET');
+      const edStatus = getStatusBadge(edPct, 'ED');
 
       const getFinalConclusion = () => {
         if (!hasRealStats) return '<strong> Lưu ý:</strong> Hệ thống chưa thu thập được dữ liệu định lượng từ AI. Vui lòng thử lại hoặc liên hệ kỹ thuật.';
-        
+
         let messages = [];
         if (ncrPct > 25) messages.push(`Hoại tử <strong>${ncrPct.toFixed(1)}%</strong> vượt ngưỡng (>25%), gợi ý u ác tính cao (Grade IV)`);
-        if (etPct > 45)  messages.push(`Vùng tăng cường <strong>${etPct.toFixed(1)}%</strong> cho thấy u tiến triển và tưới máu mạnh`);
-        if (edPct > 60)  messages.push(`Phù nề diện rộng <strong>${edPct.toFixed(1)}%</strong> gây áp lực nội sọ lớn`);
-        
+        if (etPct > 45) messages.push(`Vùng tăng cường <strong>${etPct.toFixed(1)}%</strong> cho thấy u tiến triển và tưới máu mạnh`);
+        if (edPct > 60) messages.push(`Phù nề diện rộng <strong>${edPct.toFixed(1)}%</strong> gây áp lực nội sọ lớn`);
+
         if (messages.length > 0) {
           return `<strong>Cảnh báo bác sĩ:</strong> ${messages.join('. ')}. Cần cân nhắc phẫu thuật hoặc xạ trị sớm.`;
         }
-        
+
         return `<strong>Đánh giá tổng thể:</strong> Cấu trúc khối u ổn định (NCR ${ncrPct.toFixed(1)}% / ET ${etPct.toFixed(1)}% / ED ${edPct.toFixed(1)}%). Vùng phù nề là yếu tố chính cần theo dõi.`;
       };
 
@@ -1900,22 +2029,8 @@
 
       return `
         <div class="xai-card xai-animate delay-3" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.03); margin-bottom: 5px; width: 100%; box-sizing: border-box;">
-          <!-- Header -->
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px solid #f1f5f9; padding-bottom: 15px;">
-            <div style="display: flex; align-items: center; gap: 16px;">
-              <div style="width: 52px; height: 52px; background: #334155; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 24px;">
-                <i class="fa-solid fa-layer-group"></i>
-              </div>
-              <div>
-                <h3 style="margin: 0; color: #0f172a; font-size: 22px; font-weight: 500; letter-spacing: -0.5px;">Phân Lớp Màu Cấu Trúc</h3>
-                <p style="margin: 0; color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600;">Định lượng thành phần khối u thực tế (Color Grading)</p>
-              </div>
-            </div>
-            <div style="text-align: right;">
-              <div style="background: #f1f5f9; color: #475569; padding: 4px 14px; border-radius: 20px; font-size: 11px; font-weight: 500; border: 1px solid #e2e8f0; display: inline-block; margin-bottom: 6px;">PHÂN TÍCH LÂM SÀNG</div>
-              <div style="font-size: 11px; color: #94a3b8;">Tổng diện tích: <span style="color: #334155; font-weight: 500;">${totMm2} mm²</span></div>
-            </div>
-          </div>
+       
+         
 
           <div style="display: flex; flex-direction: column; gap: 24px;">
             <!-- Top: Visual Mapping (4/4/4 Grid) -->
@@ -1971,35 +2086,19 @@
 
             <!-- Right: Detailed Metrics -->
             <div style="display: flex; flex-direction: column; gap: 5px;margin-top: 15px;">
-              <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700;">Thông số AI chi tiết</h4>
+              <h4 style="margin: 0 0 8px 0; font-size: 16px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Thông số AI chi tiết</h4>
               
-              ${row('#ef4444','Hoại tử (NCR)',  ncrPct, ncrPixels, ncrMm2, ncrStatus,
-                'Vùng lõi mô chết, tín hiệu thấp trên T1ce. Dấu hiệu tiêu chuẩn của Glioma ác tính cao.')}
+              ${row('#ef4444', 'Hoại tử (NCR)', ncrPct, ncrPixels, ncrMm2, ncrStatus,
+        'Vùng lõi mô chết, tín hiệu thấp trên T1ce. Dấu hiệu tiêu chuẩn của Glioma ác tính cao.')}
               
-              ${row('#eab308','Tăng cường (ET)', etPct, etPixels, etMm2, etStatus,
-                'Vùng u đang phát triển mạnh, tưới máu cao. Cần ưu tiên theo dõi ranh giới xâm lấn.')}
+              ${row('#eab308', 'Tăng cường (ET)', etPct, etPixels, etMm2, etStatus, 'Vùng u đang phát triển mạnh, tưới máu cao. Cần ưu tiên theo dõi ranh giới xâm lấn.')}
+          'Vùng u đang phát triển mạnh, tưới máu cao. Cần ưu tiên theo dõi ranh giới xâm lấn.')}
               
-              ${row('#22c55e','Phù nề (ED)', edPct, edPixels, edMm2, edStatus,
-                'Chất lỏng tích tụ quanh u. Gây hiệu ứng khối (mass effect) và chèn ép nhu mô não lành.')}
+              ${row('#22c55e', 'Phù nề (ED)', edPct, edPixels, edMm2, edStatus, 'Chất lỏng tích tụ quanh u. Gây hiệu ứng khối (mass effect) và chèn ép nhu mô não lành.')}
+            'Chất lỏng tích tụ quanh u. Gây hiệu ứng khối (mass effect) và chèn ép nhu mô não lành.')}
             </div>
 
-              <!-- Clinical Conclusion -->
-          <div style="margin-top: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; display: flex; align-items: flex-start; gap: 20px;">
-            <div style="width: 48px; height: 48px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #475569; font-size: 20px; border: 1px solid #e2e8f0; flex-shrink: 0;">
-              <i class="fa-solid fa-user-md"></i>
-            </div>
-            <div>
-              <h5 style="margin: 0 0 8px 0; font-size: 15px; color: #0f172a; font-weight: 800; display: flex; align-items: center; gap: 10px;">
-                Phân tích định lượng cấu trúc
-                <span style="font-size: 11px; color: #475569; background: #e2e8f0; padding: 2px 10px; border-radius: 12px; font-weight: 500;">THÔNG TIN LÂM SÀNG</span>
-              </h5>
-              <div style="color: #334155; font-size: 14px; line-height: 1.7;">${getFinalConclusion()}</div>
-              <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.05); display: flex; align-items: center; gap: 20px;">
-                 <span style="font-size: 11px; color: #94a3b8;"><i class="fa-solid fa-chart-line" style="margin-right: 6px;"></i> Phân tích từ ${totalPixels.toLocaleString()} voxel</span>
-                 <span style="font-size: 11px; color: #94a3b8;"><i class="fa-solid fa-shield-halved" style="margin-right: 6px;"></i> Độ tin cậy: ~95.8%</span>
-              </div>
-            </div>
-          </div>
+             
 
           </div>
 
@@ -2146,7 +2245,7 @@
       ].join(', ');
     },
 
-    getImportanceLevel: function(percent) {
+    getImportanceLevel: function (percent) {
       if (percent >= IMPORTANCE_COLORS.critical.threshold) return IMPORTANCE_COLORS.critical;
       if (percent >= IMPORTANCE_COLORS.high.threshold) return IMPORTANCE_COLORS.high;
       if (percent >= IMPORTANCE_COLORS.medium.threshold) return IMPORTANCE_COLORS.medium;
@@ -2184,8 +2283,8 @@
 
     // ===== STYLES OBJECT =====
     styles: {
-      container: 'padding: 20px 30px; background: #ffffff; border-radius: 12px; max-width: 1400px; margin: 0 auto;',
-      header: 'margin-bottom: 20px; border-bottom: 1px solid #f1f5f9; padding-bottom: 15px;',
+      container: 'padding: 20px 24px 20px 24px; background: transparent; border-radius: 12px; max-width: 1400px; margin: 0 auto;',
+      header: 'margin-bottom: 20px; margin-top: 20px; border-bottom: 1px solid #f1f5f9; padding-bottom: 15px;',
       title: 'color: #1e293b; margin: 0 0 4px 0; font-size: 20px; font-weight: 500;',
       subtitle: 'color: #64748b; margin: 0; font-size: 13px;',
       grid: 'display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px;',
@@ -2206,43 +2305,43 @@
     },
 
     // ===== 🏥 CLINICAL META-ANALYSIS FALLBACK (PORTED FROM BACKEND) =====
-    computeClinicalMeta: function(diag) {
+    computeClinicalMeta: function (diag) {
       if (!diag || !diag.prediction) return null;
-      
+
       const pred = diag.prediction;
       const xai = diag.xai || {};
       const ruleB = xai.rule_based || {};
       const mcStats = pred.multiclass_stats;
-      
+
       // 1. Malignancy Risk
-      const malignancy = (function() {
+      const malignancy = (function () {
         let score = 0;
         let factors = [];
         const area = ruleB.tumor_area_mm2 || 0;
         if (area > 2000) { score += 3; factors.push(`Kích thước lớn (${area.toFixed(0)} mm²)`); }
         else if (area > 500) { score += 2; factors.push(`Kích thước trung bình (${area.toFixed(0)} mm²)`); }
         else { score += 1; }
-        
+
         const circ = (ruleB.quantitative_features || {}).circularity || 1.0;
         if (circ < 0.4) { score += 2; factors.push(`Bờ không đều (circularity=${circ.toFixed(2)})`); }
         else if (circ < 0.6) { score += 1; factors.push(`Bờ tương đối không đều (circularity=${circ.toFixed(2)})`); }
-        
+
         const loc = (pred.location_hint || '').toLowerCase();
         if (loc.includes('frontal') || loc.includes('temporal')) { score += 1; factors.push("Vị trí vùng chức năng quan trọng"); }
-        
+
         const conf = pred.confidence || 0;
-        if (conf > 0.85) { score += 1; factors.push(`Độ tin cậy mô hình cao (${(conf*100).toFixed(0)}%)`); }
-        
+        if (conf > 0.85) { score += 1; factors.push(`Độ tin cậy mô hình cao (${(conf * 100).toFixed(0)}%)`); }
+
         let level, color, en;
         if (score <= 2) { level = "Thấp"; color = "#22c55e"; en = "LOW"; }
         else if (score <= 4) { level = "Trung bình"; color = "#f59e0b"; en = "MEDIUM"; }
         else { level = "Cao"; color = "#ef4444"; en = "HIGH"; }
-        
+
         return { level, level_en: en, score, max_score: 7, color, factors, disclaimer: "Chỉ mang tính hỗ trợ. Cần sinh thiết để xác định chính xác." };
       })();
-      
+
       // 2. Edema Assessment
-      const edema = (function() {
+      const edema = (function () {
         if (!mcStats) {
           const totalPct = pred.tumor_area_percent || 0;
           let level, color;
@@ -2261,9 +2360,9 @@
         else { level = "Nặng"; color = "#ef4444"; }
         return { level, color, ed_pixels: Math.round(ed), ed_percent: ed_pct, note: "Dựa trên phân vùng đa lớp (multiclass segmentation)" };
       })();
-      
+
       // 3. Mass Effect
-      const massEffect = (function() {
+      const massEffect = (function () {
         const areaPct = pred.tumor_area_percent || 0;
         const areaMm2 = ruleB.tumor_area_mm2 || 0;
         const loc = (pred.location_hint || '').toLowerCase();
@@ -2275,27 +2374,27 @@
         const midlineMm = midlineShift ? devMm : 0;
         const ventComp = areaPct > 8 && (loc.includes('central') || loc.includes('parietal'));
         const icpSusp = areaMm2 > 2000 || areaPct > 15;
-        
+
         let signs = [];
         if (midlineShift) signs.push(`Lệch đường giữa ~${midlineMm} mm`);
         if (ventComp) signs.push("Nghi ngờ chèn ép não thất");
         if (icpSusp) signs.push("Tăng áp lực nội sọ nghi ngờ");
-        
+
         let severity = "Không có", color = "#22c55e";
         if (signs.length >= 2) { severity = "Đáng kể"; color = "#ef4444"; }
         else if (signs.length === 1) { severity = "Nhẹ"; color = "#f59e0b"; }
-        
+
         return { signs, midline_shift_mm: midlineMm, ventricular_compression: ventComp, icp_suspected: icpSusp, severity, color };
       })();
-       
+
       // 4. Next Recommendations - ENHANCED CASE-SPECIFIC LOGIC
-      const nextRecs = (function() {
+      const nextRecs = (function () {
         let recs = [];
         const risk = malignancy.level_en || 'MEDIUM';
         const detected = pred.tumor_detected;
         const label = pred.label || ''; // Vietnamese label
         const diameter = dims.max_diameter_mm || 0;
-        
+
         // CASE: NO TUMOR DETECTED
         if (!detected) {
           recs.push({ icon: "fa-calendar-check", text: "Theo dõi định kỳ sau 6-12 tháng nếu có triệu chứng lâm sàng mới", priority: "normal" });
@@ -2328,7 +2427,7 @@
         if (edema.level.includes('Trung bình') || edema.level.includes('Nặng')) {
           recs.push({ icon: "fa-pills", text: "Sử dụng Dexamethasone giảm phù não quanh u", priority: "high" });
         }
-        
+
         if (massEffect.severity.includes('Đáng kể')) {
           recs.push({ icon: "fa-brain", text: "Phẫu thuật giải áp hoặc dẫn lưu não thất nếu cần", priority: "urgent" });
         }
@@ -2341,7 +2440,7 @@
 
         // STANDARD FOLLOW-UP
         recs.push({ icon: "fa-magnet", text: "MRI có tiêm thuốc tương phản Gadolinium (đánh giá hàng rào máu não)", priority: "high" });
-        
+
         // Remove duplicates and limit to 5 most relevant
         return recs.filter((v, i, a) => a.findIndex(t => t.text === v.text) === i).slice(0, 5);
       })();
@@ -2349,9 +2448,9 @@
       return { malignancy_risk: malignancy, edema_assessment: edema, mass_effect_signs: massEffect, next_recommendations: nextRecs };
     },
 
-    // ===== 🎨 IMAGE UTILITIES =====
+    // =====  IMAGE UTILITIES =====
 
-    maskToBase64: function(mask) {
+    maskToBase64: function (mask) {
       if (!mask || !Array.isArray(mask)) return '';
       try {
         const canvas = document.createElement('canvas');
@@ -2359,21 +2458,21 @@
         canvas.height = 256;
         const ctx = canvas.getContext('2d');
         const imageData = ctx.createImageData(256, 256);
-        
+
         for (let y = 0; y < 256; y++) {
           if (!mask[y]) continue;
           for (let x = 0; x < 256; x++) {
             const idx = (y * 256 + x) * 4;
             const val = mask[y][x];
-            
+
             if (val === 1) { // NCR - Red
-              imageData.data[idx] = 239; imageData.data[idx+1] = 68; imageData.data[idx+2] = 68; imageData.data[idx+3] = 200;
+              imageData.data[idx] = 239; imageData.data[idx + 1] = 68; imageData.data[idx + 2] = 68; imageData.data[idx + 3] = 200;
             } else if (val === 2) { // ED - Green
-              imageData.data[idx] = 34; imageData.data[idx+1] = 197; imageData.data[idx+2] = 94; imageData.data[idx+3] = 160;
+              imageData.data[idx] = 34; imageData.data[idx + 1] = 197; imageData.data[idx + 2] = 94; imageData.data[idx + 3] = 160;
             } else if (val === 3) { // ET - Yellow
-              imageData.data[idx] = 234; imageData.data[idx+1] = 179; imageData.data[idx+2] = 8; imageData.data[idx+3] = 220;
+              imageData.data[idx] = 234; imageData.data[idx + 1] = 179; imageData.data[idx + 2] = 8; imageData.data[idx + 3] = 220;
             } else if (val > 0.5) { // Binary - Reddish
-              imageData.data[idx] = 239; imageData.data[idx+1] = 68; imageData.data[idx+2] = 68; imageData.data[idx+3] = 140;
+              imageData.data[idx] = 239; imageData.data[idx + 1] = 68; imageData.data[idx + 2] = 68; imageData.data[idx + 3] = 140;
             }
           }
         }
@@ -2387,11 +2486,11 @@
 
     // ===== ⏳ HISTORY & SIDEBAR METHODS =====
 
-    loadHistoryAndRefresh: async function() {
+    loadHistoryAndRefresh: async function () {
       log('Loading history and refreshing dashboard');
       const items = await this.fetchXAIHistory();
       this.state.historyItems = items;
-      
+
       // ✅ Sync with live data if available to avoid unnecessary reload
       if (window.lastXAIData) {
         this.state.currentXAIData = window.lastXAIData;
@@ -2408,7 +2507,7 @@
       }
     },
 
-    fetchXAIHistory: async function() {
+    fetchXAIHistory: async function () {
       log('Fetching XAI history list...');
       try {
         const response = await fetch(`${API_BASE}/history?per_page=20`);
@@ -2421,7 +2520,7 @@
       }
     },
 
-    renderXAISidebar: function(historyItems) {
+    renderXAISidebar: function (historyItems) {
       if (!historyItems || historyItems.length === 0) {
         return `
           <div class="xai-sidebar">
@@ -2435,10 +2534,10 @@
           </div>
         `;
       }
-      
-      // ✅ SORT: Stable alphabetical sort for ISO strings (newest first)
+
+
       const sortedItems = [...historyItems].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-      
+
       const activeId = this.state.activeRecordId;
       const liveId = window.lastDiagnosisData?.history_id;
 
@@ -2452,29 +2551,29 @@
           </div>
           <div class="xai-history-list">
             ${sortedItems.map(item => {
-              // ✅ ROBUST PARSING: Avoid Date object timezone shifts
-              // Expected format: YYYY-MM-DDTHH:mm:ss.ssssss
-              let dateStr = "??/??/????";
-              let timeStr = "??:??";
-              
-              if (item.timestamp) {
-                try {
-                  const parts = item.timestamp.split('T');
-                  const dParts = parts[0].split('-');
-                  dateStr = `${dParts[2]}/${dParts[1]}/${dParts[0]}`;
-                  timeStr = parts[1].substring(0, 5);
-                } catch (e) {
-                  const d = new Date(item.timestamp);
-                  dateStr = d.toLocaleDateString('vi-VN');
-                  timeStr = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-                }
-              }
-              
-              const isActive = item.id === activeId;
-              const isLive = item.id === liveId;
-              const hasTumor = item.tumor_detected;
-              
-              return `
+
+
+        let dateStr = "??/??/????";
+        let timeStr = "??:??";
+
+        if (item.timestamp) {
+          try {
+            const parts = item.timestamp.split('T');
+            const dParts = parts[0].split('-');
+            dateStr = `${dParts[2]}/${dParts[1]}/${dParts[0]}`;
+            timeStr = parts[1].substring(0, 5);
+          } catch (e) {
+            const d = new Date(item.timestamp);
+            dateStr = d.toLocaleDateString('vi-VN');
+            timeStr = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+          }
+        }
+
+        const isActive = item.id === activeId;
+        const isLive = item.id === liveId;
+        const hasTumor = item.tumor_detected;
+
+        return `
                 <div class="xai-history-item ${isActive ? 'active' : ''} ${isLive ? 'live-item' : ''}" 
                      onclick="window.XAISimilarUI.loadHistoryCaseIntoXAI('${item.id}')">
                   
@@ -2492,26 +2591,24 @@
                         </span>
                       </div>
                     </div>
-                    <div class="xai-history-filename" title="${item.image_filename}">
-                      <i class="fa-regular fa-file-image" style="margin-right: 6px; color: #64748b;"></i>${item.image_filename}
-                    </div>
+                  
                     <div class="xai-history-footer">
-                      <span class="xai-history-id">#${item.id.substring(0, 8)}</span>
+                    
                       ${item.confidence ? `<span class="xai-history-conf">${Math.round(item.confidence * 100)}% tin cậy</span>` : ''}
                     </div>
                   </div>
                 </div>
               `;
-            }).join('')}
+      }).join('')}
           </div>
         </div>
       `;
     },
 
-    loadHistoryCaseIntoXAI: async function(recordId) {
+    loadHistoryCaseIntoXAI: async function (recordId) {
       log(`🔄 Switching to historical case: ${recordId}`);
       this.state.activeRecordId = recordId;
-      
+
       try {
         // Show loading state in main content area
         const mainArea = document.querySelector('.xai-content-main');
@@ -2529,18 +2626,18 @@
         const response = await fetch(`${API_BASE}/history/${recordId}`);
         if (!response.ok) throw new Error('Failed to fetch case detail');
         let data = await response.json();
-        
+
         log('✅ Case data retrieved:', data);
 
         // Defensive parsing if xai_data arrives as a string
         if (typeof data.xai_data === 'string') {
           try {
             data.xai_data = JSON.parse(data.xai_data);
-          } catch(e) {
+          } catch (e) {
             error('Failed to parse xai_data string', e);
           }
         }
-        
+
         // Ensure xai_data exists even if empty
         data.xai_data = data.xai_data || { gradcam: null, rule_based: null, shap: null, combined_insights: [] };
 
@@ -2554,10 +2651,10 @@
           data.xai_data.gradcam.heatmap_base64 = slices.heatmap_b64;
           // Also use thumbnail as overlay if missing
           if (!data.xai_data.gradcam.overlay_base64) {
-             data.xai_data.gradcam.overlay_base64 = data.image_base64;
+            data.xai_data.gradcam.overlay_base64 = data.image_base64;
           }
         }
-        
+
         window.lastDiagnosisData = {
           prediction: pred,
           report: data.report_data,
@@ -2574,7 +2671,7 @@
             severity: data.severity
           }
         };
-        
+
         window.lastXAIData = data.xai_data;
         this.state.currentXAIData = data.xai_data;
 
@@ -2582,9 +2679,9 @@
         if (data.xai_data?.gradcam) {
           const gc = data.xai_data.gradcam;
           log('🔍 Grad-CAM Check:', {
-             overlay: !!gc.overlay_base64,
-             heatmap: !!gc.heatmap_base64,
-             score: gc.attention_score
+            overlay: !!gc.overlay_base64,
+            heatmap: !!gc.heatmap_base64,
+            score: gc.attention_score
           });
         }
 
@@ -2596,7 +2693,7 @@
 
         // Re-render dashboard
         this.renderXAIDashboard(data.xai_data);
-        
+
         // Also update 3D brain if possible
         if (window.update3DBrain) {
           window.update3DBrain(window.lastDiagnosisData);
@@ -2607,6 +2704,183 @@
         this.showXAIError('Không thể tải dữ liệu ca bệnh: ' + err.message);
       }
     }
+  };
+
+  // Override malformed legacy template with balanced markup so all accordion items
+  // stay inside the same list container.
+  window.XAISimilarUI.renderTumorGradingCard = function (diagnosisData) {
+    if (!diagnosisData) return '';
+
+    const mcMask = diagnosisData.multiclass_mask;
+    const stats = diagnosisData.multiclass_stats;
+    const mask = diagnosisData.mask;
+    const slices = diagnosisData.slices;
+
+    let segmentationImg = slices?.axial?.segmentation_b64;
+    if (!segmentationImg) {
+      log('Generating fallback segmentation image from mask data');
+      segmentationImg = this.maskToBase64(mcMask || mask);
+    }
+
+    if (!segmentationImg && !mask) return '';
+
+    let ncrPct = 0, edPct = 0, etPct = 0;
+    let ncrPixels = 0, edPixels = 0, etPixels = 0, totalPixels = 0;
+    let hasRealStats = false;
+
+    if (stats && stats.total_tumor_pixels > 0) {
+      totalPixels = stats.total_tumor_pixels;
+      ncrPixels = stats.ncr_count || 0;
+      edPixels = stats.ed_count || 0;
+      etPixels = stats.et_count || 0;
+      ncrPct = ncrPixels / totalPixels * 100;
+      edPct = edPixels / totalPixels * 100;
+      etPct = etPixels / totalPixels * 100;
+      hasRealStats = true;
+    }
+
+    const PX2 = 0.884;
+    const ncrMm2 = (ncrPixels * PX2).toFixed(1);
+    const etMm2 = (etPixels * PX2).toFixed(1);
+    const edMm2 = (edPixels * PX2).toFixed(1);
+    const totMm2 = (totalPixels * PX2).toFixed(1);
+
+    const getStatusBadge = (pct, type) => {
+      if (pct === 0) return { l: 'Không phát hiện', c: '#64748b', b: '#f1f5f9' };
+      if (type === 'NCR') {
+        if (pct < 10) return { l: 'Nhẹ', c: '#22c55e', b: '#f0fdf4' };
+        if (pct < 25) return { l: 'Trung bình', c: '#f59e0b', b: '#fffbeb' };
+        return { l: 'Cao (Nguy cơ u ác)', c: '#ef4444', b: '#fef2f2' };
+      }
+      if (type === 'ET') {
+        if (pct < 20) return { l: 'Thấp', c: '#22c55e', b: '#f0fdf4' };
+        if (pct < 45) return { l: 'Trung bình', c: '#f59e0b', b: '#fffbeb' };
+        return { l: 'Cao (U tiến triển)', c: '#ef4444', b: '#fef2f2' };
+      }
+      if (type === 'ED') {
+        if (pct < 30) return { l: 'Nhẹ', c: '#22c55e', b: '#f0fdf4' };
+        if (pct < 60) return { l: 'Trung bình', c: '#f59e0b', b: '#fffbeb' };
+        return { l: 'Nặng (Hiệu ứng khối)', c: '#ef4444', b: '#fef2f2' };
+      }
+      return { l: 'N/A', c: '#64748b', b: '#f1f5f9' };
+    };
+
+    const ncrStatus = getStatusBadge(ncrPct, 'NCR');
+    const etStatus = getStatusBadge(etPct, 'ET');
+    const edStatus = getStatusBadge(edPct, 'ED');
+
+    const getFinalConclusion = () => {
+      if (!hasRealStats) {
+        return '<strong> Lưu ý:</strong> Hệ thống chưa thu thập được dữ liệu định lượng từ AI. Vui lòng thử lại hoặc liên hệ kỹ thuật.';
+      }
+
+      const messages = [];
+      if (ncrPct > 25) messages.push(`Hoại tử <strong>${ncrPct.toFixed(1)}%</strong> vượt ngưỡng (>25%), gợi ý u ác tính cao (Grade IV)`);
+      if (etPct > 45) messages.push(`Vùng tăng cường <strong>${etPct.toFixed(1)}%</strong> cho thấy u tiến triển và tưới máu mạnh`);
+      if (edPct > 60) messages.push(`Phù nề diện rộng <strong>${edPct.toFixed(1)}%</strong> gây áp lực nội sọ lớn`);
+
+      if (messages.length > 0) {
+        return `<strong>Cảnh báo bác sĩ:</strong> ${messages.join('. ')}. Cần cân nhắc phẫu thuật hoặc xạ trị sớm.`;
+      }
+
+      return `<strong>Đánh giá tổng thể:</strong> Cấu trúc khối u ổn định (NCR ${ncrPct.toFixed(1)}% / ET ${etPct.toFixed(1)}% / ED ${edPct.toFixed(1)}%). Vùng phù nề là yếu tố chính cần theo dõi.`;
+    };
+
+    const row = (color, label, pct, px, mm2, status, note) => `
+      <div style="background: #ffffff; border-radius: 10px; padding: 14px 18px; border: 1px solid #e2e8f0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 12px; height: 12px; background: ${color}; border-radius: 3px; flex-shrink:0;"></div>
+            <div>
+              <span style="font-size: 14px; font-weight: 500; color: #1e293b;">${label}</span>
+              <span style="margin-left: 8px; font-size: 9px; font-weight: 500; color: ${status.c}; background: ${status.b}; padding: 2px 8px; border-radius: 10px; border: 1px solid #e2e8f0;">${status.l}</span>
+            </div>
+          </div>
+          <span style="font-size: 20px; font-weight: 500; color: #334155;">${pct.toFixed(1)}%</span>
+        </div>
+        <div style="height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; margin-bottom: 12px;">
+          <div style="width: ${pct}%; height: 100%; background: ${color}; border-radius: 3px;"></div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+          <div style="background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 10px; color: #94a3b8; font-weight: 500;">DIỆN TÍCH</span>
+            <span style="font-size: 12px; font-weight: 500; color: #334155;">${mm2} mm²</span>
+          </div>
+          <div style="background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 10px; color: #94a3b8; font-weight: 500;">PIXEL AI</span>
+            <span style="font-size: 12px; font-weight: 500; color: #334155;">${px.toLocaleString()}</span>
+          </div>
+        </div>
+        <p style="margin: 0; font-size: 11px; color: #64748b; line-height: 1.5; padding-top: 8px; border-top: 1px dashed #e2e8f0;">${note}</p>
+      </div>`;
+
+    return `
+      <div class="xai-card xai-animate delay-3" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.03); margin-bottom: 5px; width: 100%; box-sizing: border-box;">
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+            <div style="position: relative; border-radius: 12px; overflow: hidden; border: 2px solid #f1f5f9; background: #000; aspect-ratio: 1/1; box-shadow: 0 8px 20px rgba(0,0,0,0.12);">
+              <img src="${slices?.axial?.clean_b64 || diagnosisData.image_base64 || ''}" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.8;" onerror="this.style.display='none'"/>
+              <img src="${segmentationImg}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; z-index: 2;" onerror="this.style.display='none'"/>
+              <div style="position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.7); color: #fff; font-size: 10px; font-weight: 800; padding: 3px 10px; border-radius: 6px; backdrop-filter: blur(4px);">AXIAL</div>
+            </div>
+            <div style="position: relative; border-radius: 12px; overflow: hidden; border: 2px solid #f1f5f9; background: #000; aspect-ratio: 1/1; box-shadow: 0 8px 20px rgba(0,0,0,0.12);">
+              <img src="${slices?.coronal?.clean_b64 || ''}" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.8;" onerror="this.style.display='none'"/>
+              <img src="${slices?.coronal?.segmentation_b64 || ''}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; z-index: 2;" onerror="this.style.display='none'"/>
+              <div style="position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.7); color: #fff; font-size: 10px; font-weight: 800; padding: 3px 10px; border-radius: 6px; backdrop-filter: blur(4px);">CORONAL</div>
+            </div>
+            <div style="position: relative; border-radius: 12px; overflow: hidden; border: 2px solid #f1f5f9; background: #000; aspect-ratio: 1/1; box-shadow: 0 8px 20px rgba(0,0,0,0.12);">
+              <img src="${slices?.sagittal?.clean_b64 || ''}" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.8;" onerror="this.style.display='none'"/>
+              <img src="${slices?.sagittal?.segmentation_b64 || ''}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; z-index: 2;" onerror="this.style.display='none'"/>
+              <div style="position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.7); color: #fff; font-size: 10px; font-weight: 800; padding: 3px 10px; border-radius: 6px; backdrop-filter: blur(4px);">SAGITTAL</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: minmax(260px, 0.95fr) minmax(320px, 1.05fr); gap: 24px; align-items: start;">
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="padding: 15px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                <h4 style="margin: 0 0 12px 0; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Chú giải vùng u</h4>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 12px; height: 12px; background: #ef4444; border-radius: 3px;"></div>
+                    <span style="font-size: 13px; color: #475569; font-weight: 600;">Hoại tử (NCR)</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 12px; height: 12px; background: #f59e0b; border-radius: 3px;"></div>
+                    <span style="font-size: 13px; color: #475569; font-weight: 600;">Tăng cường (ET)</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 12px; height: 12px; background: #22c55e; border-radius: 3px;"></div>
+                    <span style="font-size: 13px; color: #475569; font-weight: 600;">Phù nề (ED)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="padding: 15px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                <h4 style="margin: 0 0 12px 0; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Nhận định lâm sàng</h4>
+                <p style="margin: 0; font-size: 12px; color: #475569; line-height: 1.7;">${getFinalConclusion()}</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
+                  <div style="background: #ffffff; padding: 10px 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <div style="font-size: 10px; color: #94a3b8; font-weight: 600; margin-bottom: 4px;">Tổng diện tích</div>
+                    <div style="font-size: 14px; color: #334155; font-weight: 700;">${totMm2} mm²</div>
+                  </div>
+                  <div style="background: #ffffff; padding: 10px 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <div style="font-size: 10px; color: #94a3b8; font-weight: 600; margin-bottom: 4px;">Voxel AI</div>
+                    <div style="font-size: 14px; color: #334155; font-weight: 700;">${totalPixels.toLocaleString()}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <h4 style="margin: 0 0 8px 0; font-size: 16px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Thông số AI chi tiết</h4>
+              ${row('#ef4444', 'Hoại tử (NCR)', ncrPct, ncrPixels, ncrMm2, ncrStatus, 'Vùng lõi mô chết, tín hiệu thấp trên T1ce. Dấu hiệu tiêu chuẩn của Glioma ác tính cao.')}
+              ${row('#eab308', 'Tăng cường (ET)', etPct, etPixels, etMm2, etStatus, 'Vùng u đang phát triển mạnh, tưới máu cao. Cần ưu tiên theo dõi ranh giới xâm lấn.')}
+              ${row('#22c55e', 'Phù nề (ED)', edPct, edPixels, edMm2, edStatus, 'Chất lỏng tích tụ quanh u. Gây hiệu ứng khối (mass effect) và chèn ép nhu mô não lành.')}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
   };
 
   // ===== AUTO INITIALIZATION =====

@@ -29,6 +29,7 @@ THÔNG TIN FAISS :
 [FAISS] ✅ Copy complete
 -------------- 
 * THÔNG TIN TẬP DỮ LIỆU :  < 
+- Mô hình 3D : https://sketchfab.com/3d-models/limbic-system-ap-psychology-042b7c37263f4309bc8b4e18dc989102
 
 - https://www.kaggle.com/datasets/masoudnickparvar/brain-tumor-mri-dataset
 

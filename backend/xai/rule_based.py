@@ -479,7 +479,7 @@ class RuleBasedAnalyzer:
     def _calculate_circularity(self, mask: np.ndarray) -> float:
         """Calculate tumor circularity (0-1, 1=perfect circle)."""
         contours, _ = cv2.findContours(
-            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE    
         )
         
         if not contours:

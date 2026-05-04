@@ -199,12 +199,12 @@
       if (rawSim) {
         lastSimilarData = JSON.parse(rawSim);
         window.lastSimilarData = lastSimilarData;
-        
+
         // ✅ CRITICAL: Restore global variable used by brain3d_new.js comparison picker
         if (lastSimilarData.similar_cases) {
           window._similarCasesData = lastSimilarData.similar_cases;
         }
-        
+
         _showCompareButton(lastSimilarData);
       }
 
@@ -350,7 +350,7 @@
       for (let x = 0; x < 256; x++) {
         const idx = (y * 256 + x) * 4;
         const val = mask[y][x];
-        
+
         if (val === 1) { // Necrosis - Red
           imageData.data[idx] = 255;
           imageData.data[idx + 1] = 0;
@@ -406,7 +406,7 @@
         const err = await res.json();
         throw new Error(err.detail || 'Diagnosis failed');
       }
- 
+
       const diagnosisResult = await res.json();
       window.lastDiagnosisData = diagnosisResult; // Set globally for all features
       lastPredictionData = diagnosisResult.prediction;
@@ -543,12 +543,18 @@
 
     // Findings
     findingsList.innerHTML = (report.findings || [])
-      .map(f => `<li><i class="fa-solid fa-check" style="color:var(--cyan);margin-right:8px;font-size:10px;"></i> ${f}</li>`)
+      .map(f => `<li style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px;">
+          <i class="fa-solid fa-circle-check" style="color: #00c853; margin-top: 3px; font-size: 13px;"></i>
+          <span>${f}</span>
+        </li>`)
       .join('');
 
     // Recommendations
     recommendationsList.innerHTML = (report.recommendations || [])
-      .map(r => `<li><i class="fa-solid fa-arrow-right" style="color:var(--green);margin-right:8px;font-size:10px;"></i> ${r}</li>`)
+      .map(r => `<li style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px;">
+          <i class="fa-solid fa-user-doctor" style="color: #0097b4; margin-top: 3px; font-size: 13px;"></i>
+          <span>${r}</span>
+        </li>`)
       .join('');
 
     // Populate methods comparison table
@@ -589,14 +595,14 @@
       `).join('');
     }
 
-    // Disclaimer
-    disclaimer.innerHTML = report.disclaimer ? `<i class="fa-solid fa-triangle-exclamation" style="color:#ff9800;margin-right:6px;"></i> ${report.disclaimer}` :
-      '<i class="fa-solid fa-triangle-exclamation" style="color:#ff9800;margin-right:6px;"></i> Đây là báo cáo do AI sinh ra. Nó không thay thế lời khuyên y tế chuyên môn.';
+    // Disclaimer - Disabled as per user request
+    // disclaimer.innerHTML = report.disclaimer ? `<i class="fa-solid fa-triangle-exclamation" style="color:#ff9800;margin-right:6px;"></i> ${report.disclaimer}` :
+    //   '<i class="fa-solid fa-triangle-exclamation" style="color:#ff9800;margin-right:6px;"></i> Đây là báo cáo do AI sinh ra. Nó không thay thế lời khuyên y tế chuyên môn.';
 
     // ✅ Render Depth Status Card on main screen (right panel)
     renderDepthCard(data);
-    // ✅ Render Depth Overlay directly on 3D Brain viewer
-    renderDepthOn3DViewer(data);
+    // ✅ Render Depth Overlay directly on 3D Brain viewer (DISABLED as per user request)
+    // renderDepthOn3DViewer(data);
 
     console.log('[App] ✅ Report displayed');
   }
@@ -617,12 +623,12 @@
     const conf = Math.round((data.prediction?.confidence || 0) * 100);
 
     const STYLES = {
-      'OUTSIDE': { border: '#ef4444', text: '#ef4444', bg: 'rgba(255,255,255,0.92)', emoji: '🔴', badge: 'NGUY HIỂM KỊCH TRẦN' },
-      'SUPERFICIAL': { border: '#f87171', text: '#f87171', bg: 'rgba(255,255,255,0.92)', emoji: '🔴', badge: 'RỦI RO BAO PHỦ' },
-      'SHALLOW': { border: '#f59e0b', text: '#f59e0b', bg: 'rgba(255,255,255,0.92)', emoji: '🟠', badge: 'NÔNG & RỦI RO CAO' },
-      'INTERMEDIATE': { border: '#eab308', text: '#eab308', bg: 'rgba(255,255,255,0.92)', emoji: '🟡', badge: 'RỦI RO TRUNG BÌNH' },
-      'DEEP': { border: '#22c55e', text: '#16a34a', bg: 'rgba(255,255,255,0.92)', emoji: '🟢', badge: 'SÂU & RỦI RO THẤP' },
-      'VERY_DEEP': { border: '#3b82f6', text: '#2563eb', bg: 'rgba(255,255,255,0.92)', emoji: '🔵', badge: 'RẤT SÂU, BÊN TRONG' },
+      'OUTSIDE': { border: '#ef4444', text: '#ef4444', bg: 'rgba(255,255,255,0.92)', icon: '<i class="fa-solid fa-circle"></i>', badge: 'NGUY HIỂM KỊCH TRẦN' },
+      'SUPERFICIAL': { border: '#f87171', text: '#f87171', bg: 'rgba(255,255,255,0.92)', icon: '<i class="fa-solid fa-circle"></i>', badge: 'RỦI RO BAO PHỦ' },
+      'SHALLOW': { border: '#f59e0b', text: '#f59e0b', bg: 'rgba(255,255,255,0.92)', icon: '<i class="fa-solid fa-circle"></i>', badge: 'NÔNG & RỦI RO CAO' },
+      'INTERMEDIATE': { border: '#eab308', text: '#eab308', bg: 'rgba(255,255,255,0.92)', icon: '<i class="fa-solid fa-circle"></i>', badge: 'RỦI RO TRUNG BÌNH' },
+      'DEEP': { border: '#22c55e', text: '#16a34a', bg: 'rgba(255,255,255,0.92)', icon: '<i class="fa-solid fa-circle"></i>', badge: 'SÂU & RỦI RO THẤP' },
+      'VERY_DEEP': { border: '#3b82f6', text: '#2563eb', bg: 'rgba(255,255,255,0.92)', icon: '<i class="fa-solid fa-circle"></i>', badge: 'RẤT SÂU, BÊN TRONG' },
     };
     const S = STYLES[category] || STYLES['INTERMEDIATE'];
     const depthPct = depth != null ? Math.min((depth / 55) * 100, 100) : 0;
@@ -637,7 +643,6 @@
       'position:absolute;bottom:44px;left:10px',
       'width:200px;z-index:8;pointer-events:none',
       `background:${S.bg}`,
-      `border-left:4px solid ${S.border}`,
       'border-radius:8px;padding:12px',
       'font-family:Inter, Segoe UI, sans-serif',
       'backdrop-filter:blur(8px)',
@@ -700,24 +705,24 @@
 
     // ── Color palette per depth category ──
     const DEPTH_STYLES = {
-      'OUTSIDE': { bg: '#ffffff', tint: 'rgba(220,0,0,0.05)', border: '#dc2626', text: '#991b1b', glow: '#dc2626', emoji: '🔴', label: 'NGOÀI VỎ NÃO', badge: 'NGUY KỊCH', grad: '#dc2626,#f87171' },
-      'SUPERFICIAL': { bg: '#ffffff', tint: 'rgba(239,68,68,0.05)', border: '#ef4444', text: '#991b1b', glow: '#ef4444', emoji: '🔴', label: 'QUÁ NÔNG', badge: 'NGHIÊM TRỌNG', grad: '#ef4444,#fca5a5' },
-      'SHALLOW': { bg: '#ffffff', tint: 'rgba(245,158,11,0.05)', border: '#f59e0b', text: '#92400e', glow: '#f59e0b', emoji: '🟠', label: 'NÔNG / GẦN VỎ NÃO', badge: 'RỦI RO CAO', grad: '#f59e0b,#fcd34d' },
-      'INTERMEDIATE': { bg: '#ffffff', tint: 'rgba(234,179,8,0.05)', border: '#eab308', text: '#854d0e', glow: '#eab308', emoji: '🟡', label: 'TRUNG BÌNH', badge: 'RỦI RO VỪA', grad: '#eab308,#fde047' },
-      'DEEP': { bg: '#ffffff', tint: 'rgba(34,197,94,0.05)', border: '#22c55e', text: '#166534', glow: '#22c55e', emoji: '🟢', label: 'SÂU ĐÁNG KỂ', badge: 'RỦI RO THẤP', grad: '#22c55e,#86efac' },
-      'VERY_DEEP': { bg: '#ffffff', tint: 'rgba(59,130,246,0.05)', border: '#3b82f6', text: '#1e40af', glow: '#3b82f6', emoji: '🔵', label: 'RẤT SÂU, BÊN TRONG', badge: 'AN TOÀN HƠN', grad: '#3b82f6,#93c5fd' }
+      'OUTSIDE': { bg: '#ffffff', tint: 'rgba(220,0,0,0.05)', border: '#dc2626', text: '#991b1b', glow: '#dc2626', icon: '<i class="fa-solid fa-circle"></i>', label: 'NGOÀI VỎ NÃO', badge: 'NGUY KỊCH', grad: '#dc2626,#f87171' },
+      'SUPERFICIAL': { bg: '#ffffff', tint: 'rgba(239,68,68,0.05)', border: '#ef4444', text: '#991b1b', glow: '#ef4444', icon: '<i class="fa-solid fa-circle"></i>', label: 'QUÁ NÔNG', badge: 'NGHIÊM TRỌNG', grad: '#ef4444,#fca5a5' },
+      'SHALLOW': { bg: '#ffffff', tint: 'rgba(245,158,11,0.05)', border: '#f59e0b', text: '#92400e', glow: '#f59e0b', icon: '<i class="fa-solid fa-circle"></i>', label: 'NÔNG / GẦN VỎ NÃO', badge: 'RỦI RO CAO', grad: '#f59e0b,#fcd34d' },
+      'INTERMEDIATE': { bg: '#ffffff', tint: 'rgba(234,179,8,0.05)', border: '#eab308', text: '#854d0e', glow: '#eab308', icon: '<i class="fa-solid fa-circle"></i>', label: 'TRUNG BÌNH', badge: 'RỦI RO VỪA', grad: '#eab308,#fde047' },
+      'DEEP': { bg: '#ffffff', tint: 'rgba(34,197,94,0.05)', border: '#22c55e', text: '#166534', glow: '#22c55e', icon: '<i class="fa-solid fa-circle"></i>', label: 'SÂU ĐÁNG KỂ', badge: 'RỦI RO THẤP', grad: '#22c55e,#86efac' },
+      'VERY_DEEP': { bg: '#ffffff', tint: 'rgba(59,130,246,0.05)', border: '#3b82f6', text: '#1e40af', glow: '#3b82f6', icon: '<i class="fa-solid fa-circle"></i>', label: 'RẤT SÂU, BÊN TRONG', badge: 'AN TOÀN HƠN', grad: '#3b82f6,#93c5fd' }
     };
 
     const S = DEPTH_STYLES[category] || DEPTH_STYLES['INTERMEDIATE'];
 
     // Medical descriptions per category
     const DEPTH_DESC = {
-      'OUTSIDE': '⚠️ Khối u dường như vượt qua ranh giới bề mặt vỏ não. Cần đánh giá của bác sĩ chuyên khoa ngay lập tức.',
-      'SUPERFICIAL': '⚠️ Khối u rất gần bề mặt ngoài của vỏ não (< 5mm). Nguy cơ tổn thương vỏ não cao — khuyến cáo tư vấn phẫu thuật thần kinh khẩn cấp.',
-      'SHALLOW': '⚠️ Khối u nằm ở nông, cách vỏ não 5–15mm. Nguy cơ trung bình khi động chạm vùng vỏ não chức năng, yêu cầu phải thiết kế phẫu thuật cẩn trọng.',
-      'INTERMEDIATE': '✓ Khối u sâu mức trung bình so với vỏ não (15–30mm). Nguy cơ cho vỏ não thấp — phù hợp thực hiện các quy trình theo dõi kỹ thuật chuẩn.',
-      'DEEP': '✓ Khối u ở vị trí sâu đáng kể (30–45mm). Hầu như không đe dọa vỏ não — có thể cân nhắc sinh thiết lập thể hoặc xạ phẫu.',
-      'VERY_DEEP': '✓ Khối u nằm ở vùng rất sâu (>45mm). Không có nguy cơ xâm lấn bề mặt vỏ não — có khả năng thuộc vùng quanh não thất hoặc chất trắng sâu.'
+      'OUTSIDE': '<i class="fa-solid fa-triangle-exclamation" style="color:#ef4444;margin-right:6px;"></i> Khối u dường như vượt qua ranh giới bề mặt vỏ não. Cần đánh giá của bác sĩ chuyên khoa ngay lập tức.',
+      'SUPERFICIAL': '<i class="fa-solid fa-triangle-exclamation" style="color:#ef4444;margin-right:6px;"></i> Khối u rất gần bề mặt ngoài của vỏ não (< 5mm). Nguy cơ tổn thương vỏ não cao — khuyến cáo tư vấn phẫu thuật thần kinh khẩn cấp.',
+      'SHALLOW': '<i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;margin-right:6px;"></i> Khối u nằm ở nông, cách vỏ não 5–15mm. Nguy cơ trung bình khi động chạm vùng vỏ não chức năng, yêu cầu phải thiết kế phẫu thuật cẩn trọng.',
+      'INTERMEDIATE': '<i class="fa-solid fa-check" style="color:#22c55e;margin-right:6px;"></i> Khối u sâu mức trung bình so với vỏ não (15–30mm). Nguy cơ cho vỏ não thấp — phù hợp thực hiện các quy trình theo dõi kỹ thuật chuẩn.',
+      'DEEP': '<i class="fa-solid fa-check" style="color:#22c55e;margin-right:6px;"></i> Khối u ở vị trí sâu đáng kể (30–45mm). Hầu như không đe dọa vỏ não — có thể cân nhắc sinh thiết lập thể hoặc xạ phẫu.',
+      'VERY_DEEP': '<i class="fa-solid fa-check" style="color:#22c55e;margin-right:6px;"></i> Khối u nằm ở vùng rất sâu (>45mm). Không có nguy cơ xâm lấn bề mặt vỏ não — có khả năng thuộc vùng quanh não thất hoặc chất trắng sâu.'
     };
 
     // Progress (0→55mm scale, higher = deeper = safer)
@@ -728,10 +733,9 @@
     card.style.display = 'block';
     inner.style.background = S.bg;
     inner.style.borderColor = S.border;
-    inner.style.borderLeftWidth = '5px';
     if (glowBar) { glowBar.style.background = `linear-gradient(90deg,transparent,${S.glow},transparent)`; }
 
-    if (emoji) emoji.textContent = S.emoji;
+    if (emoji) emoji.innerHTML = S.icon;
     if (mmVal) {
       mmVal.textContent = depth != null ? depth.toFixed(1) : '—';
       mmVal.style.color = S.text;
@@ -910,6 +914,7 @@
   let tabHistory = [];
 
   function switchTab(tabName, isGoBack = false) {
+    if (tabName === 'scan') tabName = 'brain3d';
     console.log(`[App] 📑 Switching to tab: ${tabName}`);
 
     if (!isGoBack) {
@@ -941,7 +946,7 @@
 
     // Show based on tab
     switch (tabName) {
-      case 'scan':
+
       case 'brain3d':
         if (mainLayout) {
           mainLayout.style.display = 'grid';
@@ -954,8 +959,10 @@
       case 'xai':
         if (window.XAISimilarUI?.loadHistoryAndRefresh) {
           window.XAISimilarUI.loadHistoryAndRefresh();
+          window.XAISimilarUI.showXAIPanel?.();
         } else if (window.XAISimilarUI?.renderXAIDashboard && lastXAIData) {
           window.XAISimilarUI.renderXAIDashboard(lastXAIData);
+          window.XAISimilarUI.showXAIPanel?.();
         } else if (window.XAISimilarUI?.showXAIPanel) {
           window.XAISimilarUI.showXAIPanel();
         } else {
@@ -982,6 +989,7 @@
       case 'similar':
         if (window.XAISimilarUI?.renderSimilarCases && lastSimilarData) {
           window.XAISimilarUI.renderSimilarCases(lastSimilarData);
+          window.XAISimilarUI.showSimilarPanel?.();
         } else if (window.XAISimilarUI?.showSimilarPanel) {
           window.XAISimilarUI.showSimilarPanel();
         } else {
@@ -1230,6 +1238,33 @@
       _restoreFromLS();
     }, 500);
 
+    // ===== PERSISTENT HEADER STYLE TOGGLE =====
+    (function initHeaderScroll() {
+      const header = document.querySelector('.header');
+      if (!header) return;
+
+      let ticking = false;
+
+      function onScroll() {
+        if (!ticking) {
+          window.requestAnimationFrame(() => {
+            const currentScrollY = window.scrollY;
+
+            if (currentScrollY > 20) {
+              header.classList.add('header--scrolled');
+            } else {
+              header.classList.remove('header--scrolled');
+            }
+
+            ticking = false;
+          });
+          ticking = true;
+        }
+      }
+
+      window.addEventListener('scroll', onScroll, { passive: true });
+    })();
+
     console.log('%c[App] ✅ All systems ready!', 'color: #00c853; font-weight: bold; font-size: 14px;');
   });
 
@@ -1241,7 +1276,7 @@
     console.log('[App] 🔄 Syncing restored diagnosis data...');
     window.lastDiagnosisData = data;
     lastPredictionData = data.prediction;
-    
+
     if (data.xai && !data.xai.error) {
       lastXAIData = data.xai;
       window.lastXAIData = data.xai;

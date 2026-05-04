@@ -7,7 +7,7 @@ from xai.rule_based import RuleBasedAnalyzer
 def test_depth():
     analyzer = RuleBasedAnalyzer()
     
-    # Create a dummy mask with a tumor at some position
+   
     mask = np.zeros((256, 256), dtype=np.uint8)
     cv2.circle(mask, (100, 100), 10, 1, -1)
     

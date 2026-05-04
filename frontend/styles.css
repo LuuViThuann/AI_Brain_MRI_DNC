@@ -5,6 +5,10 @@
    ============================================================ */
 
 /* --- Reset & Vars --- */
+/* Google Sans import (User choice) */
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap');
+/* Note: Using Open Sans as a technical base if the system lacks Google Sans, but labeling variables as Google Sans as requested */
+
 *,
 *::before,
 *::after {
@@ -29,8 +33,8 @@
   --text-primary: #1a2435;
   --text-sec: #4a5568;
   --text-dim: #90a0b4;
-  --font-main: 'Segoe UI', 'Helvetica Neue', sans-serif;
-  --font-mono: 'Consolas', 'SF Mono', monospace;
+  --font-main: "Google Sans", sans-serif;
+  --font-family: "Google Sans", sans-serif;
   --radius: 10px;
   --radius-sm: 6px;
 
@@ -50,13 +54,15 @@
 
 html,
 body {
-  height: 100%;
+  min-height: 100%;
   background: var(--bg-deep);
   color: var(--text-primary);
   font-family: var(--font-main);
   font-size: 14px;
   line-height: 1.5;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* Enable vertical scrolling */
   user-select: none;
 }
 
@@ -77,21 +83,42 @@ body::before {
    HEADER
    ============================================================ */
 .header {
-  position: relative;
-  z-index: 10;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
   background: var(--nav-bg);
   border-bottom: 1px solid var(--nav-border);
-  height: 56px;
+  height: 64px;
   display: flex;
   align-items: center;
-  padding: 0 24px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  padding: 0;
+
+  /* Permanent Fixed Header */
+  transform: translateY(0);
+  transition: all 0.4s ease-out;
+}
+
+
+
+
+
+/* Header Scrolled state */
+.header--scrolled {
+  height: 52px;
+  background: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: 0 8px 32px rgba(0, 151, 180, 0.12);
+  border-bottom: 1px solid rgba(0, 151, 180, 0.1);
 }
 
 .header-inner {
   display: flex;
   align-items: center;
   width: 100%;
+  padding: 0 24px;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -114,6 +141,7 @@ body::before {
   font-weight: 700;
   letter-spacing: -0.5px;
   color: var(--nav-text);
+  font-family: var(--font-main);
 }
 
 .logo-ai {
@@ -135,6 +163,7 @@ body::before {
   border-radius: 20px;
   font-size: 13px;
   font-weight: 500;
+  font-family: var(--font-main);
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -181,7 +210,7 @@ body::before {
 .status-text {
   font-size: 12px;
   color: var(--nav-text-sec);
-  font-family: var(--font-mono);
+  font-family: var(--font-main);
 }
 
 /* ============================================================
@@ -193,8 +222,12 @@ body::before {
   display: grid;
   grid-template-columns: 320px 1fr 380px;
   gap: 0;
-  height: calc(100vh - 56px);
-  overflow: hidden;
+  min-height: calc(100vh - 64px);
+  /* Offset header fixed */
+  margin-top: 64px;
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
   opacity: 0;
   transform: translateY(5px);
   transition: opacity 0.4s ease, transform 0.4s ease;
@@ -211,8 +244,8 @@ body::before {
 .panel {
   background: var(--bg-panel);
   border-right: 1px solid var(--border);
-  overflow-y: auto;
-  padding: 20px;
+  /* overflow-y: auto; REMOVED to allow page scroll if content is long */
+  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -391,14 +424,14 @@ body::before {
    ============================================================ */
 .viewer-3d {
   flex: 1;
-  min-height: 0;
+  min-height: 550px;
+  height: 55vh;
   position: relative;
   border-radius: var(--radius);
   overflow: hidden;
-  /* Always keep dark for 3D brain model visibility */
-  background: radial-gradient(ellipse at center, #0d1525 0%, #050810 100%) !important;
-  border: 1px solid #1e2d4a;
-  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5), 0 4px 20px rgba(0, 0, 0, 0.15);
+  background: radial-gradient(circle at 50% 42%, #18263b 0%, #0d1725 55%, #08101b 100%) !important;
+  border: 1px solid #2a3950;
+  box-shadow: inset 0 0 26px rgba(2, 6, 23, 0.38), 0 10px 26px rgba(15, 23, 42, 0.12);
 }
 
 #brainCanvas {
@@ -425,7 +458,7 @@ body::before {
   color: var(--text-sec);
   font-size: 13px;
   z-index: 5;
-  background: rgba(5, 8, 16, 0.8);
+  background: rgba(11, 18, 32, 0.82);
   padding: 24px 32px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
@@ -460,7 +493,7 @@ body::before {
   font-weight: 700;
   color: var(--text-dim);
   font-family: var(--font-mono);
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 0 8px rgba(2, 6, 23, 0.95);
 }
 
 .axis-label.x {
@@ -570,28 +603,26 @@ body::before {
 
 /* Healthy Tissue - Realistic brain pink/beige */
 .legend-swatch.healthy {
-  background: #E8B4A8;
-  box-shadow: 0 0 4px rgba(232, 180, 168, 0.4);
+  background: #d9d2ca;
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.22), 0 0 4px rgba(217, 210, 202, 0.28);
 }
 
-/* Tumor Core - Vivid neon red */
+/* Tumor core */
 .legend-swatch.tumor {
   background: var(--tumor-core);
-  box-shadow: 0 0 12px rgba(255, 0, 64, 0.9), inset 0 0 4px rgba(255, 100, 100, 0.5);
-  animation: tumor-pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10), 0 0 8px rgba(255, 51, 92, 0.38);
 }
 
-/* Tumor Glow - Orange halo */
+/* Enhancing zone */
 .legend-swatch.glow {
-  background: var(--tumor-glow);
-  box-shadow: 0 0 10px rgba(255, 61, 0, 0.7), inset 0 0 2px rgba(255, 150, 100, 0.3);
-  animation: glow-pulse 2.5s ease-in-out infinite;
+  background: #facc15;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10), 0 0 7px rgba(250, 204, 21, 0.34);
 }
 
-/* Tumor Spike/Edge markers */
+/* Edema */
 .legend-swatch.spike {
-  background: var(--tumor-edge);
-  box-shadow: 0 0 8px rgba(255, 107, 0, 0.6);
+  background: #22c55e;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10), 0 0 7px rgba(34, 197, 94, 0.30);
 }
 
 /* Confidence indicator */
@@ -784,7 +815,7 @@ body::before {
   font-size: 11px;
   color: var(--cyan);
   text-transform: uppercase;
-  letter-spacing: 1px;
+
   font-weight: 600;
   margin-bottom: 8px;
   padding-bottom: 4px;
@@ -805,20 +836,10 @@ body::before {
 .findings-list li {
   font-size: 13px;
   color: var(--text-sec);
-  padding: 6px 0 6px 20px;
+  padding: 6px 0;
   position: relative;
   line-height: 1.5;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-}
-
-.findings-list li::before {
-  content: '›';
-  position: absolute;
-  left: 6px;
-  top: 6px;
-  color: var(--cyan);
-  font-weight: 700;
-  font-size: 15px;
 }
 
 /* Disclaimer */
@@ -837,12 +858,14 @@ body::before {
    INFO PANEL (full overlay) — WHITE BACKGROUND
    ============================================================ */
 .info-panel {
-  position: fixed;
-  inset: 0;
+  position: relative;
+  margin-top: 64px;
+  min-height: calc(100vh - 64px);
   z-index: 100;
   background: #ffffff;
-  overflow-y: auto;
-  padding: 80px 24px 40px;
+  padding: 40px 24px;
+  display: none;
+  flex-direction: column;
 }
 
 .info-content {
@@ -1646,7 +1669,7 @@ body::before {
 /* Full-screen panel */
 #atlasViewPanel {
   position: fixed;
-  inset: 56px 0 0 0;
+  inset: 64px 0 0 0;
   /* below header */
   z-index: 90;
   background: var(--bg-deep);
@@ -2236,16 +2259,6 @@ body::before {
 
 /*** css phần tab lịch sử -----------------*/
 
-/* ── History panel (full-screen overlay below header) ─────── */
-#historyPanel {
-  position: fixed;
-  inset: 56px 0 0 0;
-  z-index: 80;
-  background: var(--bg-deep);
-  flex-direction: column;
-  overflow: hidden;
-}
-
 /* ── History toolbar ──────────────────────────────────────── */
 #historyToolbar {
   flex-shrink: 0;
@@ -2297,22 +2310,20 @@ body::before {
 
 /* ── History panel ──────────────────────────────────────────── */
 #historyPanel {
-  position: fixed;
-  top: 56px;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: calc(100vh - 56px);
+  position: relative;
+  margin-top: 64px;
+  min-height: calc(100vh - 64px);
+  /* Keep the history toolbar flush with the sticky app header */
   padding: 0;
-  overflow: hidden;
   background: var(--bg-deep);
   z-index: 100;
   display: none;
+  width: 100%;
   flex-direction: column;
   opacity: 0;
   transform: translateY(10px);
-  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
-              transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #historyPanel.active {
@@ -2354,7 +2365,7 @@ body::before {
   padding: 10px 12px;
   z-index: 20;
   backdrop-filter: blur(6px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   animation: atlasFadeIn 0.3s ease-out;
 }
 
@@ -2365,7 +2376,7 @@ body::before {
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-bottom: 8px;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   padding-bottom: 4px;
 }
 
@@ -2379,7 +2390,9 @@ body::before {
   color: #c1cfe8;
 }
 
-.atlas-seg-item:last-child { margin-bottom: 0; }
+.atlas-seg-item:last-child {
+  margin-bottom: 0;
+}
 
 .atlas-seg-item .dot {
   width: 10px;
@@ -2388,11 +2401,107 @@ body::before {
   box-shadow: 0 0 6px currentColor;
 }
 
-.atlas-seg-item .dot.ncr { background-color: #ff3232; color: #ff3232; }
-.atlas-seg-item .dot.et  { background-color: #3296ff; color: #3296ff; }
-.atlas-seg-item .dot.ed  { background-color: #32ff32; color: #32ff32; }
+.atlas-seg-item .dot.ncr {
+  background-color: #ff3232;
+  color: #ff3232;
+}
+
+.atlas-seg-item .dot.et {
+  background-color: #3296ff;
+  color: #3296ff;
+}
+
+.atlas-seg-item .dot.ed {
+  background-color: #32ff32;
+  color: #32ff32;
+}
 
 @keyframes atlasFadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================================
+   LIGHT THEME FOOTER
+   ============================================================ */
+.footer {
+  background: #f8fafc;
+  color: var(--text-primary);
+  padding: 25px 0;
+  border-top: 1px solid var(--border);
+  position: relative;
+  z-index: 10;
+  font-family: var(--font-main);
+}
+
+.footer-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.footer-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.footer-bottom .copyright {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+
+.footer-bottom-links {
+  display: flex;
+  gap: 15px;
+}
+
+.system-badge,
+.version-badge {
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--bg-deep);
+  color: var(--text-sec);
+  border: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.system-badge {
+  color: var(--green);
+  border-color: rgba(0, 168, 70, 0.2);
+  background: rgba(0, 168, 70, 0.05);
+}
+
+.footer-logo .logo-text {
+  color: var(--text-primary);
+}
+
+/* Responsive Footer */
+@media (max-width: 900px) {
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .footer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-bottom {
+    flex-direction: column;
+    text-align: center;
+  }
 }

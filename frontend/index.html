@@ -7,8 +7,8 @@
   <title>NeuroScan AI — Chẩn Đoán MRI Não</title>
 
   <!-- ===== STYLESHEETS ===== -->
-  <link rel="stylesheet" href="styles.css?v=4" />
-  <link rel="stylesheet" href="xai_similar_styles.css?v=3" />
+  <link rel="stylesheet" href="styles.css?v=10" />
+  <link rel="stylesheet" href="xai_similar_styles.css?v=7" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
   <script src="static/mni_registration.js"></script>
@@ -24,7 +24,7 @@
 
   <!-- ===== IMMEDIATE UI ENFORCEMENT ===== -->
   <script>
-    (function() {
+    (function () {
       // Hide the panel as soon as it's added to DOM, before scripts finish loading
       const observer = new MutationObserver((mutations) => {
         const panel = document.getElementById('tumorMetricsPanel');
@@ -46,12 +46,11 @@
       </div>
 
       <nav class="nav-pills">
-        <button class="pill active" data-tab="scan">Quét MRI</button>
-        <button class="pill" data-tab="brain3d">Não 3D</button>
+        <button class="pill active" data-tab="brain3d">Trực quan 3D</button>
         <button class="pill" data-tab="atlas">Atlas</button>
         <button class="pill" data-tab="xai">Giải Thích AI</button>
         <button class="pill" data-tab="similar">Ca Tương Tự</button>
-         <button class="pill" data-tab="history">Lịch Sử</button>
+        <button class="pill" data-tab="history">Lịch Sử</button>
         <button class="pill" data-tab="info">Thông Tin</button>
       </nav>
 
@@ -84,7 +83,8 @@
         <div class="preview-overlay" id="maskOverlay"></div>
       </div>
 
-      <button class="btn-diagnose" id="btnDiagnose" disabled style="display:flex;align-items:center;justify-content:center;gap:10px;">
+      <button class="btn-diagnose" id="btnDiagnose" disabled
+        style="display:flex;align-items:center;justify-content:center;gap:10px;">
         <i class="fa-solid fa-wand-magic-sparkles"></i> Chạy Chẩn Đoán
       </button>
     </section>
@@ -96,15 +96,18 @@
         <div class="viewer-controls">
           <!-- ✅ Auto-rotate | Detail View | Compare Cases | Atlas | Reset -->
           <button class="ctrl-btn" id="btnRotate" title="Auto-rotate (R)"><i class="fa-solid fa-rotate"></i></button>
-          <button class="ctrl-btn" id="btnSlice" title="Bật Detail Analysis (D)"><i class="fa-solid fa-chart-line"></i></button>
+          <button class="ctrl-btn" id="btnSlice" title="Bật Detail Analysis (D)"><i
+              class="fa-solid fa-chart-line"></i></button>
           <button class="ctrl-btn" id="btnCompare" title="So sánh ca bệnh tương tự"
-            style="display:none;position:relative;" onclick="window.openComparePicker && window.openComparePicker()"><i class="fa-solid fa-scale-balanced"></i>
+            style="display:none;position:relative;" onclick="window.openComparePicker && window.openComparePicker()"><i
+              class="fa-solid fa-scale-balanced"></i>
             <span id="compareBadge"
               style="position:absolute;top:-4px;right:-4px;background:#00c853;color:#000;font-size:8px;font-weight:900;padding:1px 4px;border-radius:8px;display:none;min-width:14px;text-align:center;line-height:14px;"></span>
           </button>
-         
 
-          <button class="ctrl-btn" id="btnReset" title="Reset view (ESC)"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+
+          <button class="ctrl-btn" id="btnReset" title="Reset view (ESC)"><i
+              class="fa-solid fa-arrow-rotate-left"></i></button>
         </div>
       </div>
 
@@ -123,43 +126,12 @@
         </div>
         <!-- Loading indicator for 3D model -->
         <div class="model-loading" id="modelLoading" style="display:flex;">
-          <div class="model-spinner"></div> 
+          <div class="model-spinner"></div>
           <span>Đang tải mô hình não 3D...</span>
         </div>
       </div>
 
-      <!-- Legend -->
-      <div class="legend">
-        <!-- Healthy Brain Tissue -->
-        <div class="legend-item">
-          <span class="legend-swatch healthy"></span>
-          <span>Mô Lành</span>
-        </div>
 
-        <!-- Tumor Core - Vivid Neon Red -->
-        <div class="legend-item">
-          <span class="legend-swatch tumor"></span>
-          <span>Lõi Khối U</span>
-        </div>
-
-        <!-- Tumor Glow - Orange Halo -->
-        <div class="legend-item">
-          <span class="legend-swatch glow"></span>
-          <span>Vùng Sáng U</span>
-        </div>
-
-        <!-- Spike Markers - Orange-Red -->
-        <div class="legend-item">
-          <span class="legend-swatch spike"></span>
-          <span>Điểm Ranh Giới</span>
-        </div>
-
-        <div class="legend-item" id="atlasLegendItem" style="display:none;">
-          <span class="legend-swatch atlas"></span>
-          <span>Vỏ Não (Atlas)</span>
-        </div>
-
-      </div>
     </section>
 
     <!-- ---- RIGHT PANEL: Diagnosis Report ---- -->
@@ -195,20 +167,24 @@
           border-radius: 8px;
           border: 1px solid var(--border);
         ">
-          <div style="font-size: 10px; color: var(--text-sec); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; font-weight: 700;">
+          <div
+            style="font-size: 10px; color: var(--text-sec); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; font-weight: 700;">
             <i class="fa-solid fa-palette" style="margin-right: 6px;"></i> Phân Lớp Màu (Grading)
           </div>
           <div style="display: flex; gap: 12px; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="width: 10px; height: 10px; border-radius: 2px; background: #ff0040; box-shadow: 0 0 5px #ff0040;"></span>
+              <span
+                style="width: 10px; height: 10px; border-radius: 2px; background: #ff0040; box-shadow: 0 0 5px #ff0040;"></span>
               <span style="font-size: 11px; color: var(--text-primary);">Hoại tử (Necrosis)</span>
             </div>
             <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="width: 10px; height: 10px; border-radius: 2px; background: #00c853; box-shadow: 0 0 5px #00c853;"></span>
+              <span
+                style="width: 10px; height: 10px; border-radius: 2px; background: #00c853; box-shadow: 0 0 5px #00c853;"></span>
               <span style="font-size: 11px; color: var(--text-primary);">Phù não (Edema)</span>
             </div>
             <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="width: 10px; height: 10px; border-radius: 2px; background: #ffd600; box-shadow: 0 0 5px #ffd600;"></span>
+              <span
+                style="width: 10px; height: 10px; border-radius: 2px; background: #ffd600; box-shadow: 0 0 5px #ffd600;"></span>
               <span style="font-size: 11px; color: var(--text-primary);">Tăng cường (Enhancing)</span>
             </div>
           </div>
@@ -241,7 +217,6 @@
           border-radius: 12px;
           background: #ffffff;
           border: 1px solid var(--border);
-          border-left: 5px solid #ff5252;
           position: relative;
           overflow: hidden;
           box-shadow: 0 4px 12px rgba(0,0,0,0.05);
@@ -254,7 +229,8 @@
             <!-- Header row -->
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
               <div style="display:flex;align-items:center;gap:10px;">
-                <span id="depthEmoji" style="font-size:20px;color:#ff5252;"><i class="fa-solid fa-ruler-vertical"></i></span>
+                <span id="depthEmoji" style="font-size:20px;color:#ff5252;"><i
+                    class="fa-solid fa-ruler-vertical"></i></span>
                 <span
                   style="color:var(--text-sec);font-size:11px;text-transform:uppercase;letter-spacing:1.2px;font-weight:700;">Độ
                   Sâu Khối U Từ Vỏ Não</span>
@@ -274,7 +250,8 @@
               font-family:'Consolas',monospace;
               color:#ff5252;line-height:1;
             ">—</span>
-              <span style="font-size:16px;color:var(--text-dim);font-family:'Consolas',monospace;font-weight:600;">mm</span>
+              <span
+                style="font-size:16px;color:var(--text-dim);font-family:'Consolas',monospace;font-weight:600;">mm</span>
               <span id="depthCategoryLabel" style="
               margin-left:8px;font-size:13px;font-weight:700;
               color:#ff5252;
@@ -339,7 +316,8 @@
 
         <!-- AI Methods Comparison -->
         <div class="report-section">
-          <div class="report-section-title"><i class="fa-solid fa-vials" style="margin-right:8px;"></i> So Sánh Các Phương Pháp AI</div>
+          <div class="report-section-title"><i class="fa-solid fa-vials" style="margin-right:8px;"></i> So Sánh Các
+            Phương Pháp AI</div>
           <div class="comparison-table">
             <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
               <thead>
@@ -356,36 +334,9 @@
           </div>
         </div>
 
-        <!-- Clinical Disclaimer -->
-        <div class="clinical-disclaimer" style="margin-top: 20px; padding: 16px; 
-        background: rgba(255, 152, 0, 0.1); border: 2px solid #ff9800; 
-        border-radius: 8px;">
-          <div style="display: flex; align-items: start; gap: 12px;">
-            <div style="font-size: 24px; color: #ff9800;"><i class="fa-solid fa-staff-snake"></i></div>
-            <div>
-              <div style="color: var(--orange); font-size: 13px; font-weight: bold; margin-bottom: 8px;">
-                TUYÊN BỐ TỪ CHỐI TRÁCH NHIỆM Y TẾ QUAN TRỌNG
-              </div>
-              <div style="color: var(--text-primary); font-size: 11px; line-height: 1.6;">
-                <strong>Hệ thống này là công cụ hỗ trợ quyết định, KHÔNG phải thiết bị chẩn đoán.</strong>
-                <br><br>
-                <strong>Vai trò AI:</strong> LLM (Groq AI) chỉ tổng hợp và diễn giải kết quả từ
-                phân đoạn CNN, trực quan hóa Grad-CAM, phân tích dựa trên quy tắc và tầm quan trọng đặc trưng SHAP.
-                Nó KHÔNG tham gia vào quá trình chẩn đoán.
-                <br><br>
-                <strong>Cần Xem Xét Chuyên Nghiệp:</strong> Tất cả các phát hiện phải được xác nhận bởi
-                bác sĩ X-quang thần kinh hoặc bác sĩ thần kinh có chứng chỉ. Công cụ này không thay thế phán đoán lâm
-                sàng.
-                <br><br>
-                <strong>Hạn Chế:</strong> Phân tích lát cắt 2D đơn, huấn luyện trên bộ dữ liệu cụ thể,
-                không có xác nhận mô bệnh học.
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- Disclaimer -->
-        <div class="disclaimer" id="disclaimer"></div>
+
+
       </div>
 
       <!-- Loading state -->
@@ -419,25 +370,6 @@
   <!-- ===== INFO TAB (hidden by default) ===== -->
   <div class="info-panel" id="infoPanel" style="display:none;">
     <div class="info-content" style="position: relative;">
-      <!-- Nút Trở Về Màn Hình Chính -->
-      <button onclick="window.App && window.App.switchTab('scan')" style="
-        background: #f8f9fa;
-        color: #495057;
-        border: 1px solid #ced4da;
-        padding: 8px 16px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: 600;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 20px;
-        transition: all 0.2s ease;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-      " onmouseover="this.style.background='#e9ecef'; this.style.borderColor='#adb5bd'; this.style.color='#212529';" onmouseout="this.style.background='#f8f9fa'; this.style.borderColor='#ced4da'; this.style.color='#495057';">
-        <i class="fa-solid fa-arrow-left"></i> Trở về Màn Hình Chính
-      </button>
-
       <h2>Giới Thiệu NeuroScan AI</h2>
       <p>Hệ thống phát hiện u não MRI hoàn toàn dựa trên phần mềm, kết hợp phân đoạn CNN U-Net với
         tạo báo cáo y tế bằng Groq AI và trực quan hóa não 3D tương tác.</p>
@@ -507,10 +439,27 @@
         <strong>Thông Tin Tổng Hợp:</strong> Khuyến nghị lâm sàng tổng hợp
       </p>
 
-      <div class="disclaimer">⚠ Hệ thống này chỉ dành cho mục đích nghiên cứu và giáo dục. KHÔNG thay thế
-        chẩn đoán y tế chuyên nghiệp. Luôn tham khảo bác sĩ thần kinh có chứng chỉ.</div>
     </div>
   </div>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-bottom">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div class="logo footer-logo" style="transform: scale(0.85); transform-origin: left;">
+            <span class="logo-icon"><i class="fa-solid fa-circle-nodes"></i></span>
+            <span class="logo-text">NeuroScan<span class="logo-ai">AI</span></span>
+          </div>
+          <span style="width: 1px; height: 16px; background: var(--border); margin: 0 4px;"></span>
+          <p class="copyright">&copy; 2026 NeuroScan AI - LUU VI THUAN</p>
+        </div>
+
+       
+      </div>
+    </div>
+  </footer>
+
 
   <!-- ===== SCRIPTS ===== -->
 
@@ -675,6 +624,9 @@
   <!-- Brain 3D Engine -->
   <script src="brain3d_new.js?v=7"></script>
 
+  <!-- Clinical 3D Enhancer -->
+  <script src="brain3d_clinical_tools.js?v=5"></script>
+
   <!-- XAI & Similar UI -->
   <script src="xai_similar_ui.js"></script>
 
@@ -690,7 +642,7 @@
   <!-- UI Controls -->
   <script src="brain3d_ui_controls.js?v=3"></script>
 
-  <!-- Integration Patch -->  
+  <!-- Integration Patch -->
   <script src="brain3d_integration_patch.js?v=2"></script>
 
   <!-- Atlas 4-Panel Viewer (EBRAINS-style) -->
@@ -731,6 +683,204 @@
         if (loading) loading.style.display = 'none';
       }, 3000);
     });
+  </script>
+
+
+  <!-- ===== THÔNG TIN THAM KHẢO TỪ AI CHẨN ĐOÁN ===== -->
+  <div id="aiDisclaimerPopup" style="
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    max-width: 320px;
+    font-family: var(--font-main);
+    animation: slideInLeft 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  ">
+    <!-- Collapsed pill (always visible) -->
+    <div id="aiDisclaimerPill" onclick="toggleAiDisclaimer()" style="
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+    
+      border-radius: 10px;
+      padding: 10px 16px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+    " onmouseover="this.style.background='rgba(255, 255, 255, 1)'; this.style.boxShadow='0 12px 30px rgba(0, 0, 0, 0.12)'; this.style.transform='translateY(-2px)'"
+      onmouseout="this.style.background='rgba(255, 255, 255, 0.92)'; this.style.boxShadow='0 10px 25px rgba(0, 0, 0, 0.08)'; this.style.transform='translateY(0)'">
+      <!-- Pulsing dot -->
+      <span style="
+        position: relative;
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: #0284c7;
+        flex-shrink: 0;
+      ">
+        <span id="aiPulseDot" style="
+          position: absolute;
+          inset: -4px;
+          border-radius: 50%;
+          border: 1.5px solid #0284c7;
+          animation: aiPulseRing 2s ease-out infinite;
+          opacity: 0;
+        "></span>
+      </span>
+
+      <span style="
+        font-size: 11px;
+        font-weight: 700;
+      
+        color: #1e293b;
+        text-transform: uppercase;
+        white-space: nowrap;
+      ">THÔNG TIN THAM KHẢO TỪ AI CHẨN ĐOÁN</span>
+
+      <span id="aiDisclaimerChevron" style="
+        font-size: 10px;
+        color: #64748b;
+        margin-left: 4px;
+        transition: transform 0.3s ease;
+      ">▲</span>
+    </div>
+
+    <!-- Expanded content -->
+    <div id="aiDisclaimerContent" style="
+      max-height: 0;
+      opacity: 0;
+      margin-top: 0;
+      overflow: hidden;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+     
+      border-radius: 10px;
+      padding: 0 20px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    ">
+      <div style="padding-top: 16px; padding-bottom: 16px;">
+
+        <div style="
+        font-size: 11px;
+        font-weight: 700;
+       
+        color: #0284c7;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      ">
+          <i class="fa-solid fa-circle-info" style="font-size:12px;"></i>
+          Lưu ý quan trọng
+        </div>
+
+        <ul style="
+        margin: 0; padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      ">
+          <li style="display:flex;gap:10px;align-items:flex-start;">
+            <span style="color:#0284c7;font-size:12px;margin-top:1px;flex-shrink:0;"><i
+                class="fa-solid fa-chevron-right" style="font-size:8px;"></i></span>
+            <span style="font-size: 12.5px; color: #334155; line-height: 1.6;">
+              Kết quả AI chỉ mang tính <strong style="color:#0f172a;">tham khảo</strong>, không thay thế chẩn đoán lâm
+              sàng.
+            </span>
+          </li>
+          <li style="display:flex;gap:10px;align-items:flex-start;">
+            <span style="color:#0284c7;font-size:12px;margin-top:1px;flex-shrink:0;"><i
+                class="fa-solid fa-chevron-right" style="font-size:8px;"></i></span>
+            <span style="font-size: 12.5px; color: #334155; line-height: 1.6;">
+              Cần được xác nhận bởi <strong style="color:#0f172a;">bác sĩ chuyên khoa</strong> thần kinh.
+            </span>
+          </li>
+          <li style="display:flex;gap:10px;align-items:flex-start;">
+            <span style="color:#0284c7;font-size:12px;margin-top:1px;flex-shrink:0;"><i
+                class="fa-solid fa-chevron-right" style="font-size:8px;"></i></span>
+            <span style="font-size: 12.5px; color: #334155; line-height: 1.6;">
+              Độ chính xác phụ thuộc vào <strong style="color:#0f172a;">chất lượng ảnh</strong> đầu vào.
+            </span>
+          </li>
+        </ul>
+
+        <div style="
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(0, 0, 0, 0.05);
+        font-size: 10.5px;
+        color: #94a3b8;
+        letter-spacing: 0.2px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      ">
+          <span>NeuroScan AI</span>
+          <span style="opacity: 0.8;">Phiên bản nghiên cứu v2.0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @keyframes slideInLeft {
+      from {
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes aiPulseRing {
+      0% {
+        transform: scale(1);
+        opacity: 0.8;
+      }
+
+      100% {
+        transform: scale(2.8);
+        opacity: 0;
+      }
+    }
+  </style>
+
+  <script>
+    function toggleAiDisclaimer() {
+      const content = document.getElementById('aiDisclaimerContent');
+      const chevron = document.getElementById('aiDisclaimerChevron');
+      const isOpen = content.style.maxHeight !== '0px' && content.style.maxHeight !== '';
+
+      if (isOpen) {
+        content.style.maxHeight = '0px';
+        content.style.opacity = '0';
+        content.style.marginTop = '0px';
+        content.style.transform = 'translateY(10px)';
+        content.style.pointerEvents = 'none';
+        chevron.style.transform = '';
+      } else {
+        content.style.maxHeight = '500px'; // Reasonable limit
+        content.style.opacity = '1';
+        content.style.marginTop = '8px';
+        content.style.transform = 'translateY(0)';
+        content.style.pointerEvents = 'auto';
+        chevron.style.transform = 'rotate(180deg)';
+      }
+    }
   </script>
 
 </body>
