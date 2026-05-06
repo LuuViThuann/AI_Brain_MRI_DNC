@@ -459,10 +459,10 @@
   function _drawSliceAnnotations(ctx, W, H, view, mode, zoom) {
     // ── 1. Orientation labels (colored, high-contrast badges) ──
     const ORIENT = {
-      axial:    { top:'A', bottom:'P', left:'R', right:'L', topC:'#00e5ff', bottomC:'#ff9100', leftC:'#44ff88', rightC:'#cc88ff' },
-      coronal:  { top:'S', bottom:'I', left:'R', right:'L', topC:'#00e5ff', bottomC:'#ff5252', leftC:'#44ff88', rightC:'#cc88ff' },
-      sagittal: { top:'S', bottom:'I', left:'A', right:'P', topC:'#00e5ff', bottomC:'#ff5252', leftC:'#ffcc44', rightC:'#ff6688' },
-    }[view] || { top:'↑', bottom:'↓', left:'←', right:'→', topC:'#fff', bottomC:'#fff', leftC:'#fff', rightC:'#fff' };
+      axial: { top: 'A', bottom: 'P', left: 'R', right: 'L', topC: '#00e5ff', bottomC: '#ff9100', leftC: '#44ff88', rightC: '#cc88ff' },
+      coronal: { top: 'S', bottom: 'I', left: 'R', right: 'L', topC: '#00e5ff', bottomC: '#ff5252', leftC: '#44ff88', rightC: '#cc88ff' },
+      sagittal: { top: 'S', bottom: 'I', left: 'A', right: 'P', topC: '#00e5ff', bottomC: '#ff5252', leftC: '#ffcc44', rightC: '#ff6688' },
+    }[view] || { top: '↑', bottom: '↓', left: '←', right: '→', topC: '#fff', bottomC: '#fff', leftC: '#fff', rightC: '#fff' };
 
     const fs = Math.max(10, Math.round(W / 30));
     const pad = 5;
@@ -474,7 +474,7 @@
       ctx.textAlign = align;
       ctx.textBaseline = baseline;
       const tw = ctx.measureText(text).width;
-      const bx = align === 'right' ? x - tw - bpad : (align === 'center' ? x - tw/2 - bpad : x - bpad);
+      const bx = align === 'right' ? x - tw - bpad : (align === 'center' ? x - tw / 2 - bpad : x - bpad);
       const by = baseline === 'bottom' ? y - fs - bpad : y - bpad;
       ctx.fillStyle = 'rgba(0,0,0,0.65)';
       ctx.beginPath();
@@ -486,10 +486,10 @@
       ctx.restore();
     }
 
-    drawOrientBadge(ORIENT.top,    W / 2, pad + fs, ORIENT.topC,    'center', 'top');
-    drawOrientBadge(ORIENT.bottom, W / 2, H - pad,  ORIENT.bottomC, 'center', 'bottom');
-    drawOrientBadge(ORIENT.left,   pad + 2, H / 2,  ORIENT.leftC,   'left',   'middle');
-    drawOrientBadge(ORIENT.right,  W - pad - 2, H / 2, ORIENT.rightC, 'right', 'middle');
+    drawOrientBadge(ORIENT.top, W / 2, pad + fs, ORIENT.topC, 'center', 'top');
+    drawOrientBadge(ORIENT.bottom, W / 2, H - pad, ORIENT.bottomC, 'center', 'bottom');
+    drawOrientBadge(ORIENT.left, pad + 2, H / 2, ORIENT.leftC, 'left', 'middle');
+    drawOrientBadge(ORIENT.right, W - pad - 2, H / 2, ORIENT.rightC, 'right', 'middle');
 
     // ── 2. Scale bar (bottom-right) ──
     // 1mm ≈ (actual FOV / W) pixels. Approximate: brain ~18cm, image 256px → 1mm ≈ 256/180 px
@@ -516,23 +516,23 @@
     // ── 3. Tumor depth + info badge (top-right corner) ──
     const dd = STATE.diagnosisData;
     if (dd?.prediction?.tumor_detected) {
-      const depth    = dd.depth_metrics?.tumor_depth_mm;
-      const cat      = dd.depth_metrics?.depth_category?.category || 'INTERMEDIATE';
-      const area     = dd.prediction?.tumor_area_percent;
-      const conf     = Math.round((dd.prediction?.confidence || 0) * 100);
-      let loc      = dd.prediction?.location_hint || '';
+      const depth = dd.depth_metrics?.tumor_depth_mm;
+      const cat = dd.depth_metrics?.depth_category?.category || 'INTERMEDIATE';
+      const area = dd.prediction?.tumor_area_percent;
+      const conf = Math.round((dd.prediction?.confidence || 0) * 100);
+      let loc = dd.prediction?.location_hint || '';
       if (window.translateLocationToVi) loc = window.translateLocationToVi(loc);
 
       const DCOL = {
-        OUTSIDE:'#ff0000', SUPERFICIAL:'#ff5252', SHALLOW:'#ffb74d',
-        INTERMEDIATE:'#ffe57a', DEEP:'#66bb6a', VERY_DEEP:'#4dd0e1'
+        OUTSIDE: '#ff0000', SUPERFICIAL: '#ff5252', SHALLOW: '#ffb74d',
+        INTERMEDIATE: '#ffe57a', DEEP: '#66bb6a', VERY_DEEP: '#4dd0e1'
       };
       const dcol = DCOL[cat] || '#ffe57a';
 
       const lines = [
-        { label: 'Sâu', val: depth != null ? depth.toFixed(1)+' mm' : 'N/A', valCol: dcol },
-        { label: 'D/Tích',  val: area  != null ? area.toFixed(2)+'%' : 'N/A',  valCol: '#ff9100' },
-        { label: 'T/cậy',  val: conf + '%', valCol: '#00e5ff' },
+        { label: 'Sâu', val: depth != null ? depth.toFixed(1) + ' mm' : 'N/A', valCol: dcol },
+        { label: 'D/Tích', val: area != null ? area.toFixed(2) + '%' : 'N/A', valCol: '#ff9100' },
+        { label: 'T/cậy', val: conf + '%', valCol: '#00e5ff' },
       ];
 
       const lineH = 14, bw = 135, bh = lines.length * lineH + 22;
@@ -577,7 +577,7 @@
     }
 
     // ── 4. Mode watermark ──
-    const MODE_WM = { gray:'ẢNH MRI XÁM', tumor:'PHỦ KHỐI U', segmentation:'PHÂN VÙNG MÀU U', heatmap:'BẢN ĐỒ NHIỆT', region:'BẢN ĐỒ VÙNG KHU VỰC' };
+    const MODE_WM = { gray: 'ẢNH MRI XÁM', tumor: 'PHỦ KHỐI U', segmentation: 'PHÂN VÙNG MÀU U', heatmap: 'BẢN ĐỒ NHIỆT', region: 'BẢN ĐỒ VÙNG KHU VỰC' };
     const wmText = MODE_WM[mode] || mode.toUpperCase();
     ctx.save();
     ctx.globalAlpha = 0.22;
@@ -841,7 +841,7 @@
     if (!canvas || typeof THREE === 'undefined') return;
 
     const wrap = canvas.parentElement;
-    canvas.width  = wrap.clientWidth  || 400;
+    canvas.width = wrap.clientWidth || 400;
     canvas.height = wrap.clientHeight || 400;
     const W = canvas.width, H = canvas.height;
 
@@ -882,14 +882,14 @@
     grid.position.y = -80; scene.add(grid);
 
     // ── Global scene refs (available immediately for addTumorTo3D) ──
-    window._atlas3DTumorMesh   = null;
-    window._atlas3DTumorGlow   = null;
-    window._atlas3DTumorRings  = [];
-    window._atlas3DTumorLines  = [];
-    window._atlas3DScene       = scene;
-    window._atlas3DCamera      = camera;
-    window._atlas3DBrainGroup  = brainGroup;
-    window._atlas3DGLBModel    = null;
+    window._atlas3DTumorMesh = null;
+    window._atlas3DTumorGlow = null;
+    window._atlas3DTumorRings = [];
+    window._atlas3DTumorLines = [];
+    window._atlas3DScene = scene;
+    window._atlas3DCamera = camera;
+    window._atlas3DBrainGroup = brainGroup;
+    window._atlas3DGLBModel = null;
 
     // ─────────────────────────────────────────────
     // LOADING OVERLAY (inside 3D panel)
@@ -928,34 +928,34 @@
       const innerMesh = new THREE.Mesh(innerGeo, innerMat);
       innerMesh.castShadow = true; brainGroup.add(innerMesh);
 
-      gyriMat = new THREE.MeshBasicMaterial({ color:0x0d2244, wireframe:true, opacity:0.20, transparent:true });
+      gyriMat = new THREE.MeshBasicMaterial({ color: 0x0d2244, wireframe: true, opacity: 0.20, transparent: true });
       brainGroup.add(new THREE.Mesh(shellGeo, gyriMat));
 
       const lobeData = [
-        { pos:[-28,22,18], r:[22,18,18], color:0x4477ff },
-        { pos:[28,22,18],  r:[22,18,18], color:0x55aaff },
-        { pos:[-30,-5,12], r:[20,14,18], color:0xff7733 },
-        { pos:[30,-5,12],  r:[20,14,18], color:0xffaa44 },
-        { pos:[0,10,-8],   r:[30,16,20], color:0x44cc88 },
-        { pos:[0,-28,-12], r:[24,14,18], color:0xcc44ff },
+        { pos: [-28, 22, 18], r: [22, 18, 18], color: 0x4477ff },
+        { pos: [28, 22, 18], r: [22, 18, 18], color: 0x55aaff },
+        { pos: [-30, -5, 12], r: [20, 14, 18], color: 0xff7733 },
+        { pos: [30, -5, 12], r: [20, 14, 18], color: 0xffaa44 },
+        { pos: [0, 10, -8], r: [30, 16, 20], color: 0x44cc88 },
+        { pos: [0, -28, -12], r: [24, 14, 18], color: 0xcc44ff },
       ];
       lobeData.forEach(l => {
-        const geo = new THREE.SphereGeometry(1,24,24); geo.scale(...l.r);
-        const m = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({color:l.color,transparent:true,opacity:0.38,shininess:50}));
+        const geo = new THREE.SphereGeometry(1, 24, 24); geo.scale(...l.r);
+        const m = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: l.color, transparent: true, opacity: 0.38, shininess: 50 }));
         m.position.set(...l.pos); brainGroup.add(m);
       });
-      const cbGeo = new THREE.SphereGeometry(1,32,32); cbGeo.scale(26,18,20);
-      const cb = new THREE.Mesh(cbGeo,new THREE.MeshPhongMaterial({color:0xffcc88,transparent:true,opacity:0.36}));
-      cb.position.set(0,-44,-28); brainGroup.add(cb);
-      const bs = new THREE.Mesh(new THREE.CylinderGeometry(7,9,28,16),
-        new THREE.MeshPhongMaterial({color:0xddbb88,transparent:true,opacity:0.40}));
-      bs.position.set(0,-58,-4); brainGroup.add(bs);
-      const thalGeo = new THREE.SphereGeometry(1,20,20); thalGeo.scale(14,10,12);
-      const thal = new THREE.Mesh(thalGeo,new THREE.MeshPhongMaterial({color:0xffee44,transparent:true,opacity:0.30}));
-      thal.position.set(0,4,-4); brainGroup.add(thal);
-      const cc = new THREE.Mesh(new THREE.TorusGeometry(18,4,8,32,Math.PI),
-        new THREE.MeshPhongMaterial({color:0xffd700,transparent:true,opacity:0.28}));
-      cc.rotation.x = Math.PI/2; cc.position.y = 5; brainGroup.add(cc);
+      const cbGeo = new THREE.SphereGeometry(1, 32, 32); cbGeo.scale(26, 18, 20);
+      const cb = new THREE.Mesh(cbGeo, new THREE.MeshPhongMaterial({ color: 0xffcc88, transparent: true, opacity: 0.36 }));
+      cb.position.set(0, -44, -28); brainGroup.add(cb);
+      const bs = new THREE.Mesh(new THREE.CylinderGeometry(7, 9, 28, 16),
+        new THREE.MeshPhongMaterial({ color: 0xddbb88, transparent: true, opacity: 0.40 }));
+      bs.position.set(0, -58, -4); brainGroup.add(bs);
+      const thalGeo = new THREE.SphereGeometry(1, 20, 20); thalGeo.scale(14, 10, 12);
+      const thal = new THREE.Mesh(thalGeo, new THREE.MeshPhongMaterial({ color: 0xffee44, transparent: true, opacity: 0.30 }));
+      thal.position.set(0, 4, -4); brainGroup.add(thal);
+      const cc = new THREE.Mesh(new THREE.TorusGeometry(18, 4, 8, 32, Math.PI),
+        new THREE.MeshPhongMaterial({ color: 0xffd700, transparent: true, opacity: 0.28 }));
+      cc.rotation.x = Math.PI / 2; cc.position.y = 5; brainGroup.add(cc);
 
       addSlicePlanes(brainGroup);
       _glbLoaded = false;
@@ -970,9 +970,9 @@
       const Loader = THREE.GLTFLoader;
       if (!Loader) { _buildFallbackBrain(); loadingOverlay.remove(); return; }
 
-      const loader   = new Loader();
-      const urls     = ['models/detail_brain.glb', 'models/Brain.glb'];
-      let   urlIndex = 0;
+      const loader = new Loader();
+      const urls = ['models/detail_brain.glb', 'models/Brain.glb'];
+      let urlIndex = 0;
 
       function attempt() {
         if (urlIndex >= urls.length) {
@@ -989,13 +989,13 @@
             const model = gltf.scene;
 
             // Centre & scale to fit ~130 world-units
-            const box    = new THREE.Box3().setFromObject(model);
+            const box = new THREE.Box3().setFromObject(model);
             const centre = new THREE.Vector3();
             box.getCenter(centre);
-            const size   = new THREE.Vector3();
+            const size = new THREE.Vector3();
             box.getSize(size);
             const maxDim = Math.max(size.x, size.y, size.z);
-            const scale  = 130 / (maxDim || 1);
+            const scale = 130 / (maxDim || 1);
             model.position.sub(centre);
             model.scale.setScalar(scale);
 
@@ -1003,35 +1003,35 @@
             let outerMat = null;
             model.traverse(child => {
               if (!child.isMesh) return;
-              child.castShadow    = true;
+              child.castShadow = true;
               child.receiveShadow = true;
               const n = (child.name || '').toLowerCase();
-              const isOuter = n.includes('outer')||n.includes('cortex')||n.includes('brain')||
-                              n.includes('surface')||(child.geometry?.attributes?.position?.count > 8000);
+              const isOuter = n.includes('outer') || n.includes('cortex') || n.includes('brain') ||
+                n.includes('surface') || (child.geometry?.attributes?.position?.count > 8000);
               const mat = new THREE.MeshPhongMaterial({
-                color:      isOuter ? 0xb8c8d8 : 0x7ba7cc,
+                color: isOuter ? 0xb8c8d8 : 0x7ba7cc,
                 transparent: true,
-                opacity:     isOuter ? 0.28 : 0.52,
-                shininess:   isOuter ? 70 : 35,
-                specular:    0x334466,
-                side:        THREE.DoubleSide
+                opacity: isOuter ? 0.28 : 0.52,
+                shininess: isOuter ? 70 : 35,
+                specular: 0x334466,
+                side: THREE.DoubleSide
               });
               child.material = mat;
               if (isOuter && !outerMat) outerMat = mat;
             });
 
             // Expose primary shell mat for mode-select
-            shellMat = outerMat || new THREE.MeshPhongMaterial({color:0xb8c8d8,transparent:true,opacity:0.28});
+            shellMat = outerMat || new THREE.MeshPhongMaterial({ color: 0xb8c8d8, transparent: true, opacity: 0.28 });
             innerMat = shellMat; // same ref (GLB has real anatomy)
-            gyriMat  = null;     // no wireframe overlay needed
+            gyriMat = null;     // no wireframe overlay needed
 
             brainGroup.add(model);
             window._atlas3DGLBModel = model;
 
             // Faint wireframe skull overlay
-            const skullGeo = new THREE.SphereGeometry(70,48,48);
-            const skullMat = new THREE.MeshBasicMaterial({color:0x1a3366,wireframe:true,opacity:0.06,transparent:true});
-            brainGroup.add(new THREE.Mesh(skullGeo,skullMat));
+            const skullGeo = new THREE.SphereGeometry(70, 48, 48);
+            const skullMat = new THREE.MeshBasicMaterial({ color: 0x1a3366, wireframe: true, opacity: 0.06, transparent: true });
+            brainGroup.add(new THREE.Mesh(skullGeo, skullMat));
 
             addSlicePlanes(brainGroup);
             _glbLoaded = true;
@@ -1039,8 +1039,8 @@
 
             // Badge
             const badge = document.createElement('div');
-            badge.style.cssText = 'position:absolute;bottom:8px;left:8px;background:rgba(0,229,255,0.10);'+
-              'border:1px solid rgba(0,229,255,0.28);border-radius:5px;padding:2px 8px;'+
+            badge.style.cssText = 'position:absolute;bottom:8px;left:8px;background:rgba(0,229,255,0.10);' +
+              'border:1px solid rgba(0,229,255,0.28);border-radius:5px;padding:2px 8px;' +
               'font-size:9px;color:#4dd0e1;letter-spacing:0.5px;pointer-events:none;z-index:5;';
             badge.textContent = '🧠 ' + url.split('/').pop();
             if (wrap) wrap.appendChild(badge);
@@ -1061,7 +1061,7 @@
             }
           },
           function onError(err) {
-            console.warn('[Atlas4Panel] ⚠️  GLB load failed:', url, err.message||err);
+            console.warn('[Atlas4Panel] ⚠️  GLB load failed:', url, err.message || err);
             attempt();
           }
         );
@@ -1077,24 +1077,24 @@
       const mode = this.value;
       if (_glbLoaded && window._atlas3DGLBModel) {
         // Traverse GLB model and adjust opacity
-        const opaque = { normal:0.28, solid:0.72, wireframe:0.0, depth:0.12 };
-        const innerO = { normal:0.52, solid:0.85, wireframe:0.0, depth:0.35 };
+        const opaque = { normal: 0.28, solid: 0.72, wireframe: 0.0, depth: 0.12 };
+        const innerO = { normal: 0.52, solid: 0.85, wireframe: 0.0, depth: 0.35 };
         let first = true;
         window._atlas3DGLBModel.traverse(child => {
           if (!child.isMesh) return;
-          const n = (child.name||'').toLowerCase();
-          const isOuter = n.includes('outer')||n.includes('cortex')||n.includes('brain')||
-                          (child.geometry?.attributes?.position?.count > 8000);
-          child.material.opacity  = isOuter ? (opaque[mode]??0.28) : (innerO[mode]??0.52);
+          const n = (child.name || '').toLowerCase();
+          const isOuter = n.includes('outer') || n.includes('cortex') || n.includes('brain') ||
+            (child.geometry?.attributes?.position?.count > 8000);
+          child.material.opacity = isOuter ? (opaque[mode] ?? 0.28) : (innerO[mode] ?? 0.52);
           child.material.wireframe = mode === 'wireframe';
           if (first) { first = false; }
         });
       } else if (shellMat && innerMat) {
         // Fallback sphere mode
-        if (mode==='solid') { shellMat.opacity=0.85; innerMat.opacity=0.90; if(gyriMat) gyriMat.visible=false; }
-        else if (mode==='wireframe') { shellMat.opacity=0; innerMat.opacity=0; if(gyriMat){gyriMat.visible=true;gyriMat.opacity=0.45;} }
-        else if (mode==='depth') { shellMat.opacity=0.08; innerMat.opacity=0.30; if(gyriMat){gyriMat.visible=true;gyriMat.opacity=0.35;} }
-        else { shellMat.opacity=0.15; innerMat.opacity=0.80; if(gyriMat){gyriMat.visible=true;gyriMat.opacity=0.20;} }
+        if (mode === 'solid') { shellMat.opacity = 0.85; innerMat.opacity = 0.90; if (gyriMat) gyriMat.visible = false; }
+        else if (mode === 'wireframe') { shellMat.opacity = 0; innerMat.opacity = 0; if (gyriMat) { gyriMat.visible = true; gyriMat.opacity = 0.45; } }
+        else if (mode === 'depth') { shellMat.opacity = 0.08; innerMat.opacity = 0.30; if (gyriMat) { gyriMat.visible = true; gyriMat.opacity = 0.35; } }
+        else { shellMat.opacity = 0.15; innerMat.opacity = 0.80; if (gyriMat) { gyriMat.visible = true; gyriMat.opacity = 0.20; } }
       }
     });
 
@@ -1154,8 +1154,8 @@
       if (window._atlas3DTumorRings && window._atlas3DTumorRings.length) {
         window._atlas3DTumorRings.forEach((ring) => {
           if (ring && ring._pulse) {
-            const ph   = ring._pulsePhase  || 0;
-            const spd  = ring._pulseSpeed  || 1.5;
+            const ph = ring._pulsePhase || 0;
+            const spd = ring._pulseSpeed || 1.5;
             const orig = ring._origOpacity || 0.45;
             ring.material.opacity = orig * (0.45 + 0.55 * Math.abs(Math.sin(t * spd + ph)));
             const s = 1.0 + 0.06 * Math.sin(t * spd * 1.3 + ph);
@@ -1240,7 +1240,7 @@
                pulsing corona rings, 3D target reticle, volumetric glow cone
   ══════════════════════════════════════════════════════════════════════════ */
   function addTumorTo3D(diagnosisData) {
-    const scene      = window._atlas3DScene;
+    const scene = window._atlas3DScene;
     const brainGroup = window._atlas3DBrainGroup || scene;
     if (!scene) return;
 
@@ -1254,48 +1254,48 @@
     // ── Remove old tumor objects ──
     const _allOld = [
       window._atlas3DTumorMesh, window._atlas3DTumorGlow,
-      ...(window._atlas3DTumorRings    || []),
-      ...(window._atlas3DTumorLines    || []),
-      ...(window._atlas3DTumorExtras   || []),
+      ...(window._atlas3DTumorRings || []),
+      ...(window._atlas3DTumorLines || []),
+      ...(window._atlas3DTumorExtras || []),
       window._atlas3DDepthSprite,
       window._atlas3DParticleSystem,
     ].filter(Boolean);
     _allOld.forEach(m => brainGroup.remove(m));
-    window._atlas3DTumorMesh   = null;
-    window._atlas3DTumorGlow   = null;
-    window._atlas3DTumorRings  = [];
-    window._atlas3DTumorLines  = [];
+    window._atlas3DTumorMesh = null;
+    window._atlas3DTumorGlow = null;
+    window._atlas3DTumorRings = [];
+    window._atlas3DTumorLines = [];
     window._atlas3DTumorExtras = [];
     window._atlas3DDepthSprite = null;
     window._atlas3DParticleSystem = null;
 
     if (!diagnosisData?.prediction?.tumor_detected) return;
 
-    const pred     = diagnosisData.prediction;
-    const depthMm  = diagnosisData.depth_metrics?.tumor_depth_mm ?? 20;
+    const pred = diagnosisData.prediction;
+    const depthMm = diagnosisData.depth_metrics?.tumor_depth_mm ?? 20;
     const depthCat = diagnosisData.depth_metrics?.depth_category?.category || 'INTERMEDIATE';
-    const conf     = (pred.confidence || 0.9);
+    const conf = (pred.confidence || 0.9);
 
     // ── FIX: centroid_normalized từ backend là range -1..1 (không phải 0..1)
     //    backend: (cx - 128) / 128  →  range -1.0 to +1.0, center = 0
-    const cx_norm  = pred.centroid_normalized?.[0] ?? 0;   // -1..1
-    const cy_norm  = pred.centroid_normalized?.[1] ?? 0;   // -1..1
+    const cx_norm = pred.centroid_normalized?.[0] ?? 0;   // -1..1
+    const cy_norm = pred.centroid_normalized?.[1] ?? 0;   // -1..1
     const area_pct = pred.tumor_area_percent || 2;
-    const locHint  = pred.location_hint || '';
+    const locHint = pred.location_hint || '';
 
     // ── FIX: Map centroid vào brain world-space
     //    Brain GLB scale = 130 world-units (bán kính ~65)
     //    Dùng BRAIN_R = 50 để tumor chắc chắn nằm trong não
     const BRAIN_R = 50;
-    const tx      = cx_norm * BRAIN_R;                    // X: trái(-) ↔ phải(+)
-    const ty      = -cy_norm * BRAIN_R;                   // Y: flip (ảnh↓ = 3D ↑)
-    const tz      = -(depthMm / 55) * (BRAIN_R * 0.45);  // Z: sâu hơn → đẩy vào trong
-    const radius  = Math.max(4, Math.min(24, Math.sqrt(area_pct) * 3.8));
+    const tx = cx_norm * BRAIN_R;                    // X: trái(-) ↔ phải(+)
+    const ty = -cy_norm * BRAIN_R;                   // Y: flip (ảnh↓ = 3D ↑)
+    const tz = -(depthMm / 55) * (BRAIN_R * 0.45);  // Z: sâu hơn → đẩy vào trong
+    const radius = Math.max(4, Math.min(24, Math.sqrt(area_pct) * 3.8));
     const shallow = depthMm < 15;
 
     console.log(`[Atlas4Panel] 🎯 Tumor 3D pos: cx_norm=${cx_norm.toFixed(2)}, cy_norm=${cy_norm.toFixed(2)} → (${tx.toFixed(1)}, ${ty.toFixed(1)}, ${tz.toFixed(1)}) r=${radius.toFixed(1)}`);
-    const dc      = _getDepthColor3D(depthMm);
-    const extras  = [];
+    const dc = _getDepthColor3D(depthMm);
+    const extras = [];
 
     // ════════════════════════════════════════════════════
     //  1. CORE TUMOR SPHERE
@@ -1349,10 +1349,10 @@
     // ════════════════════════════════════════════════════
     const rings = [];
     const ringDefs = [
-      { scale: 2.0, tube: 0.10, color: dc.core,  opacity: 0.70, rotX: Math.PI/2 },
-      { scale: 2.8, tube: 0.08, color: dc.glow,  opacity: 0.50, rotX: Math.PI/6 },
-      { scale: 3.6, tube: 0.06, color: 0xffffff, opacity: 0.18, rotX: Math.PI/4 },
-      { scale: 2.2, tube: 0.07, color: dc.core,  opacity: 0.40, rotX: 0        }, // vertical plane
+      { scale: 2.0, tube: 0.10, color: dc.core, opacity: 0.70, rotX: Math.PI / 2 },
+      { scale: 2.8, tube: 0.08, color: dc.glow, opacity: 0.50, rotX: Math.PI / 6 },
+      { scale: 3.6, tube: 0.06, color: 0xffffff, opacity: 0.18, rotX: Math.PI / 4 },
+      { scale: 2.2, tube: 0.07, color: dc.core, opacity: 0.40, rotX: 0 }, // vertical plane
     ];
     ringDefs.forEach((rd, i) => {
       const rGeo = new THREE.TorusGeometry(radius * rd.scale, Math.max(0.4, radius * rd.tube), 12, 96);
@@ -1397,7 +1397,7 @@
     brainGroup.add(innerCircle); extras.push(innerCircle);
 
     // Cross lines (4 segments from circle edge outward)
-    const crossDirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    const crossDirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     crossDirs.forEach(([dx, dy]) => {
       const innerR = radius * 1.7, outerR = reticleSize * 1.1;
       const seg = new THREE.Line(
@@ -1429,7 +1429,7 @@
     // ════════════════════════════════════════════════════
     const needleColor = dc.core;
     const needleMat = new THREE.LineBasicMaterial({ color: needleColor, transparent: true, opacity: 0.55 });
-    const dashMat   = new THREE.LineDashedMaterial({ color: 0x44ccff, transparent: true, opacity: 0.40, dashSize: 4, gapSize: 4 });
+    const dashMat = new THREE.LineDashedMaterial({ color: 0x44ccff, transparent: true, opacity: 0.40, dashSize: 4, gapSize: 4 });
 
     // ── FIX: Cortex surface point — tính từ bán kính não thực (~65 units)
     //    Điểm vỏ não gần nhất về phía trên tumor (Y+)
@@ -1510,7 +1510,7 @@
     coneWire.position.set(tx, (ty + cortexY) / 2, tz);
     coneWire.rotation.z = Math.PI;
     brainGroup.add(coneWire); extras.push(coneWire);
-  //  brainGroup.add( coneMesh);
+    //  brainGroup.add( coneMesh);
 
     // ════════════════════════════════════════════════════
     //  9. PARTICLE HALO (orbiting points around tumor)
@@ -1519,9 +1519,9 @@
     const pPositions = new Float32Array(PARTICLE_COUNT * 3);
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       // Distribute on a slightly noisy sphere shell
-      const phi   = Math.acos(2 * Math.random() - 1);
+      const phi = Math.acos(2 * Math.random() - 1);
       const theta = Math.random() * Math.PI * 2;
-      const r     = radius * (2.0 + Math.random() * 1.2);
+      const r = radius * (2.0 + Math.random() * 1.2);
       pPositions[i * 3 + 0] = tx + r * Math.sin(phi) * Math.cos(theta);
       pPositions[i * 3 + 1] = ty + r * Math.sin(phi) * Math.sin(theta);
       pPositions[i * 3 + 2] = tz + r * Math.cos(phi);
@@ -1534,7 +1534,7 @@
     });
     const particles = new THREE.Points(pGeo, pMat);
     particles._tumorCenter = new THREE.Vector3(tx, ty, tz);
-    particles._angularVel  = 0.006;
+    particles._angularVel = 0.006;
     brainGroup.add(particles); window._atlas3DParticleSystem = particles;
 
     // ════════════════════════════════════════════════════
@@ -1548,8 +1548,8 @@
       });
       const scan = new THREE.Mesh(scanGeo, scanMat);
       scan.position.set(tx, ty - radius + k * radius * 0.7, tz);
-      scan._scanY0    = ty - radius + k * radius * 0.3;
-      scan._scanY1    = ty + radius * 1.5;
+      scan._scanY0 = ty - radius + k * radius * 0.3;
+      scan._scanY1 = ty + radius * 1.5;
       scan._scanSpeed = 0.4 + k * 0.2;
       scan._scanPhase = k * 2.1;
       brainGroup.add(scan); extras.push(scan);
@@ -1594,11 +1594,11 @@
 
   /* ── Depth color by severity (red=surface → blue=very deep) ── */
   function _getDepthColor3D(d) {
-    if (!d || d < 5)  return { core: 0xff1111, emissive: 0xaa0000, glow: 0xff5500 };
-    if (d < 15)       return { core: 0xff6600, emissive: 0xaa4400, glow: 0xff9900 };
-    if (d < 30)       return { core: 0xffcc00, emissive: 0xaa8800, glow: 0xffee55 };
-    if (d < 45)       return { core: 0x00cc55, emissive: 0x006622, glow: 0x44ff88 };
-    return                   { core: 0x00aaff, emissive: 0x004488, glow: 0x44ccff };
+    if (!d || d < 5) return { core: 0xff1111, emissive: 0xaa0000, glow: 0xff5500 };
+    if (d < 15) return { core: 0xff6600, emissive: 0xaa4400, glow: 0xff9900 };
+    if (d < 30) return { core: 0xffcc00, emissive: 0xaa8800, glow: 0xffee55 };
+    if (d < 45) return { core: 0x00cc55, emissive: 0x006622, glow: 0x44ff88 };
+    return { core: 0x00aaff, emissive: 0x004488, glow: 0x44ccff };
   }
 
   /* ── Create rich canvas-based depth info sprite ── */
@@ -1669,11 +1669,11 @@
     // ── Depth gradient bar ──
     const barX = 10, barY = 88, barW = cW - 20, barH = 8;
     const barGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
-    barGrad.addColorStop(0.0,  '#ff1111');
+    barGrad.addColorStop(0.0, '#ff1111');
     barGrad.addColorStop(0.15, '#ff6600');
     barGrad.addColorStop(0.35, '#ffcc00');
     barGrad.addColorStop(0.60, '#00cc55');
-    barGrad.addColorStop(1.0,  '#00aaff');
+    barGrad.addColorStop(1.0, '#00aaff');
     ctx.fillStyle = 'rgba(255,255,255,0.10)';
     ctx.beginPath();
     ctx.roundRect?.(barX, barY, barW, barH, 4) || ctx.rect(barX, barY, barW, barH);
@@ -1722,9 +1722,9 @@
     const dc = _getDepthColor3D(depthMm);
     const hexCol = '#' + dc.core.toString(16).padStart(6, '0');
     const label = !depthMm || depthMm < 5 ? '🔴 Critical (nông)' :
-                  depthMm < 15            ? '🟠 Shallow' :
-                  depthMm < 30            ? '🟡 Trung bình' :
-                  depthMm < 45            ? '🟢 Deep' : '🔵 Very Deep';
+      depthMm < 15 ? '🟠 Shallow' :
+        depthMm < 30 ? '🟡 Trung bình' :
+          depthMm < 45 ? '🟢 Deep' : '🔵 Very Deep';
     el.innerHTML = `<span style="color:${hexCol};font-weight:700;font-size:13px;">${depthMm.toFixed(1)} mm</span><br><small style="color:#8899b0;font-size:9px;">${label}</small>`;
   }
 

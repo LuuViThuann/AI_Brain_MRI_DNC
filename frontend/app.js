@@ -541,19 +541,17 @@
     // Summary
     reportSummary.textContent = report.summary || '—';
 
-    // Findings
     findingsList.innerHTML = (report.findings || [])
-      .map(f => `<li style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px;">
-          <i class="fa-solid fa-circle-check" style="color: #00c853; margin-top: 3px; font-size: 13px;"></i>
-          <span>${f}</span>
+      .map(f => `<li style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 18px; padding: 12px; background: rgba(0, 200, 83, 0.03); border-radius: 8px; border: 1px solid rgba(0, 200, 83, 0.08);">
+          <i class="fa-solid fa-circle-check" style="color: #00c853; margin-top: 3px; font-size: 14px;"></i>
+          <span style="font-size: 13px; line-height: 1.6; color: var(--text-sec);">${f}</span>
         </li>`)
       .join('');
 
-    // Recommendations
     recommendationsList.innerHTML = (report.recommendations || [])
-      .map(r => `<li style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px;">
-          <i class="fa-solid fa-user-doctor" style="color: #0097b4; margin-top: 3px; font-size: 13px;"></i>
-          <span>${r}</span>
+      .map(r => `<li style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 18px; padding: 12px; background: rgba(0, 151, 180, 0.03); border-radius: 8px; border: 1px solid rgba(0, 151, 180, 0.08);">
+          <i class="fa-solid fa-user-doctor" style="color: #0097b4; margin-top: 3px; font-size: 14px;"></i>
+          <span style="font-size: 13px; line-height: 1.6; color: var(--text-sec);">${r}</span>
         </li>`)
       .join('');
 
@@ -587,10 +585,10 @@
       ];
 
       comparisonBody.innerHTML = methods.map(m => `
-        <tr style="border-bottom: 1px solid var(--border);">
-          <td style="padding: 10px; color: var(--text-sec);">${m.name}</td>
-          <td style="padding: 10px; text-align: center; color: var(--cyan); font-weight: 500;">${m.result}</td>
-          <td style="padding: 10px; text-align: center; color: var(--text-dim);">${m.confidence}</td>
+        <tr style="border-bottom: 1px solid var(--border); transition: background 0.2s;">
+          <td style="padding: 12px 10px; color: var(--text-sec); font-weight: 500;">${m.name}</td>
+          <td style="padding: 12px 10px; text-align: center; color: var(--cyan); font-weight: 600;">${m.result}</td>
+          <td style="padding: 12px 10px; text-align: center; color: var(--text-dim); font-family: var(--font-mono);">${m.confidence}</td>
         </tr>
       `).join('');
     }

@@ -1485,19 +1485,15 @@
       let badgeText = '';
 
       if (globalIdx === 0) {
-
-        badgeStyle = 'background: #f4be0bff; color: #ffffff; box-shadow: 0 4px 12px rgba(0, 151, 180, 0.25); border: none;';
+        badgeStyle = 'background: #f4be0b; color: #ffffff; box-shadow: 0 4px 12px rgba(244, 190, 11, 0.25); border: none;';
         badgeText = `MẪU CA 1`;
       } else if (globalIdx === 1) {
-
         badgeStyle = 'background: #00a846; color: #ffffff; box-shadow: 0 4px 12px rgba(0, 168, 70, 0.2); border: none;';
         badgeText = `MẪU CA 2`;
       } else if (globalIdx === 2) {
-
-        badgeStyle = 'background: #7cc89cff; color: #ffffff; box-shadow: 0 4px 12px rgba(100, 116, 139, 0.2); border: none;';
+        badgeStyle = 'background: #7cc89c; color: #ffffff; box-shadow: 0 4px 12px rgba(124, 200, 156, 0.2); border: none;';
         badgeText = `MẪU CA 3`;
       } else {
-
         badgeStyle = 'background: #94a3b8; color: #ffffff; box-shadow: 0 2px 8px rgba(148, 163, 184, 0.15); border: none;';
         badgeText = 'Tương tự';
       }

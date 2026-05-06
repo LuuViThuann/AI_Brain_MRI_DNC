@@ -651,6 +651,9 @@
         overflow: visible;
         box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
       }
+      .brain-clinical-dock.brain-clinical-side {
+        margin-top: 0;
+      }
       .brain-clinical-resizer {
         display: flex;
         align-items: center;
@@ -662,6 +665,10 @@
         cursor: default;
         user-select: none;
         position: relative;
+      }
+      .brain-clinical-dock.brain-clinical-side .brain-clinical-resizer {
+        align-items: flex-start;
+        flex-wrap: wrap;
       }
       .brain-clinical-resizer-grip {
         display: none;
@@ -744,6 +751,9 @@
         align-items: stretch;
         min-height: 0;
       }
+      .brain-clinical-dock.brain-clinical-side .brain-clinical-grid {
+        grid-template-columns: 1fr;
+      }
       .brain-clinical-controls,
       .brain-clinical-slices {
         border: 1px solid #e2e8f0;
@@ -784,8 +794,15 @@
         background: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 12px;
-        margin-bottom: 18px;
+       
         box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.03);
+      }
+      .brain-clinical-dock.brain-clinical-side .brain-slider-grid-221 {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      .brain-clinical-dock.brain-clinical-side .brain-slider-col:last-child:nth-child(odd) {
+        grid-column: span 1;
       }
       .brain-slider-col {
         display: flex;
@@ -1056,6 +1073,9 @@
         gap: 10px;
         align-content: start;
       }
+      .brain-clinical-dock.brain-clinical-side .brain-slice-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
       .brain-slice-card {
         border-radius: 10px;
         border: 1px solid #d7e1ea;
@@ -1172,6 +1192,12 @@
         justify-content: space-between;
         align-items: flex-start;
         gap: 12px;
+      }
+      .brain-clinical-dock.brain-clinical-side .brain-clinical-topline {
+        flex-direction: column;
+      }
+      .brain-clinical-dock.brain-clinical-side .brain-slice-note {
+        text-align: left;
       }
       .compare-clinical-toolbar {
         display: grid;
@@ -1399,7 +1425,7 @@
         border-radius: 10px;
         background: linear-gradient(160deg, #f0f9ff 0%, #ffffff 55%, #fefce8 100%);
         padding: 14px 16px 16px;
-        margin: 0 14px 14px;
+        margin: 10px 14px 14px;
         gap: 14px;
         flex-direction: column;
         box-shadow: 0 4px 16px rgba(14,165,233,0.08), 0 1px 4px rgba(0,0,0,0.04);
@@ -1830,20 +1856,193 @@
         opacity: 0.45;
         cursor: not-allowed;
       }
+
+      /* ── Unified Accordion Styles ───────────────────────── */
+      .brain-sliders-accordion, .brain-entry-accordion, .brain-tooltip-accordion {
+        margin: 0 0 0 0;
+      }
+      .brain-sliders-accordion-toggle, 
+      .brain-entry-accordion-toggle, 
+      .brain-tooltip-accordion-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        appearance: none;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 9px 14px;
+        cursor: pointer;
+        gap: 10px;
+        transition: all 0.2s ease;
+      }
+      .brain-sliders-accordion-toggle:hover,
+      .brain-entry-accordion-toggle:hover,
+      .brain-tooltip-accordion-toggle:hover {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      }
+      .brain-sliders-accordion-toggle.is-open,
+      .brain-entry-accordion-toggle.is-open,
+      .brain-tooltip-accordion-toggle.is-open {
+        background: #ffffff;
+        border-color: #cbd5e1;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        border-bottom-color: transparent;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+      }
+      .brain-sliders-accordion-left,
+      .brain-entry-accordion-left,
+      .brain-tooltip-accordion-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+      .brain-sliders-accordion-label,
+      .brain-entry-accordion-label,
+      .brain-tooltip-accordion-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #1e293b;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .brain-sliders-accordion-pill,
+      .brain-entry-accordion-badge,
+      .brain-tooltip-accordion-badge {
+        font-size: 9px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid transparent;
+        white-space: nowrap;
+        line-height: 1.4;
+      }
+      /* Status Variations */
+      .brain-badge-muted {
+        background: #f8fafc !important;
+        color: #94a3b8 !important;
+        border-color: #e2e8f0 !important;
+        box-shadow: none !important;
+      }
+      .brain-badge-active-blue {
+        background: #0ea5e9 !important;
+        color: #ffffff !important;
+        border-color: #3e84a7ff !important;
+        box-shadow: 0 2px 6px rgba(14, 165, 233, 0.24) !important;
+      }
+      .brain-badge-active-violet {
+        background: #14905eff !important;
+        color: #ffffff !important;
+        border-color: #309e6eff !important;
+        box-shadow: 0 2px 6px rgba(139, 92, 246, 0.24) !important;
+      }
+
+      .brain-sliders-accordion-chevron,
+      .brain-entry-accordion-chevron,
+      .brain-tooltip-accordion-chevron {
+        font-size: 10px;
+        color: #64748b;
+        transition: transform 0.22s ease;
+        flex-shrink: 0;
+      }
+      .is-open .brain-sliders-accordion-chevron,
+      .is-open .brain-entry-accordion-chevron,
+      .is-open .brain-tooltip-accordion-chevron {
+        transform: rotate(180deg);
+      }
+      .brain-sliders-accordion-body,
+      .brain-entry-accordion-body,
+      .brain-tooltip-accordion-body {
+        display: none;
+        flex-direction: column;
+        border: 1px solid #e2e8f0;
+        border-top: none;
+        border-bottom-left-radius: 10px;
+        border-bottom-right-radius: 10px;
+        background: #ffffff;
+        overflow: hidden;
+        animation: accordionIn 0.20s ease;
+      }
+      .brain-sliders-accordion-body.is-open,
+      .brain-entry-accordion-body.is-open,
+      .brain-tooltip-accordion-body.is-open {
+        display: flex;
+      }
+      @keyframes accordionIn {
+        from { opacity: 0; transform: translateY(-4px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      /* Slider grid inside accordion gets its own padding/bg */
+      .brain-sliders-accordion-body .brain-slider-grid-221 {
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        margin-bottom: 0;
+      }
+      /* Entry Point Body Styling */
+      .brain-entry-accordion-body {
+        padding: 12px 14px 14px;
+        gap: 10px;
+      }
+      .brain-entry-accordion-toprow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .brain-entry-accordion-title {
+        font-size: 10px;
+        font-weight: 700;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.7px;
+      }
+
+      /* Tooltip Body Styling */
+      .brain-tooltip-accordion-body {
+        gap: 0;
+      }
+      /* Tooltip panel inside accordion — remove its own border/bg */
+      .brain-tooltip-accordion-body .brain-tooltip-panel {
+        display: grid;
+        border: none;
+        border-radius: 0;
+        background: transparent;
+        padding: 12px 14px 14px;
+      }
     `;
     document.head.appendChild(style);
   }
 
   function ensureMainUI() {
-    if (MAIN.ui?.panel && document.body.contains(MAIN.ui.panel)) return;
     const viewer = document.getElementById('viewer3d');
-    const host = viewer?.parentElement;
-    const legend = host?.querySelector('.legend');
+    const sideHost = document.getElementById('clinicalPanelHost');
+    const fallbackHost = viewer?.parentElement;
+    const host = sideHost || fallbackHost;
+    const legend = fallbackHost?.querySelector('.legend');
     if (!viewer || !host) return;
+    if (MAIN.ui?.panel && document.body.contains(MAIN.ui.panel)) {
+      if (sideHost && MAIN.ui.panel.parentElement !== sideHost) {
+        sideHost.replaceChildren(MAIN.ui.panel);
+        MAIN.ui.panel.classList.add('brain-clinical-side');
+      }
+      return;
+    }
 
     const panel = document.createElement('section');
     panel.id = 'brainClinicalDock';
     panel.className = 'brain-clinical-dock';
+    if (sideHost) panel.classList.add('brain-clinical-side');
     panel.innerHTML = `
       <div class="brain-clinical-resizer" id="brainClinicalResizer">
         <span class="brain-clinical-resizer-label">Điều hướng lâm sàng</span>
@@ -1976,42 +2175,97 @@
       <div class="brain-clinical-body">
       
 
-        <!-- ══ MAIN NAVIGATION SLIDERS (Axial, Coronal, Sagittal, Cortex, Deep) ══ -->
-        <div class="brain-slider-grid-221">
-          <div class="brain-slider-col">
-            <div class="brain-slider-col-head">
-              <span class="brain-slider-col-label">Axial (Trục Z)</span>
-              <span class="brain-slider-col-value" id="brainValueAxial">100%</span>
+        <!-- ══ SLIDERS ACCORDION ══ -->
+        <div class="brain-sliders-accordion" id="brainSlidersAccordion">
+          <button class="brain-sliders-accordion-toggle is-open" id="brainSlidersAccordionToggle" type="button">
+            <span class="brain-sliders-accordion-left">
+              <i class="fa-solid fa-sliders" style="color:#64748b;font-size:13px;"></i>
+              <span class="brain-sliders-accordion-label">Cắt lớp &amp; Độ trong suốt</span>
+             
+            </span>
+            <i class="fa-solid fa-chevron-down brain-sliders-accordion-chevron"></i>
+          </button>
+          <div class="brain-sliders-accordion-body is-open" id="brainSlidersAccordionBody">
+            <div class="brain-slider-grid-221">
+              <div class="brain-slider-col">
+                <div class="brain-slider-col-head">
+                  <span class="brain-slider-col-label">Axial (Trục Z)</span>
+                  <span class="brain-slider-col-value" id="brainValueAxial">100%</span>
+                </div>
+                <input class="brain-range" type="range" min="0" max="100" value="100" data-axis="axial" />
+              </div>
+              <div class="brain-slider-col">
+                <div class="brain-slider-col-head">
+                  <span class="brain-slider-col-label">Coronal (Trục Y)</span>
+                  <span class="brain-slider-col-value" id="brainValueCoronal">100%</span>
+                </div>
+                <input class="brain-range" type="range" min="0" max="100" value="100" data-axis="coronal" />
+              </div>
+              <div class="brain-slider-col">
+                <div class="brain-slider-col-head">
+                  <span class="brain-slider-col-label">Sagittal (Trục X)</span>
+                  <span class="brain-slider-col-value" id="brainValueSagittal">100%</span>
+                </div>
+                <input class="brain-range" type="range" min="0" max="100" value="100" data-axis="sagittal" />
+              </div>
+              <div class="brain-slider-col">
+                <div class="brain-slider-col-head">
+                  <span class="brain-slider-col-label">Vỏ não (Cortex)</span>
+                  <span class="brain-slider-col-value" id="brainValueCortex">100%</span>
+                </div>
+                <input class="brain-range" type="range" min="5" max="100" value="100" data-opacity="cortex" />
+              </div>
+              <div class="brain-slider-col">
+                <div class="brain-slider-col-head">
+                  <span class="brain-slider-col-label">Cấu trúc sâu</span>
+                  <span class="brain-slider-col-value" id="brainValueDeep">21%</span>
+                </div>
+                <input class="brain-range" type="range" min="5" max="100" value="21" data-opacity="deep" />
+              </div>
             </div>
-            <input class="brain-range" type="range" min="0" max="100" value="100" data-axis="axial" />
           </div>
-          <div class="brain-slider-col">
-            <div class="brain-slider-col-head">
-              <span class="brain-slider-col-label">Coronal (Trục Y)</span>
-              <span class="brain-slider-col-value" id="brainValueCoronal">100%</span>
+        </div>
+
+        <!-- ══ ENTRY POINT ACCORDION ══ -->
+        <div class="brain-entry-accordion" id="brainEntryAccordion">
+          <button class="brain-entry-accordion-toggle" id="brainEntryAccordionToggle" type="button">
+            <span class="brain-entry-accordion-left">
+              <i class="fa-solid fa-location-crosshairs" style="color:#64748b;font-size:13px;"></i>
+              <span class="brain-entry-accordion-label">Chọn điểm vào phẫu thuật</span>
+              <span class="brain-entry-accordion-badge" id="brainEntryAccordionBadge">Chưa chọn</span>
+            </span>
+            <i class="fa-solid fa-chevron-down brain-entry-accordion-chevron"></i>
+          </button>
+          <div class="brain-entry-accordion-body" id="brainEntryAccordionBody">
+            <div class="brain-entry-accordion-toprow">
+              <span class="brain-entry-accordion-title">Vùng chức năng lân cận</span>
+              <button class="brain-mini-btn" id="brainClearEntryBtn2" disabled>Xóa tất cả</button>
             </div>
-            <input class="brain-range" type="range" min="0" max="100" value="100" data-axis="coronal" />
+            <div class="brain-entry-note" id="brainEntryNote">Chọn 1 trong 4 vùng chức năng bên dưới hoặc "Xem tất cả" để hiển thị đồng thời các đường vào để so sánh.</div>
+            <div class="brain-entry-panel" id="brainEntryPanel"></div>
+            <div class="brain-toggle-row" style="margin-top:2px;">
+              <button class="brain-entry-all-btn" id="brainEntryAllBtn"><i class="fa-solid fa-layer-group"></i> Xem tất cả</button>
+            </div>
           </div>
-          <div class="brain-slider-col">
-            <div class="brain-slider-col-head">
-              <span class="brain-slider-col-label">Sagittal (Trục X)</span>
-              <span class="brain-slider-col-value" id="brainValueSagittal">100%</span>
+        </div>
+
+        <!-- ══ TOOLTIP ACCORDION ══ -->
+        <div class="brain-sliders-accordion" id="brainTooltipAccordion">
+          <button class="brain-tooltip-accordion-toggle" id="brainTooltipAccordionToggle" type="button">
+            <span class="brain-tooltip-accordion-left">
+              <i class="fa-solid fa-location-dot" style="color:#64748b;font-size:13px;"></i>
+              <span class="brain-tooltip-accordion-label">Bảng Tooltip 3D</span>
+              <span class="brain-tooltip-accordion-badge" id="brainTooltipAccordionBadge">Ẩn bảng</span>
+            </span>
+            <i class="fa-solid fa-chevron-down brain-tooltip-accordion-chevron"></i>
+          </button>
+          <div class="brain-tooltip-accordion-body" id="brainTooltipAccordionBody">
+            <div class="brain-tooltip-panel" id="brainTooltipPanel">
+              <div class="brain-tooltip-panel-note" id="brainTooltipPanelNote">
+                Chọn các tooltip cần hiển thị trên mô hình 3D. Bỏ tích hoặc bấm dấu × trên tooltip sẽ ẩn đúng mục đó.
+              </div>
+              <div class="brain-tooltip-list" id="brainTooltipList"></div>
             </div>
-            <input class="brain-range" type="range" min="0" max="100" value="100" data-axis="sagittal" />
-          </div>
-          <div class="brain-slider-col">
-            <div class="brain-slider-col-head">
-              <span class="brain-slider-col-label">Vỏ não (Cortex)</span>
-              <span class="brain-slider-col-value" id="brainValueCortex">100%</span>
-            </div>
-            <input class="brain-range" type="range" min="5" max="100" value="100" data-opacity="cortex" />
-          </div>
-          <div class="brain-slider-col">
-            <div class="brain-slider-col-head">
-              <span class="brain-slider-col-label">Cấu trúc sâu</span>
-              <span class="brain-slider-col-value" id="brainValueDeep">21%</span>
-            </div>
-            <input class="brain-range" type="range" min="5" max="100" value="21" data-opacity="deep" />
           </div>
         </div>
 
@@ -2034,30 +2288,9 @@
               </div>
             </div>
 
-            <div class="brain-control-section" id="brainEntrySection">
-              <div class="brain-clinical-topline">
-                <div class="brain-control-title"><i class="fa-solid fa-location-crosshairs" style="color:#22c55e;margin-right:6px;"></i>Chọn điểm vào phẫu thuật</div>
-                <button class="brain-mini-btn" id="brainClearEntryBtn" disabled>Xóa tất cả</button>
-              </div>
-              <div class="brain-entry-note" id="brainEntryNote">Chọn 1 trong 4 vùng chức năng bên dưới hoặc "So sánh tất cả" để hiển thị đồng thời các đường vào để so sánh.</div>
-              <div class="brain-entry-panel" id="brainEntryPanel"></div>
-              <div class="brain-toggle-row" style="margin-top:4px;">
-                <button class="brain-entry-all-btn" id="brainEntryAllBtn"><i class="fa-solid fa-layer-group"></i> So sánh tất cả</button>
-              </div>
-            </div>
+            <div class="brain-control-section" id="brainEntrySection" style="display:none;"></div>
 
-            <div class="brain-control-section">
-              <div class="brain-clinical-topline">
-                <div class="brain-control-title">Bảng tooltip 3D</div>
-                <button class="brain-mini-btn" id="brainTooltipPanelBtn">Mở bảng</button>
-              </div>
-              <div class="brain-tooltip-panel" id="brainTooltipPanel">
-                <div class="brain-tooltip-panel-note" id="brainTooltipPanelNote">
-                  Chọn các tooltip cần hiển thị trên mô hình 3D. Bỏ tích hoặc bấm dấu × trên tooltip sẽ ẩn đúng mục đó.
-                </div>
-                <div class="brain-tooltip-list" id="brainTooltipList"></div>
-              </div>
-            </div>
+            <div class="brain-control-section" id="brainTooltipSection" style="display:none;"></div>
 
             <div class="brain-control-section">
               <div class="brain-control-title">Thành phần khối u</div>
@@ -2092,7 +2325,9 @@
         </div>
       </div>
     `;
-    if (legend) {
+    if (sideHost) {
+      sideHost.replaceChildren(panel);
+    } else if (legend) {
       legend.insertAdjacentElement('afterend', panel);
     } else {
       viewer.insertAdjacentElement('afterend', panel);
@@ -2111,11 +2346,6 @@
       resetClipBtn: panel.querySelector('#brainResetClipBtn'),
       sliceGrid: panel.querySelector('#brainSliceGrid'),
       sliceNote: panel.querySelector('#brainSliceNote'),
-      tooltipPanelBtn: panel.querySelector('#brainTooltipPanelBtn'),
-      tooltipPanel: panel.querySelector('#brainTooltipPanel'),
-      tooltipList: panel.querySelector('#brainTooltipList'),
-      tooltipPanelNote: panel.querySelector('#brainTooltipPanelNote'),
-
 
       axisRanges: {
         axial: panel.querySelector('input[data-axis="axial"]'),
@@ -2135,10 +2365,31 @@
         cortex: panel.querySelector('#brainValueCortex'),
         deep: panel.querySelector('#brainValueDeep'),
       },
+      // Sliders accordion
+      slidersAccordionToggle: panel.querySelector('#brainSlidersAccordionToggle'),
+      slidersAccordionBody: panel.querySelector('#brainSlidersAccordionBody'),
+      sliderPills: {
+        axial: panel.querySelector('#brainPillAxial'),
+        coronal: panel.querySelector('#brainPillCoronal'),
+        sagittal: panel.querySelector('#brainPillSagittal'),
+        cortex: panel.querySelector('#brainPillCortex'),
+        deep: panel.querySelector('#brainPillDeep'),
+      },
+      // Entry accordion
       entryPanel: panel.querySelector('#brainEntryPanel'),
       entryNote: panel.querySelector('#brainEntryNote'),
-      clearEntryButton: panel.querySelector('#brainClearEntryBtn'),
+      clearEntryButton: panel.querySelector('#brainClearEntryBtn2'),
       entryAllButton: panel.querySelector('#brainEntryAllBtn'),
+      entryAccordionToggle: panel.querySelector('#brainEntryAccordionToggle'),
+      entryAccordionBody: panel.querySelector('#brainEntryAccordionBody'),
+      entryAccordionBadge: panel.querySelector('#brainEntryAccordionBadge'),
+      // Tooltip accordion
+      tooltipPanel: panel.querySelector('#brainTooltipPanel'),
+      tooltipList: panel.querySelector('#brainTooltipList'),
+      tooltipPanelNote: panel.querySelector('#brainTooltipPanelNote'),
+      tooltipAccordionToggle: panel.querySelector('#brainTooltipAccordionToggle'),
+      tooltipAccordionBody: panel.querySelector('#brainTooltipAccordionBody'),
+      tooltipAccordionBadge: panel.querySelector('#brainTooltipAccordionBadge'),
       toggleButtons: panel.querySelectorAll('.brain-toggle-btn'),
       segmentButtons: panel.querySelectorAll('.brain-segment-btn'),
     };
@@ -2156,12 +2407,36 @@
       });
     }
 
-    if (MAIN.ui.tooltipPanelBtn) {
-      MAIN.ui.tooltipPanelBtn.addEventListener('click', () => {
-        MAIN.tooltipPanelOpen = !MAIN.tooltipPanelOpen;
+    // ── Sliders Accordion toggle ─────────────────────────────────
+    if (MAIN.ui.slidersAccordionToggle && MAIN.ui.slidersAccordionBody) {
+      MAIN.ui.slidersAccordionToggle.addEventListener('click', () => {
+        const isOpen = MAIN.ui.slidersAccordionBody.classList.toggle('is-open');
+        MAIN.ui.slidersAccordionToggle.classList.toggle('is-open', isOpen);
+        // Show/hide pills: pills visible only when collapsed
+        const pillsEl = MAIN.ui.slidersAccordionToggle.querySelector('#brainSlidersPills');
+        if (pillsEl) pillsEl.style.display = isOpen ? 'none' : 'flex';
+      });
+    }
+
+    // ── Entry Point Accordion toggle ──────────────────────────────────
+    if (MAIN.ui.entryAccordionToggle && MAIN.ui.entryAccordionBody) {
+      MAIN.ui.entryAccordionToggle.addEventListener('click', () => {
+        const isOpen = MAIN.ui.entryAccordionBody.classList.toggle('is-open');
+        MAIN.ui.entryAccordionToggle.classList.toggle('is-open', isOpen);
+      });
+    }
+
+    // ── Tooltip Accordion toggle ────────────────────────────────
+    if (MAIN.ui.tooltipAccordionToggle && MAIN.ui.tooltipAccordionBody) {
+      MAIN.ui.tooltipAccordionToggle.addEventListener('click', () => {
+        const isOpen = MAIN.ui.tooltipAccordionBody.classList.toggle('is-open');
+        MAIN.ui.tooltipAccordionToggle.classList.toggle('is-open', isOpen);
+        MAIN.tooltipPanelOpen = isOpen;
         syncMainUI();
       });
     }
+
+    // tooltipPanelBtn removed (now handled by accordion)
 
     MAIN.ui.resetClipBtn.addEventListener('click', () => {
       if (MAIN.diagnosisData) {
@@ -2300,6 +2575,26 @@
       MAIN.ui.opacityValues[key].textContent = value + '%';
     });
 
+    // Update slider accordion pills (shown when accordion is collapsed)
+    if (MAIN.ui.sliderPills) {
+      const axialVal = Math.round(clamp01(MAIN.state.clip.axial) * 100);
+      const coronalVal = Math.round(clamp01(MAIN.state.clip.coronal) * 100);
+      const sagVal = Math.round(clamp01(MAIN.state.clip.sagittal) * 100);
+      const cortexVal = Math.round(clamp01(MAIN.state.cortexOpacity) * 100);
+      const deepVal = Math.round(clamp01(MAIN.state.deepOpacity) * 100);
+      if (MAIN.ui.sliderPills.axial) MAIN.ui.sliderPills.axial.textContent = `Z ${axialVal}%`;
+      if (MAIN.ui.sliderPills.coronal) MAIN.ui.sliderPills.coronal.textContent = `Y ${coronalVal}%`;
+      if (MAIN.ui.sliderPills.sagittal) MAIN.ui.sliderPills.sagittal.textContent = `X ${sagVal}%`;
+      if (MAIN.ui.sliderPills.cortex) MAIN.ui.sliderPills.cortex.textContent = `Vỏ ${cortexVal}%`;
+      if (MAIN.ui.sliderPills.deep) MAIN.ui.sliderPills.deep.textContent = `Sâu ${deepVal}%`;
+      // Hide pills when accordion is open
+      const pillsEl = MAIN.ui.slidersAccordionToggle?.querySelector('#brainSlidersPills');
+      if (pillsEl) {
+        const isOpen = MAIN.ui.slidersAccordionBody?.classList.contains('is-open');
+        pillsEl.style.display = isOpen ? 'none' : 'flex';
+      }
+    }
+
     MAIN.ui.toggleButtons.forEach(button => {
       const action = button.getAttribute('data-action');
       const on =
@@ -2320,7 +2615,35 @@
       MAIN.ui.entryAllButton.disabled = !MAIN.riskSummary.length;
     }
 
+    // Update entry accordion badge (Modern Badge Style)
+    if (MAIN.ui.entryAccordionBadge) {
+      if (customEntryCount === 0) {
+        MAIN.ui.entryAccordionBadge.textContent = 'Chưa chọn';
+        MAIN.ui.entryAccordionBadge.className = 'brain-entry-accordion-badge brain-badge-muted';
+      } else {
+        MAIN.ui.entryAccordionBadge.textContent = `${customEntryCount} điểm vào`;
+        MAIN.ui.entryAccordionBadge.className = 'brain-entry-accordion-badge brain-badge-active-blue';
+      }
+    }
+
     renderEntryPointPanel();
+
+    // Update tooltip accordion badge (Modern Badge Style)
+    if (MAIN.ui.tooltipAccordionBadge) {
+      const total = tooltipCatalog.length;
+      const selected = tooltipSelectedCount;
+      if (total === 0) {
+        MAIN.ui.tooltipAccordionBadge.textContent = 'Ẩn bảng';
+        MAIN.ui.tooltipAccordionBadge.className = 'brain-tooltip-accordion-badge brain-badge-muted';
+      } else {
+        MAIN.ui.tooltipAccordionBadge.textContent = `${selected}/${total} bật`;
+        if (selected === 0) {
+          MAIN.ui.tooltipAccordionBadge.className = 'brain-tooltip-accordion-badge brain-badge-muted';
+        } else {
+          MAIN.ui.tooltipAccordionBadge.className = 'brain-tooltip-accordion-badge brain-badge-active-violet';
+        }
+      }
+    }
 
     MAIN.ui.segmentButtons.forEach(button => {
       const component = button.getAttribute('data-component');
@@ -3073,16 +3396,14 @@
   }
 
   function renderMainTooltipManager() {
-    if (!MAIN.ui?.tooltipPanel || !MAIN.ui?.tooltipList || !MAIN.ui?.tooltipPanelBtn) return;
+    if (!MAIN.ui?.tooltipPanel || !MAIN.ui?.tooltipList) return;
 
     const catalog = computeMainTooltipCatalog();
     const selectedCount = catalog.filter(spec => isMainTooltipSelected(spec.key)).length;
 
+    // Accordion body visibility is handled by CSS is-open class on the body, 
+    // but we can sync the internal state if needed.
     MAIN.ui.tooltipPanel.classList.toggle('is-open', !!MAIN.tooltipPanelOpen);
-    MAIN.ui.tooltipPanelBtn.classList.toggle('is-on', !!MAIN.tooltipPanelOpen);
-    MAIN.ui.tooltipPanelBtn.textContent = MAIN.tooltipPanelOpen
-      ? `Ẩn bảng (${selectedCount}/${catalog.length || 0})`
-      : `Mở bảng (${selectedCount}/${catalog.length || 0})`;
 
     if (MAIN.ui.tooltipPanelNote) {
       MAIN.ui.tooltipPanelNote.textContent = MAIN.state?.showTooltips
@@ -3112,6 +3433,7 @@
         setMainTooltipSelected(key, !!event.target.checked);
         updateMainViewerTooltips();
         renderMainTooltipManager();
+        syncMainUI(); // To update the accordion badge count
       });
     });
   }
@@ -3374,7 +3696,7 @@
       persistTooltipSelections();
     }
 
-    // Subtitle update logic removed as it is redundant
+    // -------------------------------------------------------------------------------
 
     syncMainUI();
     applyMainState();

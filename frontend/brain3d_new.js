@@ -2000,7 +2000,7 @@
     buildTumorContour(tumorPoints);
     buildCoordinateMarkers(tumorPoints, metrics);
     buildTumorVolumetricShell(tumorPoints, depthMetrics);
-    buildTumorBoundingBox(tumorPoints, depthMetrics); 
+    buildTumorBoundingBox(tumorPoints, depthMetrics);
     if (depthMetrics) {
       buildTumorDepthVector(depthMetrics);
       buildTumorEnhancedOverlay(tumorPoints, metrics, depthMetrics);
@@ -3336,9 +3336,6 @@
             </div>
             <div style="position:absolute;top:10px;left:10px;background:rgba(255,255,255,0.9);backdrop-filter:blur(4px);
               color:#1e293b;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:800;box-shadow:0 2px 8px rgba(0,0,0,0.1);">#${c.rank || actualIdx + 1}</div>
-            <div style="position:absolute;top:10px;right:10px;background:${simCol};
-              padding:4px 12px;border-radius:20px;font-size:12px;font-weight:900;color:#ffffff;
-              box-shadow:0 4px 12px ${simCol}44;">${sim}%</div>
           </div>
           <!-- Content -->
           <div style="padding:16px 20px;">
@@ -3747,7 +3744,6 @@
       return `
           <div class="cp-card" style="animation-delay:${i * 0.04}s;" onclick="const pC=document.getElementById('previewCanvas'); const iS=pC?pC.toDataURL('image/png'):null; document.getElementById('comparePicker').remove(); window.openDual3DCompare(window._similarCasesData[${actualIdx}], window.lastDiagnosisData, iS)">
             <div class="cp-rank">#${c.rank || actualIdx + 1}</div>
-            <div class="cp-score" style="background:${scoreBg};box-shadow:0 12px 24px ${scoreShadow};">${sim}%</div>
             <div class="cp-card-body">
               <div class="cp-img-wrap">${imgHTML}</div>
             </div>
@@ -4007,13 +4003,15 @@
         justify-content:center;
         min-width:42px;
         height:30px;
-        padding:0 10px;
+        padding:0 12px;
         border-radius:10px;
-        background:rgba(255,255,255,0.96);
+        background:#ffffff;
         color:#344256;
         font-size:11px;
         font-weight:800;
         box-shadow:0 8px 18px rgba(15,23,42,0.16);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
       }
       #comparePicker .cp-score {
         position:absolute;
@@ -4143,21 +4141,19 @@
       const actualIdx = startIndex + i;
       const rankValue = Number(c.rank || (actualIdx + 1));
       const rankLabel = rankValue <= 3 ? `Mẫu ca ${rankValue}` : 'Tương tự';
-      const sim = Math.round((c.similarity_score || 0) * 100);
-      const scoreBg = sim >= 80
-        ? 'linear-gradient(135deg,#34d399 0%,#10b981 100%)'
-        : sim >= 55
-          ? 'linear-gradient(135deg,#fbbf24 0%,#f59e0b 100%)'
-          : 'linear-gradient(135deg,#fb7185 0%,#ef4444 100%)';
-      const scoreShadow = sim >= 80 ? 'rgba(16,185,129,0.24)' : sim >= 55 ? 'rgba(245,158,11,0.24)' : 'rgba(239,68,68,0.22)';
+      const rankBg = rankValue === 1 ? '#f4be0b' :
+        rankValue === 2 ? '#00a846' :
+          rankValue === 3 ? '#7cc89c' : '#94a3b8';
+      const rankShadow = rankValue === 1 ? 'rgba(244,190,11,0.25)' :
+        rankValue === 2 ? 'rgba(0,168,70,0.2)' :
+          rankValue === 3 ? 'rgba(124,200,156,0.2)' : 'rgba(148,163,184,0.15)';
       const imageSrc = c.filename ? `/data/images/${c.filename}` : c.thumbnail;
       const imgHTML = imageSrc
         ? `<img src="${imageSrc}" alt="Ca bệnh ${c.case_id || actualIdx + 1}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"/><span class="cp-empty" style="display:none;">MRI</span>`
         : '<span class="cp-empty">MRI</span>';
       return `
           <div class="cp-card" style="animation-delay:${i * 0.04}s;" onclick="const pC=document.getElementById('previewCanvas'); const iS=pC?pC.toDataURL('image/png'):null; window.closeComparePicker(true); window.openDual3DCompare(window._similarCasesData[${actualIdx}], window.lastDiagnosisData, iS)">
-            <div class="cp-rank">${rankLabel}</div>
-            <div class="cp-score" style="background:${scoreBg};box-shadow:0 12px 24px ${scoreShadow};">${sim}%</div>
+            <div class="cp-rank" style="background:${rankBg}; color:#fff; box-shadow:0 4px 12px ${rankShadow}; border:none;">${rankLabel}</div>
             <div class="cp-card-body">
               <div class="cp-img-wrap">${imgHTML}</div>
             </div>

@@ -7,8 +7,8 @@
   <title>NeuroScan AI — Chẩn Đoán MRI Não</title>
 
   <!-- ===== STYLESHEETS ===== -->
-  <link rel="stylesheet" href="styles.css?v=10" />
-  <link rel="stylesheet" href="xai_similar_styles.css?v=7" />
+  <link rel="stylesheet" href="styles.css?v=11" />
+  <link rel="stylesheet" href="xai_similar_styles.css?v=8" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
   <script src="static/mni_registration.js"></script>
@@ -67,8 +67,7 @@
     <!-- ---- LEFT PANEL: Upload + Preview ---- -->
     <section class="panel panel-left">
       <div class="panel-header">
-        <h2>Tải Ảnh MRI</h2>
-        <span class="badge">PNG / JPG</span>
+        <span class="badge">Tải ảnh MRI (PNG / JPG)</span>
       </div>
 
       <div class="upload-zone" id="uploadZone">
@@ -134,8 +133,8 @@
 
     </section>
 
-    <!-- ---- RIGHT PANEL: Diagnosis Report ---- -->
-    <section class="panel panel-right">
+    <!-- ---- REPORT PANEL: Diagnosis Report ---- -->
+    <section class="panel panel-right panel-report is-collapsed">
       <div class="panel-header">
         <h2>Báo Cáo Chẩn Đoán</h2>
 
@@ -161,11 +160,11 @@
 
         <!-- ===== TUMOR COLOR GRADING LEGEND ===== -->
         <div class="grading-legend" style="
-          margin: 14px 0;
-          padding: 12px;
-          background: rgba(255,255,255,0.03);
-          border-radius: 8px;
-          border: 1px solid var(--border);
+          margin: 20px 0;
+          padding: 16px;
+          background: rgba(0, 151, 180, 0.02);
+          border-radius: 12px;
+          border: 1px solid rgba(0, 151, 180, 0.1);
         ">
           <div
             style="font-size: 10px; color: var(--text-sec); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; font-weight: 700;">
@@ -213,13 +212,13 @@
         <!-- ===== DEPTH STATUS CARD ===== -->
         <div id="depthStatusCard" style="display:none; margin-top:14px; margin-bottom:14px;">
           <div id="depthCardInner" style="
-          padding: 16px;
-          border-radius: 12px;
+          padding: 20px;
+          border-radius: 16px;
           background: #ffffff;
           border: 1px solid var(--border);
           position: relative;
           overflow: hidden;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+          box-shadow: 0 4px 15px rgba(0,0,0,0.04);
         ">
             <!-- Animated glow line top -->
             <div
@@ -271,13 +270,14 @@
 
             <!-- Medical description -->
             <div id="depthMedDesc" style="
-            font-size:12px;color:var(--text-primary);
-            line-height:1.6;
-            padding:12px 14px;
-            background:#f8fafc;
-            border:1px solid var(--border);
-            border-radius:8px;
-            font-weight:500;
+            font-size: 12px;
+            color: var(--text-primary);
+            line-height: 1.7;
+            padding: 14px 16px;
+            background: rgba(0, 151, 180, 0.03);
+            border: 1px solid rgba(0, 151, 180, 0.1);
+            border-radius: 10px;
+            font-weight: 500;
           ">—</div>
           </div>
         </div>
@@ -347,7 +347,15 @@
       </div>
     </section>
 
-
+    <!-- ---- RIGHT PANEL: Clinical Guidance ---- -->
+    <section class="panel panel-clinical">
+      <div class="clinical-panel-host" id="clinicalPanelHost">
+        <div class="clinical-panel-placeholder">
+          <div class="clinical-panel-placeholder-title">&#272;i&#7873;u H&#432;&#7899;ng L&#226;m S&#224;ng</div>
+          <p>B&#7843;ng &#273;i&#7873;u khi&#7875;n l&#226;m s&#224;ng s&#7869; &#273;&#432;&#7907;c hi&#7875;n th&#7883; &#7903; c&#7897;t b&#234;n ph&#7843;i sau khi m&#244; h&#236;nh 3D kh&#7903;i t&#7841;o.</p>
+        </div>
+      </div>
+    </section>
 
   </main>
 
@@ -625,7 +633,7 @@
   <script src="brain3d_new.js?v=7"></script>
 
   <!-- Clinical 3D Enhancer -->
-  <script src="brain3d_clinical_tools.js?v=5"></script>
+  <script src="brain3d_clinical_tools.js?v=6"></script>
 
   <!-- XAI & Similar UI -->
   <script src="xai_similar_ui.js"></script>
