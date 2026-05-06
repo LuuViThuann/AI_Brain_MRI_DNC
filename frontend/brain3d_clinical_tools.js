@@ -1,3 +1,4 @@
+/* global THREE, window, document, console, requestAnimationFrame, Event */
 (function Brain3DClinicalEnhancerModule() {
   'use strict';
 
@@ -166,18 +167,12 @@
     return parsed;
   }
 
+
   // Màn hình 3D chính < ---------------
   function getPreferredMainViewerMinHeight() {
-    return Math.round(Math.max(400, Math.min(550, window.innerHeight * 0.70)));
+    return Math.round(Math.max(400, Math.min(460, window.innerHeight * 0.70)));
   }
 
-  function getPreferredDockHeight() {
-    return Math.round(Math.max(240, Math.min(320, window.innerHeight * 0.30)));
-  }
-
-  function getMaximumDockHeight() {
-    return Math.round(Math.max(280, Math.min(400, window.innerHeight * 0.42)));
-  }
 
   function lerp(a, b, t) {
     return a + (b - a) * t;
@@ -217,10 +212,6 @@
   function getRotationEuler(ctx) {
     const rotation = ctx?.getRotation ? ctx.getRotation() : { x: 0, y: 0 };
     return new THREE.Euler(rotation.x || 0, rotation.y || 0, 0, 'XYZ');
-  }
-
-  function worldToLocalRotated(point, euler) {
-    return point.clone().applyEuler(new THREE.Euler(-(euler.x || 0), -(euler.y || 0), 0, 'XYZ'));
   }
 
   function applyVectorRotation(point, euler) {
@@ -773,7 +764,7 @@
         font-size: 10px;
         color: #64748b;
         text-transform: uppercase;
-        letter-spacing: 0.8px;
+     
         font-weight: 700;
       }
       .brain-slider-grid {
@@ -1370,6 +1361,7 @@
         padding: 16px;
         display: grid;
         gap: 12px;
+        margin-bottom: 12px;
       }
       .compare-note-row {
         display: flex;
@@ -2525,14 +2517,6 @@
     });
   }
 
-  function setMainDockCollapsed(collapsed) {
-    if (!MAIN.ui?.panel) return;
-    MAIN.dockCollapsed = false;
-    MAIN.ui.panel.classList.remove('is-collapsed');
-    MAIN.ui.panel.style.height = 'auto';
-    MAIN.ui.panel.style.maxHeight = 'none';
-  }
-
   function syncMainLayoutSizing() {
     if (!MAIN.ui?.panel) return;
     const viewer = MAIN.ctx?.viewerElement || document.getElementById('viewer3d');
@@ -3229,10 +3213,6 @@
     renderMainTooltipManager();
   }
 
-  function computeMainPathLengthMm(entryPoint, tumorCenter) {
-    return computePathLengthMm(entryPoint, tumorCenter, MAIN_SCENE_RADIUS);
-  }
-
   function computeMainTooltipCatalog() {
     if (!MAIN.diagnosisData?.prediction?.tumor_detected || !MAIN.tumorCenter) return [];
 
@@ -3399,8 +3379,6 @@
     if (!MAIN.ui?.tooltipPanel || !MAIN.ui?.tooltipList) return;
 
     const catalog = computeMainTooltipCatalog();
-    const selectedCount = catalog.filter(spec => isMainTooltipSelected(spec.key)).length;
-
     // Accordion body visibility is handled by CSS is-open class on the body, 
     // but we can sync the internal state if needed.
     MAIN.ui.tooltipPanel.classList.toggle('is-open', !!MAIN.tooltipPanelOpen);

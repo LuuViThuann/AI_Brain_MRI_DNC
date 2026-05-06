@@ -1,3 +1,4 @@
+/* global window, document, console, FormData, fetch, setTimeout, requestAnimationFrame */
 /**
  * xai_similar_ui.js - FIXED VERSION (Vietnamese Feature Names)
  * ✅ Tất cả lỗi syntax đã được sửa
@@ -517,12 +518,10 @@
       const area_cm2 = gradcam.lesion_area_cm2 || 0;
       const uncertainty = gradcam.uncertainty || {};
       const classProbs = gradcam.class_probabilities || {};
-      const aiDesc = gradcam.ai_description || '';
 
       const malignancy = clinMeta.malignancy_risk || {};
       const edema = clinMeta.edema_assessment || {};
       const massEffect = clinMeta.mass_effect_signs || {};
-      const nextRecs = clinMeta.next_recommendations || [];
       const ruleBased = xai.rule_based || gradcam.rule_based || {};
 
       const probsMap = {
@@ -535,12 +534,9 @@
       // Confidence score logic
       const confScore = diag.prediction ? Math.round((diag.prediction.confidence || 0) * 100) : attScore;
       const confColor = confScore >= 80 ? '#0d9488' : confScore >= 55 ? '#ca8a04' : '#dc2626';
-      const uncColor = (uncertainty.score || 0) > 0.4 ? '#ef4444' : (uncertainty.score || 0) > 0.2 ? '#f59e0b' : '#22c55e';
       const uncLevel = (uncertainty.score || 0) > 0.4 ? 'Cao' : (uncertainty.score || 0) > 0.2 ? 'Trung bình' : 'Thấp';
 
       // ✅ FIX: Provide meaningful fallback labels
-      const malLevel = malignancy.level || (Object.keys(malignancy).length === 0 ? 'Phân tích...' : 'N/A');
-      const malColor = malignancy.color || '#64748b';
       const edLevel = edema.level || (Object.keys(edema).length === 0 ? 'Phân tích...' : 'N/A');
       const edColor = edema.color || '#64748b';
       const meSeverity = massEffect.severity || 'Bình thường';
@@ -556,8 +552,6 @@
       const lobeNote = anatomy.function_vi || anatomy.function || anatomy.note || 'Khu vực tổn thương não';
 
       // Malignancy score display
-      const malScoreDisplay = malignancy.score !== undefined ? `${malignancy.score}/${malignancy.max_score || 7}` : '—';
-
       return `
         <div class="xai-card xai-animate delay-2 gradcam-clinical-card" style="${this.styles.card}; padding: 0; overflow: hidden;">
 
@@ -1064,7 +1058,6 @@
       const vision = diagnosisData.vision_report;
 
       const severity = (report.severity || 'MEDIUM').toUpperCase();
-      const severityColor = this.getConfidenceColorHex(severity === 'THẤP' ? 'LOW' : (severity === 'CAO' ? 'HIGH' : 'MEDIUM'));
 
       return `
         <div class="xai-card clinical-report-card xai-animate delay-1" style="${this.styles.card}; margin-bottom: 5px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
@@ -1089,7 +1082,7 @@
                 <ul class="d3-report-list" style="margin: 0; padding: 0; list-style: none;">
                   ${(report.findings || []).map(f => {
         // Clean leading bullets/dashes/dots
-        const cleanF = f.replace(/^[•\-\*\d\.\s]+/, '').trim();
+        const cleanF = f.replace(/^[•\-*\d.\s]+/, '').trim();
         return `
                       <li style="margin-bottom: 12px; display: flex; align-items: flex-start; gap: 10px; line-height: 1.6; color: #4a5568; font-size: 13.5px;">
                         <i class="fa-solid fa-circle-check" style="color: #00c853; margin-top: 3px; font-size: 14px; flex-shrink: 0;"></i>
@@ -1477,7 +1470,6 @@
       const simColor = similarity >= 80 ? '#10b981' : similarity >= 55 ? '#f59e0b' : '#ef4444';
       const statusColor = caseItem.has_tumor ? '#ef4444' : '#10b981';
       const statusIcon = caseItem.has_tumor ? '<i class="fa-solid fa-circle" style="font-size: 10px; margin-right: 8px;"></i>' : '<i class="fa-solid fa-circle" style="font-size: 10px; margin-right: 8px;"></i>';
-      const statusText = caseItem.has_tumor ? `${statusIcon} Phát hiện khối u` : `${statusIcon} Không có khối u`;
 
       // Badge Logic: Top 3 show rank, others show "Xem thêm"
       let rankBadgeHtml = '';
@@ -1954,7 +1946,6 @@
       const ncrMm2 = (ncrPixels * PX2).toFixed(1);
       const etMm2 = (etPixels * PX2).toFixed(1);
       const edMm2 = (edPixels * PX2).toFixed(1);
-      const totMm2 = (totalPixels * PX2).toFixed(1);
 
       const getStatusBadge = (pct, type) => {
         if (pct === 0) return { l: 'Không phát hiện', c: '#64748b', b: '#f1f5f9' };
@@ -1979,21 +1970,6 @@
       const ncrStatus = getStatusBadge(ncrPct, 'NCR');
       const etStatus = getStatusBadge(etPct, 'ET');
       const edStatus = getStatusBadge(edPct, 'ED');
-
-      const getFinalConclusion = () => {
-        if (!hasRealStats) return '<strong> Lưu ý:</strong> Hệ thống chưa thu thập được dữ liệu định lượng từ AI. Vui lòng thử lại hoặc liên hệ kỹ thuật.';
-
-        let messages = [];
-        if (ncrPct > 25) messages.push(`Hoại tử <strong>${ncrPct.toFixed(1)}%</strong> vượt ngưỡng (>25%), gợi ý u ác tính cao (Grade IV)`);
-        if (etPct > 45) messages.push(`Vùng tăng cường <strong>${etPct.toFixed(1)}%</strong> cho thấy u tiến triển và tưới máu mạnh`);
-        if (edPct > 60) messages.push(`Phù nề diện rộng <strong>${edPct.toFixed(1)}%</strong> gây áp lực nội sọ lớn`);
-
-        if (messages.length > 0) {
-          return `<strong>Cảnh báo bác sĩ:</strong> ${messages.join('. ')}. Cần cân nhắc phẫu thuật hoặc xạ trị sớm.`;
-        }
-
-        return `<strong>Đánh giá tổng thể:</strong> Cấu trúc khối u ổn định (NCR ${ncrPct.toFixed(1)}% / ET ${etPct.toFixed(1)}% / ED ${edPct.toFixed(1)}%). Vùng phù nề là yếu tố chính cần theo dõi.`;
-      };
 
       const row = (color, label, pct, px, mm2, status, note) => `
         <div style="background: #ffffff; border-radius: 10px; padding: 14px 18px; border: 1px solid #e2e8f0; margin-bottom: 8px;">
@@ -2158,13 +2134,6 @@
     },
 
     // ===== UTILITIES =====
-
-    getImportanceLevel: function (percent) {
-      if (percent > 40) return IMPORTANCE_COLORS.critical;
-      if (percent > 20) return IMPORTANCE_COLORS.high;
-      if (percent > 10) return IMPORTANCE_COLORS.medium;
-      return IMPORTANCE_COLORS.low;
-    },
 
     getImportanceExplanation: function (percent) {
       if (percent > 40) return `Ảnh hưởng rất lớn (>${percent}%)`;
@@ -2389,7 +2358,7 @@
         const risk = malignancy.level_en || 'MEDIUM';
         const detected = pred.tumor_detected;
         const label = pred.label || ''; // Vietnamese label
-        const diameter = dims.max_diameter_mm || 0;
+        const diameter = Number(pred.max_diameter_mm || ruleB.max_diameter_mm || ruleB?.detailed_metrics?.max_diameter_mm || 0);
 
         // CASE: NO TUMOR DETECTED
         if (!detected) {

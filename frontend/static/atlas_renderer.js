@@ -1,3 +1,4 @@
+/* eslint-env browser */
 /**
  * atlas_renderer.js
  * Optimized Atlas Rendering Engine
@@ -386,4 +387,5 @@ class AtlasRenderer {
   }
   
   // Export singleton instance
-  window.AtlasRenderer = window.AtlasRenderer || new AtlasRenderer();
+  const root = typeof globalThis !== 'undefined' ? globalThis : {};
+  root.AtlasRenderer = root.AtlasRenderer || new AtlasRenderer();

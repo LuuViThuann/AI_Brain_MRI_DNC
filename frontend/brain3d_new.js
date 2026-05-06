@@ -1,3 +1,4 @@
+/* eslint-env browser */
 /**
  * brain3d.js (ENHANCED VERSION V4 - PROMINENT TUMOR VISUALIZATION)
  * Three.js 3D Brain Visualization Engine
@@ -12,6 +13,17 @@
  */
 
 (function BrainViewer() {
+  const window = globalThis;
+  const document = window.document;
+  const console = window.console;
+  const THREE = window.THREE;
+  const setTimeout = window.setTimeout.bind(window);
+  const requestAnimationFrame = window.requestAnimationFrame.bind(window);
+  const cancelAnimationFrame = window.cancelAnimationFrame.bind(window);
+  const getComputedStyle = window.getComputedStyle.bind(window);
+  const Event = window.Event;
+  const ResizeObserver = window.ResizeObserver;
+  const MutationObserver = window.MutationObserver;
 
   // ---- Configuration ----
   const BRAIN_MODEL_PATH = '/frontend/models/Brain.glb';
@@ -103,10 +115,8 @@
 
   // ---- State ----
   let scene, camera, renderer, brainMesh, tumorParticles, tumorGlow, tumorSpikes;
-  let animationId = null;
   let isAutoRotating = true;
   let isDetailView = false;
-  let mouseX = 0, mouseY = 0;
   let targetRotX = 0, targetRotY = 0;
   let currentRotX = 0, currentRotY = 0;
   let isDragging = false;
@@ -114,7 +124,6 @@
   let clock;
   let loader;
   let originalBrainMaterials = [];
-  let loadedTextures = {};
 
   // Model caching
   let cachedBrainModel = null;
@@ -811,50 +820,6 @@
     // Việc show/hide panel hoàn toàn do user quyết định qua nút toggle hoặc phím M.
     console.log('[Brain3D] ✅ Nội dung Phân Tích Chi Tiết đã cập nhật (panel không tự mở)');
   };
-  // =========== NEW UPDATE 
-  function createDepthVisualizationBar(depth) {
-    const maxDepth = 55;  // Brain radius
-    const percentage = Math.min((depth / maxDepth) * 100, 100);
-
-    let color;
-    if (depth < 5) color = '#ff0040';
-    else if (depth < 15) color = '#ff9100';
-    else if (depth < 30) color = '#ffff00';
-    else if (depth < 45) color = '#00c853';
-    else color = '#00a3cc';
-
-    return `
-    <div style="
-      height: 100%;
-      width: ${percentage}%;
-      background: ${color};
-      transition: width 0.3s ease;
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      padding-right: 8px;
-      font-size: 10px;
-      color: #0a0e1a;
-      font-weight: bold;
-    ">
-      ${depth < 8 ? '' : (percentage < 100 ? percentage.toFixed(0) + '%' : '')}
-    </div>
-  `;
-  }
-
-  // 
-  function getDepthCategoryColor(category) {
-    const colors = {
-      'OUTSIDE': { bg: 'rgba(255, 0, 0, 0.1)', border: '#ff0000', text: '#ff5555' },
-      'SUPERFICIAL': { bg: 'rgba(255, 0, 64, 0.1)', border: '#ff0040', text: '#ff5252' },
-      'SHALLOW': { bg: 'rgba(255, 145, 0, 0.1)', border: '#ff9100', text: '#ffb74d' },
-      'INTERMEDIATE': { bg: 'rgba(255, 255, 0, 0.1)', border: '#ffff00', text: '#ffff99' },
-      'DEEP': { bg: 'rgba(0, 200, 83, 0.1)', border: '#00c853', text: '#66bb6a' },
-      'VERY_DEEP': { bg: 'rgba(0, 163, 204, 0.1)', border: '#00a3cc', text: '#4dd0e1' }
-    };
-
-    return colors[category] || colors['INTERMEDIATE'];
-  }
   // ---- Show Loading Indicator ----
   function showModelLoading(message = 'Đang tải mô hình não 3D...') {
     const loadingEl = document.getElementById('modelLoading');
@@ -905,6 +870,17 @@
     scene.add(tumorLight);
   }
 
+  function buildProceduralBrainFallback() {
+    const fbGeo = new THREE.SphereGeometry(1.2, 40, 40);
+    const fbMat = new THREE.MeshStandardMaterial({
+      color: 0xE8B4A8, metalness: 0.05, roughness: 0.65,
+      transparent: true, opacity: 0.75
+    });
+    const fallbackMesh = new THREE.Mesh(fbGeo, fbMat);
+    fallbackMesh.position.set(0, 0, 0);
+    applyBrainModel(fallbackMesh, 'normal');
+  }
+
   // ---- Load Brain Model (Enhanced with model type selection) ----
   function loadBrainModel(modelType = 'normal') {
     if (isLoadingModel) {
@@ -920,14 +896,14 @@
 
     if (FORCE_FALLBACK) {
       console.log('[Brain3D] Using procedural brain (fallback mode)');
-      buildProceduralBrain();
+      buildProceduralBrainFallback();
       hideModelLoading();
       return;
     }
 
     if (!loader) {
       console.warn('[Brain3D] GLTFLoader not available, using fallback');
-      buildProceduralBrain();
+      buildProceduralBrainFallback();
       hideModelLoading();
       return;
     }
@@ -977,7 +953,7 @@
 
         if (USE_FALLBACK_IF_MISSING) {
           console.log('[Brain3D] Falling back to procedural brain');
-          buildProceduralBrain();
+          buildProceduralBrainFallback();
         }
         hideModelLoading();
       }
@@ -1641,7 +1617,6 @@
     arrow.position.copy(tumorPos);
 
     // Point arrow towards cortex
-    const direction = new THREE.Vector3().subVectors(tumorPos, cortexPos).normalize();
     arrow.lookAt(cortexPos);
 
     depthVectorGroup.add(arrow);
@@ -2043,7 +2018,6 @@
     const BRS = (window._brainWS || 2.8) / (2.8 * 55);  // dynamic: scales with brain model
     const centroid = depthMetrics.centroid_3d || metrics?.centroid_mm || [0, 0, 0];
     const cortexPt = depthMetrics.nearest_cortex_point;
-    const depthMm = depthMetrics.tumor_depth_mm || 20;
     const category = depthMetrics.depth_category?.category || 'INTERMEDIATE';
 
     // Tumor center in world space
@@ -2349,7 +2323,7 @@
     window._tumorBBoxGroup = grp;
     console.log('[Brain3D] ✅ Tumor 3D bounding box built:', window._bboxLabelText);
 
-    // ✅ FIXED: Re-trigger sidebar update now that precise 3D metrics are available
+    //  Re-trigger sidebar update now that precise 3D metrics are available
     if (window.updateTumorMetrics && window.lastDiagnosisData) {
       window.updateTumorMetrics(window.lastDiagnosisData);
     }
@@ -2366,7 +2340,7 @@
       window._tumorShellGroup = null;
     }
 
-    // ✅ FIX: Use dynamic BRS matching brain world scale (same as buildTumorEnhancedOverlay)
+   
     // Previously hardcoded 1.0/55 (= 2.8/(2.8*55)) which caused tumor shell to be
     // ~2.4x too large after _brainWS was reduced from 2.8 → 1.15 to fix clipping.
     const BRS = (window._brainWS || 2.8) / (2.8 * 55);
@@ -2494,7 +2468,7 @@
 
     if (!depthMetrics?.centroid_3d) return;
 
-    // ✅ FIX: dynamic BRS — mirrors brain scale
+    //  dynamic BRS — mirrors brain scale < -----------------------------------------------------
     const BRS = (window._brainWS || 2.8) / (2.8 * 55);
     const brainRatio = (window._brainWS || 2.8) / 2.8;
     const centroid = depthMetrics.centroid_3d;
@@ -2954,6 +2928,7 @@
       viewer.appendChild(panel);
     }
   }
+  window._showDetailInfoPanel = _showDetailInfoPanel;
 
   function _hideDetailInfoPanel() {
     const old = document.getElementById('brain3dDetailPanel');
@@ -3082,7 +3057,7 @@
 
   // ---- Animation Loop ----
   function animate() {
-    animationId = requestAnimationFrame(animate);
+    requestAnimationFrame(animate);
     const dt = clock.getDelta();
     const time = clock.getElapsedTime();
 
@@ -3407,6 +3382,13 @@
     window.openComparePicker();
   };
 
+  function _getHeaderDockTop() {
+    const headerEl = document.querySelector('.header');
+    if (!headerEl) return 64;
+    const rect = headerEl.getBoundingClientRect();
+    return Math.max(0, Math.round(rect.bottom));
+  }
+
   window.openComparePicker = function () {
     const cases = window._similarCasesData;
     const old = document.getElementById('comparePicker');
@@ -3438,13 +3420,16 @@
     picker.id = 'comparePicker';
     picker.setAttribute('role', 'dialog');
     picker.setAttribute('aria-modal', 'true');
-    picker.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(241,245,249,0.98);' +
-      'display:flex;flex-direction:column;font-family:var(--font-main,"Google Sans",sans-serif);' +
-      'backdrop-filter:blur(10px);animation:_cpIn 0.35s cubic-bezier(0.22,1,0.36,1);';
+    const dockTop = _getHeaderDockTop();
+    picker.style.cssText = `position:fixed;left:0;right:0;bottom:0;top:${dockTop}px;z-index:10000;` +
+      'background:rgba(241,245,249,0.98);display:flex;flex-direction:column;' +
+      'font-family:var(--font-main,"Google Sans",sans-serif);backdrop-filter:blur(10px);' +
+      'border-top-left-radius:0;border-top-right-radius:0;box-shadow:none;' +
+      'overflow:hidden;animation:_cpIn 0.35s cubic-bezier(0.22,1,0.36,1);';
 
     picker.innerHTML = `
     <style>
-      @keyframes _cpIn { from { opacity:0; transform:scale(0.98); } to { opacity:1; transform:scale(1); } }
+      @keyframes _cpIn { from { opacity:0; transform:translateY(110%); } to { opacity:1; transform:translateY(0); } }
       @keyframes _cpCard { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
       #comparePicker * { font-family:inherit; }
       #comparePicker .cp-shell { display:flex; flex-direction:column; flex:1; min-height:0; }
@@ -3730,13 +3715,6 @@
       <div class="cp-grid">
         ${pageItems.map((c, i) => {
       const actualIdx = startIndex + i;
-      const sim = Math.round((c.similarity_score || 0) * 100);
-      const scoreBg = sim >= 80
-        ? 'linear-gradient(135deg,#34d399 0%,#10b981 100%)'
-        : sim >= 55
-          ? 'linear-gradient(135deg,#fbbf24 0%,#f59e0b 100%)'
-          : 'linear-gradient(135deg,#fb7185 0%,#ef4444 100%)';
-      const scoreShadow = sim >= 80 ? 'rgba(16,185,129,0.24)' : sim >= 55 ? 'rgba(245,158,11,0.24)' : 'rgba(239,68,68,0.22)';
       const imageSrc = c.filename ? `/data/images/${c.filename}` : c.thumbnail;
       const imgHTML = imageSrc
         ? `<img src="${imageSrc}" alt="Ca bệnh ${c.case_id || actualIdx + 1}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"/><span class="cp-empty" style="display:none;">MRI</span>`
@@ -3783,22 +3761,6 @@
     window._comparePickerPage = Math.min(totalPages, Math.max(1, page));
     window.openComparePicker();
   };
-
-  function _buildComparePickerPageTokens(totalPages, currentPage) {
-    if (totalPages <= 5) {
-      return Array.from({ length: totalPages }, (_, idx) => idx + 1);
-    }
-
-    if (currentPage <= 3) {
-      return [1, 2, 3, 'ellipsis', totalPages];
-    }
-
-    if (currentPage >= totalPages - 2) {
-      return [1, 'ellipsis', totalPages - 2, totalPages - 1, totalPages];
-    }
-
-    return [1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages];
-  }
 
   window.closeComparePicker = function (immediate) {
     const picker = document.getElementById('comparePicker');
@@ -4342,12 +4304,10 @@
   // ════════════════════════════════════════════════════════════
   // HELPER: Tạo báo cáo tổng hợp cho ca bệnh tương tự (Synthetic)
   // ════════════════════════════════════════════════════════════
-  function _generateSyntheticReport(caseItem, similarity, lobeInfo, depthMetrics = {}) {
+  function _generateSyntheticReport(caseItem, similarity, lobeInfo) {
     const hasTumor = caseItem.has_tumor;
     const loc = lobeInfo.label || 'Không rõ';
     const size = caseItem.tumor_size || 0;
-    const depth = depthMetrics.tumor_depth_mm;
-    const depthCat = depthMetrics.depth_category?.label || '';
 
     const summary = `Ca bệnh tương tự trong cơ sở dữ liệu với độ tương đồng đặc trưng ${similarity}%. ` +
       (hasTumor
@@ -4415,8 +4375,6 @@
     const depth = dm.tumor_depth_mm;
     const cat = dm.depth_category || {};
 
-    const depthRef = dmRef.tumor_depth_mm;
-    const catRef = dmRef.depth_category || {};
     const simColor = similarity >= 80 ? '#15803d' : similarity >= 55 ? '#b45309' : '#dc2626';
     const rawSimColor = similarity >= 80 ? '21,128,61' : similarity >= 55 ? '180,83,9' : '220,38,38';
     const dHex = depth != null ? (depth < 5 ? '#e53935' : depth < 15 ? '#f57c00' : depth < 30 ? '#fbc02d' : depth < 45 ? '#43a047' : '#1e88e5') : '#475569';
@@ -4435,7 +4393,6 @@
     // Location match?
     const locMatch = (refLobe.key !== 'unknown' && curLobe.key !== 'unknown') &&
       (refLobe.key === curLobe.key);
-    const locMatchCol = locMatch ? '#00c853' : '#ff9100';
     const locMatchTxt = locMatch ? '✓ Cùng vùng não' : '≠ Khác vùng não';
 
     function cDark(c) {
@@ -4508,7 +4465,12 @@
 
     const modal = document.createElement('div');
     modal.id = 'dual3DModal';
-    modal.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(248,250,252,0.98);display:flex;flex-direction:column;font-family:Inter, Segoe UI, Roboto, sans-serif;';
+    const dockTop = _getHeaderDockTop();
+    modal.style.cssText = `position:fixed;left:0;right:0;bottom:0;top:${dockTop}px;z-index:10000;` +
+      'background:rgba(248,250,252,0.98);display:flex;flex-direction:column;' +
+      'font-family:Inter, Segoe UI, Roboto, sans-serif;' +
+      'border-top-left-radius:0;border-top-right-radius:0;' +
+      'box-shadow:none;overflow:hidden;';
 
     // Synthetic report for Right side
     const refReport = _generateSyntheticReport(caseItem, similarity, refLobe, dmRef);
@@ -4528,13 +4490,35 @@
         animation: d3ModalFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
       }
       @keyframes d3ModalFadeIn {
-        from { opacity: 0; transform: scale(0.98) translateY(10px); } 
-        to { opacity: 1; transform: scale(1) translateY(0); }
+        from { opacity: 0; transform: translateY(110%); } 
+        to { opacity: 1; transform: translateY(0); }
       }
       #dual3DModal .d3-col-top { flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;border-right:2px solid var(--c-border); }
       #dual3DModal .d3-col-bot { flex:1;display:flex;flex-direction:column;min-width:0;overflow-y:auto;padding:20px;background:#f8fafc;border-right:2px solid var(--c-border); scroll-behavior: smooth; }
       #dual3DModal .d3-col-top:last-child { border-right:none; }
       #dual3DModal .d3-col-bot:last-child { border-right:none; }
+      #dual3DModal .d3-main-content { position:relative; flex:1; min-height:0; overflow:hidden; }
+      #dual3DModal .d3-bottom-drawer {
+        position:absolute; left:0; right:0; bottom:0; z-index:5;
+        height:min(52vh, calc(100% - 96px));
+        background:#ffffff;
+        border-top:1px solid #cbd5e1;
+        box-shadow:0 -10px 28px rgba(15, 23, 42, 0.2);
+        transform:translateY(calc(100% - 14px));
+        transition:transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      #dual3DModal .d3-bottom-drawer.active {
+        height:calc(100% - 4px);
+        transform:translateY(0);
+      }
+      #dual3DModal .d3-drawer-handle {
+        height:14px; display:flex; align-items:center; justify-content:center;
+        background:#f8fafc; border-bottom:1px solid #e2e8f0; cursor:pointer;
+      }
+      #dual3DModal .d3-drawer-handle::before {
+        content:''; width:44px; height:4px; border-radius:4px; background:#94a3b8;
+      }
+      #dual3DModal .d3-drawer-body { display:flex; height:calc(100% - 14px); overflow:hidden; }
       #dual3DModal .d3-label { padding:12px 16px;font-size:12px;font-weight:bold;letter-spacing:0.8px;border-bottom:1px solid var(--c-border);flex-shrink:0; }
       #dual3DModal .d3-canvas-wrap { position:relative;flex:1;background:#060c1a; }
       #dual3DModal .d3-hint { position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
@@ -4577,7 +4561,7 @@
 
       .d3-report-card {
         background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px;
-        margin-bottom: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        margin-bottom: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); 
       }
       .d3-report-title { color: #1e293b; font-size: 14px; font-weight: 700; text-transform: none; letter-spacing: -0.2px; margin-bottom: 12px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; display: flex; align-items: center; gap: 8px; }
       .d3-report-text { color: #475569; font-size: 13px; line-height: 1.7; margin-bottom: 12px; }
@@ -4597,46 +4581,46 @@
       </div>
       <div style="display:flex;gap:12px;align-items:center;">
         <div style="color:#64748b;font-size:10px;font-weight:600;">Kéo để xoay · Cuộn để zoom</div>
-        <button onclick="document.getElementById('dual3DModal').remove()" style="background:transparent;border:1px solid #ef4444;color:#ef4444;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:bold;transition:all 0.2s;"
+        <button id="dual3DToggleCompareBtn" type="button" style="background:#0284c7;border:1px solid #0284c7;color:#ffffff;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:bold;transition:all 0.2s;"
+          onmouseover="this.style.background='#0369a1'" onmouseout="this.style.background='#0284c7'">Xem thông tin so sánh</button>
+        <button id="dual3DCloseBtn" type="button" style="background:transparent;border:1px solid #ef4444;color:#ef4444;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:bold;transition:all 0.2s;"
           onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background='transparent'">✕ Đóng</button>
       </div>
     </div>
 
-    <!-- ── Body: Top Row (3D Views) ── -->  
-    <div id="dual3DTopRow" style="display:flex; height:38vh; min-height:100px; flex-shrink:0;">
-      <!-- LEFT TOP -->
-      <div class="d3-col-top">
-        <div class="d3-label" style="background:#f0f9ff;color:#0284c7;">
-          CA HIỆN TẠI <span style="font-weight:normal;color:#64748b;">· Upload</span>
+    <div class="d3-main-content">
+      <!-- ── Body: Top Row (3D Views) ── -->  
+      <div id="dual3DTopRow" style="display:flex; height:100%; min-height:100px; flex-shrink:0;">
+        <!-- LEFT TOP -->
+        <div class="d3-col-top">
+          <div class="d3-label" style="background:#f0f9ff;color:#0284c7;">
+            CA HIỆN TẠI <span style="font-weight:normal;color:#64748b;">· Upload</span>
+          </div>
+          <div class="d3-canvas-wrap">
+            <canvas id="dual3DLeft" style="width:100%;height:100%;display:block;cursor:grab;"></canvas>
+            <div class="d3-badge">Ca Đang Chẩn Đoán</div>
+            <div class="d3-hint">Kéo để xoay · Cuộn để zoom</div>
+          </div>
         </div>
-        <div class="d3-canvas-wrap">
-          <canvas id="dual3DLeft" style="width:100%;height:100%;display:block;cursor:grab;"></canvas>
-          <div class="d3-badge">Ca Đang Chẩn Đoán</div>
-          <div class="d3-hint">Kéo để xoay · Cuộn để zoom</div>
+        <!-- RIGHT TOP -->
+        <div class="d3-col-top">
+          <div class="d3-label" style="background:#faf5ff;color:#7e22ce;">
+            CA TƯƠNG TỰ #${caseItem.rank || '?'} <span style="font-weight:normal;color:#64748b;">· ${caseItem.source || 'Database'}</span>
+          </div>
+          <div class="d3-canvas-wrap">
+            <canvas id="dual3DRight" style="width:100%;height:100%;display:block;cursor:grab;"></canvas>
+            <div class="d3-badge" style="background:rgba(170,68,255,0.12);border-color:#aa44ff44;color:#aa44ff;">Mô Hình Tham Chiếu</div>
+            <div class="d3-hint">🖱️ Kéo để xoay · Cuộn để zoom</div>
+          </div>
         </div>
       </div>
-      <!-- RIGHT TOP -->
-      <div class="d3-col-top">
-        <div class="d3-label" style="background:#faf5ff;color:#7e22ce;">
-          CA TƯƠNG TỰ #${caseItem.rank || '?'} <span style="font-weight:normal;color:#64748b;">· ${caseItem.source || 'Database'}</span>
-        </div>
-        <div class="d3-canvas-wrap">
-          <canvas id="dual3DRight" style="width:100%;height:100%;display:block;cursor:grab;"></canvas>
-          <div class="d3-badge" style="background:rgba(170,68,255,0.12);border-color:#aa44ff44;color:#aa44ff;">Mô Hình Tham Chiếu</div>
-          <div class="d3-hint">🖱️ Kéo để xoay · Cuộn để zoom</div>
-        </div>
-      </div>
-    </div>
 
-    <!-- ── Splitter ── -->
-    <div id="dual3DSplitter" style="height:12px; background:#f1f5f9; border-top:1px solid #e2e8f0; border-bottom:1px solid #cbd5e1; cursor:ns-resize; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background 0.2s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
-      <div style="width:40px;height:4px;background:#94a3b8;border-radius:2px;"></div>
-    </div>
-
-    <!-- ── Body: Bottom Row (Info Panels) ── -->
-    <div style="display:flex; flex:1; overflow:hidden;">
-      <!-- LEFT INFO -->
-      <div class="d3-col-bot">
+      <!-- ── Bottom Drawer: Info Panels ── -->
+      <div id="dual3DBottomDrawer" class="d3-bottom-drawer">
+        <div id="dual3DDrawerHandle" class="d3-drawer-handle" title="Thu gọn / mở rộng phần so sánh"></div>
+        <div class="d3-drawer-body">
+        <!-- LEFT INFO -->
+        <div class="d3-col-bot">
         <!-- 📸 2D Image Section -->
         <div style="display:flex; gap:12px; margin-bottom:15px;">
           <div class="d3-2d-image-wrap" style="flex:1; background:#0a0e1a; border:1px solid #3b82f6; margin-bottom:0; box-shadow:0 4px 15px rgba(0,0,0,0.3);">
@@ -4698,9 +4682,9 @@
         <div style="animation-delay: 0.9s;" class="d3-info-card">
           ${mBox('Confidence', pred.confidence != null ? (pred.confidence * 100).toFixed(1) + '%' : 'N/A', '#00e5ff')}
         </div>
-      </div>
-      <!-- RIGHT INFO -->
-      <div class="d3-col-bot">
+        </div>
+        <!-- RIGHT INFO -->
+        <div class="d3-col-bot">
         <!-- 📸 2D Image Section -->
         <div class="d3-2d-image-wrap" style="background:#0a0e1a; border:1px solid #7e22ce; margin-bottom:15px; box-shadow:0 4px 15px rgba(0,0,0,0.3);">
           ${caseItem.filename ? `<img src="/data/images/${caseItem.filename}" alt="Similar MRI" onerror="this.src=''; this.parentElement.querySelector('.err-msg').style.display='block';"/>` : (caseItem.thumbnail ? `<img src="${caseItem.thumbnail}" alt="Similar MRI"/>` : '')}
@@ -4749,7 +4733,7 @@
         ['Vùng Não Khớp', locMatch ? similarity : Math.max(40, similarity * 0.65)],
         ['Kích Thước Tương Đối', similarity * (0.82 + Math.abs(Math.sin(similarity * 0.19)) * 0.15)],
         ['Cường Độ Tín chuyên sâu', similarity * (0.78 + Math.abs(Math.cos(similarity * 0.23)) * 0.18)]
-      ].map(([label, rawV], idx) => {
+      ].map(([label, rawV]) => {
         const v = Math.min(100, Math.round(rawV));
         const c = v >= 75 ? '#15803d' : v >= 50 ? '#b45309' : '#dc2626';
         return `<div class="d3-bar-row">
@@ -4778,6 +4762,8 @@
         <div style="animation-delay: 1.05s;" class="d3-info-card">
           ${mBox('Mã Ca Bệnh / Bệnh Nhân', (caseItem.case_id || '?') + ' · ' + (caseItem.patient_id || 'N/A'), '#5a7a99')}
         </div>
+        </div>
+      </div>
       </div>
     </div>`;
 
@@ -4801,36 +4787,22 @@
       });
     }, 200);
 
-    // ── Resizer logic ──
-    let isResizing = false;
-    const topRow = document.getElementById('dual3DTopRow');
-    const splitter = document.getElementById('dual3DSplitter');
+    const bottomDrawer = document.getElementById('dual3DBottomDrawer');
+    const toggleCompareBtn = document.getElementById('dual3DToggleCompareBtn');
+    const drawerHandle = document.getElementById('dual3DDrawerHandle');
+    const closeBtn = document.getElementById('dual3DCloseBtn');
+    let isDrawerOpen = false;
 
-    splitter.addEventListener('mousedown', (e) => {
-      isResizing = true;
-      e.preventDefault();
-      document.body.style.cursor = 'ns-resize';
-      splitter.style.background = '#cbd5e1';
-    });
+    const setDrawerOpen = (open) => {
+      isDrawerOpen = !!open;
+      bottomDrawer.classList.toggle('active', isDrawerOpen);
+      toggleCompareBtn.textContent = isDrawerOpen ? 'Ẩn so sánh' : 'Xem so sánh';
+      window.dispatchEvent(new Event('resize'));
+    };
 
-    window.addEventListener('mousemove', (e) => {
-      if (!isResizing) return;
-      // Trừ ~52px header
-      let newHeight = e.clientY - 52;
-      if (newHeight < 80) newHeight = 80;
-      if (newHeight > window.innerHeight - 100) newHeight = window.innerHeight - 100;
-      topRow.style.height = newHeight + 'px';
-    });
-
-    window.addEventListener('mouseup', () => {
-      if (isResizing) {
-        isResizing = false;
-        document.body.style.cursor = '';
-        splitter.style.background = '#f1f5f9';
-        // Trigger window resize event so that Three.js canvas dynamically recalculates aspect ratio
-        window.dispatchEvent(new Event('resize'));
-      }
-    });
+    toggleCompareBtn.addEventListener('click', () => setDrawerOpen(!isDrawerOpen));
+    drawerHandle.addEventListener('click', () => setDrawerOpen(!isDrawerOpen));
+    closeBtn.addEventListener('click', () => modal.remove());
 
     // Khởi động 2 scene sau khi DOM render
     requestAnimationFrame(() => {
@@ -4931,15 +4903,13 @@
       }
 
       // ── Tumor Visualization ──────────────────────────────────
-      // Hệ số chuyển đổi mm → world-space (brain ~55mm radius → BRAIN_WS)
-      const BRS = BRAIN_WS / 55;  // ≈ 0.051 world/mm
       const pred = isLeft ? (diagData?.prediction || {}) : {};
       let tumorGroup = null;
 
       if (isLeft && pred.tumor_detected) {
-        tumorGroup = _buildDualTumor(brainGroup, pred, diagData?.depth_metrics, BRS);
+        tumorGroup = _buildDualTumor(brainGroup, pred, diagData?.depth_metrics);
       } else if (!isLeft && caseItem?.has_tumor) {
-        tumorGroup = _buildDualTumorRef(brainGroup, caseItem, similarity, BRS, locKey);
+        tumorGroup = _buildDualTumorRef(brainGroup, caseItem, similarity, locKey);
       }
 
       notifyClinicalEnhancer('onDualSceneReady', {
@@ -5319,7 +5289,7 @@
 
   // ─── _buildDualTumor — LEFT panel (ca hiện tại) ───────────────────────────────
 
-  function _buildDualTumor(brainGroup, pred, dm, BRS) {
+  function _buildDualTumor(brainGroup, pred, dm) {
     const BRAIN_R = 1.4;
 
     let tx = (pred.centroid_normalized?.[0] ?? 0) * 0.48;
@@ -5343,8 +5313,7 @@
 
   // ─── _buildDualTumorRef — RIGHT panel (ca tương tự) ───────────────────────────
 
-  function _buildDualTumorRef(brainGroup, caseItem, similarity, BRS, locKey) {
-    const BRAIN_R = 1.4;
+  function _buildDualTumorRef(brainGroup, caseItem, similarity, locKey) {
 
     const LOBES = {
       frontal: { x: 0.00, y: 0.16, z: 0.38 },

@@ -942,6 +942,17 @@
     if (historyPanel) historyPanel.style.display = 'none';
     if (atlasPanel) atlasPanel.classList.remove('active');
 
+    // Close any global compare drawers/modals when changing top tab.
+    // This prevents overlay panels from staying open across tab switches.
+    if (typeof window.closeComparePicker === 'function') {
+      window.closeComparePicker(true);
+    } else {
+      const comparePicker = document.getElementById('comparePicker');
+      if (comparePicker) comparePicker.remove();
+    }
+    const dual3DModal = document.getElementById('dual3DModal');
+    if (dual3DModal) dual3DModal.remove();
+
     // Show based on tab
     switch (tabName) {
 
@@ -1241,6 +1252,10 @@
       const header = document.querySelector('.header');
       if (!header) return;
 
+      const root = document.documentElement;
+      // Keep drawers/panels aligned with the real header height (64px normal, ~52px when scrolled).
+      root.style.setProperty('--header-height', header.offsetHeight + 'px');
+
       let ticking = false;
 
       function onScroll() {
@@ -1253,6 +1268,9 @@
             } else {
               header.classList.remove('header--scrolled');
             }
+
+            // Sync variable after header height changes.
+            root.style.setProperty('--header-height', header.offsetHeight + 'px');
 
             ticking = false;
           });

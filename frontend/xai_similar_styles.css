@@ -442,27 +442,33 @@
 
 /* ========== SIMILAR CASES PANEL ========== */
 .similar-panel {
-  position: relative;
-  margin-top: 64px;
-  min-height: calc(100vh - 64px);
+  /* Drawer-like sidebar sliding up from bottom (dock under app header). */
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--header-height, 64px);
+  bottom: 0;
   padding: 20px 24px 40px;
   background: #f8fafc;
-  /* Slightly lighter and cleaner */
   z-index: 100;
-  display: none;
-  /* Controlled by JS */
+  display: none; /* controlled by JS */
   opacity: 0;
   visibility: hidden;
-  transform: scale(0.98);
-  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+  transform: translateY(110%);
+  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
     transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-    visibility 0.4s;
+    visibility 0.35s;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  box-shadow: none;
 }
 
 .similar-panel.active {
   opacity: 1;
   visibility: visible;
-  transform: scale(1);
+  transform: translateY(0);
 }
 
 .similar-header {

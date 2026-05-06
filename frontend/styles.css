@@ -43,6 +43,8 @@
   --nav-border: #d1dde8;
   --nav-text: #1a2435;
   --nav-text-sec: #4a5568;
+  --viewer-3d-height: 50vh;
+  --viewer-3d-min-height: 460px;
 
   /* Tumor colors - VIVID NEON */
   --tumor-core: #FF0040;
@@ -477,8 +479,8 @@ body::before {
    ============================================================ */
 .viewer-3d {
   flex: 1;
-  min-height: 550px;
-  height: 55vh;
+  min-height: var(--viewer-3d-min-height);
+  height: var(--viewer-3d-height);
   position: relative;
   border-radius: var(--radius);
   overflow: hidden;
