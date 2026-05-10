@@ -43,8 +43,8 @@
   --nav-border: #d1dde8;
   --nav-text: #1a2435;
   --nav-text-sec: #4a5568;
-  --viewer-3d-height: 50vh;
-  --viewer-3d-min-height: 460px;
+  --viewer-3d-height: 45vh;
+  --viewer-3d-min-height: 380px;
 
   /* Tumor colors - VIVID NEON */
   --tumor-core: #FF0040;
@@ -52,6 +52,298 @@
   --tumor-edge: #FF6B00;
   --tumor-glow: #FF3D00;
   --tumor-halo: #FF4500;
+}
+
+/* === DARK THEME (opt-in) === */
+html[data-theme="dark"] {
+  --bg-deep: #070b14;
+  --bg-panel: #0b1220;
+  --bg-card: #0f1a2d;
+  --bg-hover: rgba(0, 229, 255, 0.06);
+  --border: rgba(148, 163, 184, 0.22);
+
+  --nav-bg: rgba(9, 14, 26, 0.92);
+  --nav-border: rgba(0, 229, 255, 0.18);
+  --nav-text: #e5eefc;
+  --nav-text-sec: rgba(193, 207, 232, 0.78);
+
+  --text-primary: #e5eefc;
+  --text-sec: rgba(193, 207, 232, 0.80);
+  --text-dim: rgba(193, 207, 232, 0.55);
+}
+
+/* ── Dark: Base panels & components ── */
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .badge,
+html[data-theme="dark"] .upload-zone,
+html[data-theme="dark"] .ctrl-btn,
+html[data-theme="dark"] .atlas-toolbar,
+html[data-theme="dark"] .atlas-ctrl-btn,
+html[data-theme="dark"] .atlas-ctrl-btn-sm,
+html[data-theme="dark"] .modal-content,
+html[data-theme="dark"] .xai-card,
+html[data-theme="dark"] .xai-card-header,
+html[data-theme="dark"] .case-card {
+  background: var(--bg-panel) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+html[data-theme="dark"] .confidence-card,
+html[data-theme="dark"] .stat-card,
+html[data-theme="dark"] .report-section,
+html[data-theme="dark"] .clinical-panel-placeholder {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+}
+
+html[data-theme="dark"] .status-text,
+html[data-theme="dark"] .legend-item,
+html[data-theme="dark"] .upload-sub,
+html[data-theme="dark"] .report-text,
+html[data-theme="dark"] .findings-list li,
+html[data-theme="dark"] .report-section-title,
+html[data-theme="dark"] .confidence-label,
+html[data-theme="dark"] .stat-label,
+html[data-theme="dark"] .panel-header h2,
+html[data-theme="dark"] .upload-text {
+  color: var(--text-sec) !important;
+}
+
+/* ── Dark: Footer ── */
+html[data-theme="dark"] .footer {
+  background: var(--bg-deep) !important;
+  border-top-color: var(--border) !important;
+  color: var(--text-dim) !important;
+}
+
+html[data-theme="dark"] .footer p,
+html[data-theme="dark"] .copyright {
+  color: var(--text-dim) !important;
+}
+
+/* ── Dark: Header scrolled override (defeats hard #fff) ── */
+html[data-theme="dark"] .header--scrolled {
+  background: rgba(9, 14, 26, 0.96) !important;
+  backdrop-filter: blur(20px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(160%) !important;
+  box-shadow: 0 8px 32px rgba(0, 229, 255, 0.06) !important;
+  border-bottom: 1px solid rgba(0, 229, 255, 0.12) !important;
+}
+
+/* ── Dark: Theme toggle button ── */
+html[data-theme="dark"] .header-icon-btn {
+  border-color: rgba(0, 229, 255, 0.28) !important;
+  background: rgba(0, 229, 255, 0.08) !important;
+  color: rgba(229, 238, 252, 0.9) !important;
+}
+
+html[data-theme="dark"] .header-icon-btn:hover {
+  background: rgba(0, 229, 255, 0.14) !important;
+  box-shadow: 0 0 0 4px rgba(0, 229, 255, 0.12) !important;
+  color: #00e5ff !important;
+}
+
+/* ── Dark: Depth Status Card (inline #ffffff override) ── */
+html[data-theme="dark"] #depthCardInner {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+}
+
+html[data-theme="dark"] #depthMedDesc {
+  background: rgba(0, 229, 255, 0.04) !important;
+  border-color: rgba(0, 229, 255, 0.1) !important;
+  color: var(--text-sec) !important;
+}
+
+/* ── Dark: Grading legend ── */
+html[data-theme="dark"] .grading-legend {
+  background: rgba(0, 229, 255, 0.03) !important;
+  border-color: rgba(0, 229, 255, 0.1) !important;
+}
+
+html[data-theme="dark"] .grading-legend span[style] {
+  color: var(--text-sec) !important;
+}
+
+/* ── Dark: Comparison/methods table ── */
+html[data-theme="dark"] .comparison-table table tr {
+  border-color: var(--border) !important;
+}
+
+html[data-theme="dark"] .comparison-table th,
+html[data-theme="dark"] .comparison-table td {
+  color: var(--text-sec) !important;
+  border-color: var(--border) !important;
+}
+
+/* ── Dark: AI Disclaimer Popup ── */
+html[data-theme="dark"] #aiDisclaimerPill {
+  background: rgba(11, 18, 32, 0.95) !important;
+  border-color: rgba(0, 229, 255, 0.18) !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4) !important;
+}
+
+html[data-theme="dark"] #aiDisclaimerPill span {
+  color: var(--text-primary) !important;
+}
+
+html[data-theme="dark"] #aiDisclaimerContent {
+  background: rgba(11, 18, 32, 0.97) !important;
+  border-color: rgba(0, 229, 255, 0.15) !important;
+}
+
+html[data-theme="dark"] #aiDisclaimerContent *:not(i) {
+  color: var(--text-sec) !important;
+  border-color: var(--border) !important;
+}
+
+html[data-theme="dark"] #aiDisclaimerContent strong,
+html[data-theme="dark"] #aiDisclaimerContent h4 {
+  color: var(--text-primary) !important;
+}
+
+/* ── Dark: Info Panel ── */
+html[data-theme="dark"] .info-panel {
+  background: var(--bg-panel) !important;
+  color: var(--text-primary) !important;
+}
+
+html[data-theme="dark"] .info-content h2,
+html[data-theme="dark"] .info-content h3,
+html[data-theme="dark"] .info-content strong {
+  color: var(--text-primary) !important;
+}
+
+html[data-theme="dark"] .info-content p {
+  color: var(--text-sec) !important;
+}
+
+html[data-theme="dark"] .step-num {
+  background: rgba(0, 229, 255, 0.12) !important;
+  color: #00e5ff !important;
+  border-color: rgba(0, 229, 255, 0.2) !important;
+}
+
+html[data-theme="dark"] .step {
+  border-color: var(--border) !important;
+}
+
+/* ── Dark: XAI Accordion & Panel Content ── */
+html[data-theme="dark"] .xai-accordion-item {
+  background: var(--bg-panel) !important;
+  border-color: var(--border) !important;
+}
+
+html[data-theme="dark"] .xai-accordion-header {
+  background: var(--bg-card) !important;
+  border-bottom-color: var(--border) !important;
+}
+
+html[data-theme="dark"] .xai-accordion-item.open>.xai-accordion-header {
+  background: rgba(0, 151, 180, 0.10) !important;
+  border-bottom-color: rgba(0, 151, 180, 0.22) !important;
+}
+
+html[data-theme="dark"] .xai-accordion-body {
+  background: var(--bg-panel) !important;
+}
+
+html[data-theme="dark"] .xai-accordion-body>div {
+  background: var(--bg-panel) !important;
+}
+
+html[data-theme="dark"] .xai-container,
+html[data-theme="dark"] .xai-layout,
+html[data-theme="dark"] .xai-content-main {
+  background: var(--bg-deep) !important;
+  color: var(--text-primary) !important;
+}
+
+/* XAI sidebar */
+html[data-theme="dark"] .xai-sidebar,
+html[data-theme="dark"] .xai-sidebar-header,
+html[data-theme="dark"] .xai-sidebar-item {
+  background: var(--bg-panel) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* GradCAM inner panels – override hardcoded light backgrounds */
+html[data-theme="dark"] .xai-accordion-body .gradcam-clinical-card,
+html[data-theme="dark"] .xai-accordion-body .xai-card {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Metric/stat mini boxes inside accordion */
+html[data-theme="dark"] .xai-accordion-body [style*="background: #f8fafc"],
+html[data-theme="dark"] .xai-accordion-body [style*="background:#f8fafc"],
+html[data-theme="dark"] .xai-accordion-body [style*="background: #fafafa"],
+html[data-theme="dark"] .xai-accordion-body [style*="background:#fafafa"],
+html[data-theme="dark"] .xai-accordion-body [style*="background: #ffffff"],
+html[data-theme="dark"] .xai-accordion-body [style*="background:#ffffff"] {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+}
+
+html[data-theme="dark"] .xai-accordion-body [style*="background: #ffffff"] *,
+html[data-theme="dark"] .xai-accordion-body [style*="background:#ffffff"] *,
+html[data-theme="dark"] .xai-accordion-body [style*="background: #f8fafc"] *,
+html[data-theme="dark"] .xai-accordion-body [style*="background: #fafafa"] * {
+  color: var(--text-primary) !important;
+}
+
+/* Text color overrides for dark mode in accordion */
+html[data-theme="dark"] .xai-accordion-body [style*="color: #1e293b"],
+html[data-theme="dark"] .xai-accordion-body [style*="color: #334155"],
+html[data-theme="dark"] .xai-accordion-body [style*="color: #374151"],
+html[data-theme="dark"] .xai-accordion-body [style*="color: #475569"],
+html[data-theme="dark"] .xai-accordion-body [style*="color:#1e293b"],
+html[data-theme="dark"] .xai-accordion-body [style*="color:#334155"] {
+  color: var(--text-primary) !important;
+}
+
+html[data-theme="dark"] .xai-accordion-body [style*="color: #64748b"],
+html[data-theme="dark"] .xai-accordion-body [style*="color: #6b7280"],
+html[data-theme="dark"] .xai-accordion-body [style*="color: #94a3b8"],
+html[data-theme="dark"] .xai-accordion-body [style*="color:#64748b"],
+html[data-theme="dark"] .xai-accordion-body [style*="color:#6b7280"] {
+  color: var(--text-sec) !important;
+}
+
+/* Border overrides in accordion dark */
+html[data-theme="dark"] .xai-accordion-body [style*="border: 1px solid #e2e8f0"],
+html[data-theme="dark"] .xai-accordion-body [style*="border: 1px solid #e5e7eb"],
+html[data-theme="dark"] .xai-accordion-body [style*="border: 1px solid #e8ecf0"],
+html[data-theme="dark"] .xai-accordion-body [style*="border-bottom: 1px solid #f1f5f9"] {
+  border-color: var(--border) !important;
+}
+
+/* Metric box label/value inside accordion */
+html[data-theme="dark"] .xai-accordion-body [style*="background:#fff"],
+html[data-theme="dark"] .xai-accordion-body [style*="background: #fff"] {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+}
+
+/* ── Dark: Allow alternative selector via .dark class ── */
+html.dark {
+  --bg-deep: #070b14;
+  --bg-panel: #0b1220;
+  --bg-card: #0f1a2d;
+  --bg-hover: rgba(0, 229, 255, 0.06);
+  --border: rgba(148, 163, 184, 0.22);
+
+  --nav-bg: rgba(9, 14, 26, 0.92);
+  --nav-border: rgba(0, 229, 255, 0.18);
+  --nav-text: #e5eefc;
+  --nav-text-sec: rgba(193, 207, 232, 0.78);
+
+  --text-primary: #e5eefc;
+  --text-sec: rgba(193, 207, 232, 0.80);
+  --text-dim: rgba(193, 207, 232, 0.55);
 }
 
 html,
@@ -66,6 +358,7 @@ body {
   overflow-y: auto;
   /* Enable vertical scrolling */
   user-select: none;
+  transition: background-color 0.18s ease, color 0.18s ease;
 }
 
 /* --- Very subtle light background grid --- */
@@ -79,6 +372,13 @@ body::before {
   background-size: 40px 40px;
   pointer-events: none;
   z-index: 0;
+}
+
+html[data-theme="dark"] body::before {
+  background-image:
+    linear-gradient(rgba(0, 229, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.06) 1px, transparent 1px);
+  opacity: 0.6;
 }
 
 /* ============================================================
@@ -184,12 +484,72 @@ body::before {
   box-shadow: 0 2px 8px rgba(0, 151, 180, 0.3);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.header-icon-btn {
+  width: 74px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 151, 180, 0.25);
+  background: rgba(0, 151, 180, 0.06);
+  color: var(--nav-text-sec);
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.18s ease;
+  position: relative;
+  z-index: 1001;
+}
+
+.theme-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: inherit;
+}
+
+.header-icon-btn:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: var(--cyan-glow);
+  box-shadow: 0 0 0 4px rgba(0, 229, 255, 0.08);
+}
+
+.header-icon-btn:active {
+  transform: scale(0.96);
+}
+
+.header-icon-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(0, 151, 180, 0.18);
+  border-color: var(--cyan);
+}
+
+html[data-theme="dark"] .header-icon-btn {
+  border-color: rgba(0, 229, 255, 0.28);
+  background: rgba(0, 229, 255, 0.08);
+  color: rgba(229, 238, 252, 0.9);
+}
+
+html[data-theme="dark"] .header-icon-btn:hover {
+  background: rgba(0, 229, 255, 0.14);
+  box-shadow: 0 0 0 4px rgba(0, 229, 255, 0.12);
+}
+
 /* Status */
 .header-status {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: 24px;
+  margin-left: 12px;
 }
 
 .status-dot {
@@ -226,13 +586,15 @@ body::before {
   grid-template-areas:
     "left center clinical"
     "left report clinical";
-  gap: 18px;
+  grid-template-rows: min-content 1fr;
+  gap: 8px;
   align-items: start;
-  min-height: calc(100vh - 64px);
+  align-content: start;
+  min-height: auto;
   /* Offset header fixed */
   margin-top: 64px;
   max-width: 1560px;
-  padding: 18px;
+  padding: 10px;
   margin-left: auto;
   margin-right: auto;
   opacity: 0;
@@ -253,10 +615,10 @@ body::before {
   border: 1px solid var(--border);
   border-radius: 16px;
   /* overflow-y: auto; REMOVED to allow page scroll if content is long */
-  padding: 24px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
 }
 
@@ -270,8 +632,9 @@ body::before {
 
 .panel-center {
   grid-area: center;
-  padding: 20px 16px;
+  padding: 16px 16px 16px;
   background: var(--bg-deep);
+  gap: 8px;
 }
 
 .panel-right {
@@ -283,7 +646,8 @@ body::before {
   width: min(100%, 920px);
   justify-self: center;
   align-self: start;
-  padding: 20px 22px 24px;
+  padding: 4px 22px 24px;
+  gap: 8px;
 }
 
 .panel-clinical {
@@ -325,8 +689,10 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 14px;
+  padding-top: 10px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
 }
 
 .panel-header h2 {
@@ -727,7 +1093,7 @@ body::before {
   justify-content: center;
   text-align: center;
   color: var(--text-dim);
-  padding: 40px 20px;
+  padding: 24px 20px;
 }
 
 .placeholder-icon {
@@ -744,7 +1110,7 @@ body::before {
 
 .panel-report .report-placeholder,
 .panel-report .loading-state {
-  min-height: 260px;
+  min-height: 180px;
 }
 
 .panel-report .report-placeholder p {
@@ -782,7 +1148,7 @@ body::before {
 /* Confidence card */
 .confidence-card {
   margin-bottom: 20px;
-  background: #ffffff;
+  background: var(--bg-card);
   border-radius: 16px;
   padding: 20px;
   border: 1px solid var(--border);
@@ -829,7 +1195,7 @@ body::before {
 }
 
 .stat-card {
-  background: #ffffff;
+  background: var(--bg-card);
   border-radius: 12px;
   padding: 16px;
   border: 1px solid var(--border);
@@ -932,7 +1298,7 @@ body::before {
   margin-top: 64px;
   min-height: calc(100vh - 64px);
   z-index: 100;
-  background: #ffffff;
+  background: var(--bg-panel);
   padding: 40px 24px;
   display: none;
   flex-direction: column;
@@ -1167,7 +1533,7 @@ body::before {
       "center"
       "report"
       "clinical";
-    gap: 14px;
+    gap: 10px;
     padding: 12px;
   }
 
@@ -1178,7 +1544,7 @@ body::before {
   }
 
   .panel-center {
-    min-height: 400px;
+    min-height: 380px;
   }
 }
 
@@ -1769,10 +2135,12 @@ body::before {
   border-radius: 2px;
   outline: none;
   -webkit-appearance: none;
+  appearance: none;
 }
 
 .slider-group input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
+  appearance: none;
   width: 12px;
   height: 12px;
   border-radius: 50%;
@@ -2604,7 +2972,7 @@ body::before {
 .footer {
   background: #f8fafc;
   color: var(--text-primary);
-  padding: 25px 0;
+  padding: 12px 0;
   border-top: 1px solid var(--border);
   position: relative;
   z-index: 10;

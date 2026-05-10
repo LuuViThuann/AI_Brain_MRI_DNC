@@ -1,5 +1,25 @@
 Thông tin ghi chú kỹ thuật : ===  mô hình của bạn là 2D U-Net chạy trên từng lát cắt đơn lẻ
 
+Các công nghệ then chốt trong dự án của bạn:
+========================
++ FastAPI: Giúp API chạy cực nhanh.
++ TensorFlow/Keras: Chạy mô hình U-Net.
++ Three.js: Xử lý đồ họa 3D tương tác.
++ Groq Cloud: Cung cấp tốc độ suy luận LLM siêu tốc để tạo báo cáo gần như tức thì.
+======================
+Luồng hoạt động (Workflow Simulation)
+
+1. Gửi ảnh: Người dùng chọn ảnh MRI -> Frontend gửi yêu cầu POST đến /api/diagnose.
+2. Chẩn đoán:
++ Backend nhận ảnh, chạy U-Net lấy Mask.
++ Tính toán diện tích (rule_based.py) và vị trí khối u.
++ Phân tích sâu: Chạy SHAP và Grad-CAM để giải thích tại sao AI đoán như vậy.
+3. Tạo báo cáo: Groq AI viết văn bản chẩn đoán dựa trên kết quả bước 2.
+4. Trả kết quả: Backend gửi về một JSON khổng lồ chứa: Mask ảnh, Báo cáo văn bản, Tọa độ 3D, và các chỉ số XAI.
+5. Hiển thị: Frontend nhận dữ liệu, vẽ Mask lên Canvas, cập nhật mô hình 3D và đổ dữ liệu vào báo cáo
+========================
+
+
 Feature ExtractionTrích xuất vector đặc trưng từ ảnh (thường dùng CNN/ResNet)
 
 Vector Search (kNN)So sánh vector ảnh mới với toàn bộ database, lấy k gần nhất
@@ -134,3 +154,26 @@ Thay vì làm mờ cả bộ não, bác sĩ có thể muốn:
 Ẩn hoàn toàn vỏ não để chỉ xem khối u và hệ thống mạch máu/não thất.
 Làm nổi bật vùng Phù não (Edema) với màu sắc khác so với Nhân khối u (Core) để thấy mức độ xâm lấn.
 
+< ========================= < ==========
+
++ Trực quan hóa "Đám mây XAI" (XAI Volumetric Cloud)
+Ý tưởng: Sử dụng dữ liệu Heatmap từ Grad-CAM (2D) để tạo ra một "đám mây điểm" (point cloud) có độ đậm nhạt khác nhau bao quanh khối u trong 3D.
+Lợi ích: Giúp bác sĩ hiểu vùng nào AI đang nghi ngờ nhất, không chỉ là vùng lõi khối u mà cả vùng thâm nhiễm (peritumoral edema).
+
++ Thang đo rủi ro tương tác (Dynamic Risk Heatmap)
+Ý tưởng: Khi người dùng thay đổi "Biên an toàn phẫu thuật" (ví dụ: từ 5mm lên 10mm), mô hình 3D sẽ tự động highlight các vùng chức năng bị ảnh hưởng bằng màu đỏ rực.
+Lợi ích: Hỗ trợ lập kế hoạch phẫu thuật chính xác hơn.
+
++ Tích hợp thông tin "Ca bệnh tương tự" vào 3D
+Ý tưởng: Hiển thị khối u của ca tương tự nhất dưới dạng một "vỏ khung" (wireframe) mờ nhạt bao quanh khối u hiện tại.
+Lợi ích: Cung cấp cái nhìn trực quan về sự khác biệt kích thước và vị trí so với các ca đã điều trị thành công.
+
+
+< =====
+
++ CẮT LỚP 3 TRỤC : sang arcodition 
++ Dời thông tin risk heatmap sang bên dưới màn hình mô hình 3D 
+
+<==========
+Dự án của bạn hiện tại là một hệ thống chẩn đoán y tế dựa trên AI rất hoàn chỉnh và chuyên nghiệp
+ kết hợp giữa học máy (Deep Learning), xử lý ngôn ngữ tự nhiên (NLP) và đồ họa 3D.

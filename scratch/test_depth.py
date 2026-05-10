@@ -1,7 +1,10 @@
 
+# pyrefly: ignore [missing-import]
 import numpy as np
+# pyrefly: ignore [missing-import]
 import cv2
 import json
+# pyrefly: ignore [missing-import]
 from xai.rule_based import RuleBasedAnalyzer
 
 def test_depth():

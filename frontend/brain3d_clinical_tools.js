@@ -17,12 +17,19 @@
     clipPlanes: null,
     slicePlaneMeshes: {},
     functionalGroup: null,
+    safetyMarginGroup: null,
+    attentionCloudGroup: null,
+    similarWireframeGroup: null,
     tumorComponentGroup: null,
     trajectoryGroup: null,
     lastMesh: null,
     tumorCenter: null,
     tumorRadius: 0.11,
     riskSummary: [],
+    attentionCloudSamples: null,
+    attentionCloudCacheKey: '',
+    attentionCloudLoadId: 0,
+    similarData: null,
     lastRotationKey: '',
     pendingReset: true,
     lastExpandedHeight: 0,
@@ -43,13 +50,25 @@
   };
 
   const REGION_RADIUS_MM = 55;
-  const MAIN_SCENE_RADIUS = 1.08;
+  const MAIN_SCENE_RADIUS = 1.08; // Bán kính chính của mô hình não 
   const COMPARE_SCENE_RADIUS = 1.40;
-  const COMPARE_TUMOR_VISUAL_SCALE = 1.24;
+  const COMPARE_TUMOR_VISUAL_SCALE = 1.24; // Tỷ lệ phóng đại hình ảnh khối u trong chế độ so sánh, giúp bác sĩ dễ dàng nhận diện sự khác biệt về hình thái giữa ca hiện tại và ca tham chiếu.
   const TOOLTIP_SELECTION_STORAGE_KEY = 'brain3d.tooltip.selection.v2';
   const CLINICAL_STATE_STORAGE_KEY = 'brain3d.clinical.state.v4';
   const TRAJECTORY_ACCENTS = ['#22c55e', '#14b8a6', '#38bdf8', '#84cc16', '#06b6d4', '#a855f7'];
   const TRAJECTORY_LABEL_RATIOS = [0.14, 0.18, 0.22, 0.26, 0.16, 0.24];
+  const SIMILAR_TUMOR_LOCATION_MAP = {
+    left_frontal: [-0.50, 0.60, 0.35],
+    right_frontal: [0.50, 0.60, 0.35],
+    left_temporal: [-0.75, 0.00, 0.45],
+    right_temporal: [0.75, 0.00, 0.45],
+    left_parietal: [-0.45, 0.55, -0.50],
+    right_parietal: [0.45, 0.55, -0.50],
+    left_occipital: [-0.30, 0.20, -0.80],
+    right_occipital: [0.30, 0.20, -0.80],
+    left_central: [-0.18, 0.36, 0.00],
+    right_central: [0.18, 0.36, 0.00],
+  };
 
   const FUNCTIONAL_ZONE_BLUEPRINTS = [
     {
@@ -109,10 +128,14 @@
       clip: { axial: 1.0, coronal: 1.0, sagittal: 1.0 },
       manualClipAdjusted: false,
       showFunctional: true,
+      showRiskShell: true,
+      showAttentionCloud: true,
+      showSimilarWireframe: true,
       showPath: true,
       showTooltips: true,
       cortexOpacity: 1.0,
       deepOpacity: 0.21,
+      safetyMarginMm: 8,
       showCore: true,
       showEdema: true,
       showEnhancing: true,
@@ -140,6 +163,10 @@
     return Math.max(0, Math.min(1, Number(value) || 0));
   }
 
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, Number(value) || 0));
+  }
+
   function formatCompareLocKey(value) {
     return String(value || '').replace(/_/g, ' ').trim();
   }
@@ -158,11 +185,15 @@
     parsed.activeView = ['axial', 'coronal', 'sagittal'].includes(parsed.activeView) ? parsed.activeView : defaults.activeView;
     parsed.manualClipAdjusted = !!parsed.manualClipAdjusted;
     parsed.showFunctional = parsed.showFunctional !== false;
+    parsed.showRiskShell = parsed.showRiskShell !== false;
+    parsed.showAttentionCloud = parsed.showAttentionCloud !== false;
+    parsed.showSimilarWireframe = parsed.showSimilarWireframe !== false;
     parsed.showPath = parsed.showPath !== false;
     parsed.showTooltips = parsed.showTooltips !== false;
     parsed.showCore = parsed.showCore !== false;
     parsed.showEdema = parsed.showEdema !== false;
     parsed.showEnhancing = parsed.showEnhancing !== false;
+    parsed.safetyMarginMm = clamp(parsed.safetyMarginMm ?? defaults.safetyMarginMm, 0, 20);
     syncLegacyCustomEntryState(parsed);
     return parsed;
   }
@@ -180,6 +211,12 @@
 
   function mmToScene(mm, sceneRadius) {
     return (mm / REGION_RADIUS_MM) * sceneRadius;
+  }
+
+
+
+  function sceneToMm(sceneUnits, sceneRadius) {
+    return (sceneUnits / sceneRadius) * REGION_RADIUS_MM;
   }
 
   function axisValueToScene(value, sceneRadius) {
@@ -217,7 +254,6 @@
   function applyVectorRotation(point, euler) {
     return point.clone().applyEuler(euler);
   }
-
   function averageTumorPoints(tumorPoints, sceneRadius) {
     if (!Array.isArray(tumorPoints) || tumorPoints.length === 0) return null;
     const sum = tumorPoints.reduce((acc, point) => {
@@ -231,6 +267,7 @@
       mmToScene(sum.y / tumorPoints.length, sceneRadius),
       mmToScene(sum.z / tumorPoints.length, sceneRadius)
     );
+
   }
 
   function computeTumorRadiusFromPoints(tumorPoints, center, sceneRadius) {
@@ -242,6 +279,7 @@
         mmToScene(point[1] || 0, sceneRadius),
         mmToScene(point[2] || 0, sceneRadius)
       );
+
       maxDist = Math.max(maxDist, local.distanceTo(center));
     }
     return Math.max(0.07, Math.min(sceneRadius * 0.22, maxDist * 1.15));
@@ -258,6 +296,7 @@
         mmToScene(centroid3d[2], sceneRadius)
       );
     }
+
     const pred = diagnosisData?.prediction || {};
     const x = (pred.centroid_normalized?.[0] || 0) * sceneRadius * 0.52;
     const y = -(pred.centroid_normalized?.[1] || 0) * sceneRadius * 0.34;
@@ -277,6 +316,7 @@
         mmToScene(depthMetrics.nearest_cortex_point[1], sceneRadius),
         mmToScene(depthMetrics.nearest_cortex_point[2], sceneRadius)
       );
+
     }
     const fallback = center.clone();
     if (fallback.lengthSq() < 0.0001) {
@@ -286,7 +326,6 @@
     }
     return fallback;
   }
-
   function parseLocationInfo(locationHint) {
     const hint = String(locationHint || '').toLowerCase();
     return {
@@ -299,6 +338,67 @@
       central: hint.includes('central'),
       label: locationHint || 'Chưa rõ vị trí',
     };
+  }
+
+  function locationHintToKey(locationHint) {
+    const info = parseLocationInfo(locationHint);
+    const side = info.isRight ? 'right' : 'left';
+    const lobe = info.frontal
+      ? 'frontal'
+      : info.temporal
+        ? 'temporal'
+        : info.parietal
+          ? 'parietal'
+          : info.occipital
+            ? 'occipital'
+            : info.central
+              ? 'central'
+              : 'frontal';
+    return `${side}_${lobe}`;
+  }
+
+  function inferSimilarCaseLocation(caseItem) {
+    const pid = String(caseItem?.patient_id || '');
+    const filename = String(caseItem?.filename || '');
+    const caseId = Number(caseItem?.case_id) || 0;
+    const numMatch = (pid + filename).match(/\d+/);
+    const seed = numMatch ? parseInt(numMatch[0], 10) : caseId;
+    const lobes = ['frontal', 'temporal', 'parietal', 'occipital', 'central'];
+    const sides = ['left', 'right'];
+    const lobe = lobes[Math.abs(seed) % lobes.length];
+    const side = sides[Math.floor(Math.abs(seed) / lobes.length) % sides.length];
+    return `${side}_${lobe}`;
+  }
+
+  function getSceneAnchorFromLocationKey(locationKey, sceneRadius) {
+    const anchor = SIMILAR_TUMOR_LOCATION_MAP[locationKey] || SIMILAR_TUMOR_LOCATION_MAP.left_frontal;
+    return new THREE.Vector3(
+      anchor[0] * sceneRadius * 0.72,
+      anchor[1] * sceneRadius * 0.62,
+      anchor[2] * sceneRadius * 0.76
+    );
+  }
+
+  function getActiveSimilarCases() {
+    return MAIN.similarData?.similar_cases
+      || window.lastSimilarData?.similar_cases
+      || window._similarCasesData
+      || [];
+  }
+
+  function pseudoRandom(seed) {
+    const value = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+    return value - Math.floor(value);
+  }
+
+  function colorFromAttention(intensity) {
+    const low = new THREE.Color('#38bdf8');
+    const mid = new THREE.Color('#facc15');
+    const high = new THREE.Color('#ef4444');
+    if (intensity < 0.45) {
+      return low.clone().lerp(mid, intensity / 0.45);
+    }
+    return mid.clone().lerp(high, (intensity - 0.45) / 0.55);
   }
 
   function buildFunctionalZones(sceneRadius) {
@@ -335,14 +435,18 @@
     return zones;
   }
 
-  function computeFunctionalRiskSummary(center, sceneRadius, locationHint) {
+  function computeFunctionalRiskSummary(center, sceneRadius, locationHint, tumorRadius = 0.11, safetyMarginMm = 0) {
     if (!center) return [];
     const zones = buildFunctionalZones(sceneRadius);
     const mmScale = REGION_RADIUS_MM / sceneRadius;
+    const tumorRadiusMm = sceneToMm(tumorRadius, sceneRadius);
     const locationInfo = parseLocationInfo(locationHint);
     return zones
       .map(zone => {
-        const distanceMm = center.distanceTo(zone.position) * mmScale;
+        const centerDistanceMm = center.distanceTo(zone.position) * mmScale;
+        const zoneRadiusMm = sceneToMm(zone.radius, sceneRadius);
+        const distanceMm = Math.max(0, centerDistanceMm - tumorRadiusMm - zoneRadiusMm);
+        const marginDeltaMm = distanceMm - safetyMarginMm;
         const risk = distanceMm < 10 ? 'Rất gần' : distanceMm < 18 ? 'Lân cận' : distanceMm < 28 ? 'Cần theo dõi' : 'Xa';
         const relevanceBoost =
           ((locationInfo.isLeft && zone.side === 'left') || (locationInfo.isRight && zone.side === 'right') || (!locationInfo.isLeft && !locationInfo.isRight))
@@ -350,7 +454,14 @@
             : 8;
         return {
           ...zone,
+          centerDistanceMm,
           distanceMm,
+          zoneRadiusMm,
+          tumorRadiusMm,
+          safetyMarginMm,
+          marginDeltaMm,
+          impacted: marginDeltaMm <= 0,
+          collisionState: marginDeltaMm <= 0 ? 'collision' : marginDeltaMm <= 4 ? 'warning' : 'clear',
           risk,
           score: distanceMm + relevanceBoost,
         };
@@ -361,6 +472,63 @@
 
   function formatMm(value) {
     return typeof value === 'number' && Number.isFinite(value) ? `${value.toFixed(1)} mm` : '—';
+  }
+
+  function pickReferenceSimilarCase() {
+    const cases = getActiveSimilarCases();
+    if (!Array.isArray(cases) || !cases.length) return null;
+    const currentKey = locationHintToKey(MAIN.diagnosisData?.prediction?.location_hint);
+    const currentInfo = parseLocationInfo(currentKey);
+
+    const pool = cases.filter(item => item && (item.has_tumor === true || item.has_tumor === 1 || item.has_tumor === 'true'));
+    const source = pool.length ? pool : cases;
+
+    return source
+      .map((caseItem, index) => {
+        const similarity = clamp(Number(caseItem?.similarity_score) || 0, 0, 1);
+        const refKey = inferSimilarCaseLocation(caseItem);
+        const refInfo = parseLocationInfo(refKey);
+        const sameSide = (currentInfo.isLeft && refInfo.isLeft) || (currentInfo.isRight && refInfo.isRight);
+        const sameLobe =
+          (currentInfo.frontal && refInfo.frontal)
+          || (currentInfo.temporal && refInfo.temporal)
+          || (currentInfo.parietal && refInfo.parietal)
+          || (currentInfo.occipital && refInfo.occipital)
+          || (currentInfo.central && refInfo.central);
+        const score = similarity + (sameSide ? 0.05 : 0) + (sameLobe ? 0.08 : 0) - index * 0.0025;
+        return {
+          caseItem,
+          refKey,
+          similarity,
+          sameSide,
+          sameLobe,
+          score,
+        };
+      })
+      .sort((a, b) => b.score - a.score)[0] || null;
+  }
+
+  function computeSafetyMarginSummary() {
+    const nearest = MAIN.riskSummary?.[0] || null;
+    const impacted = (MAIN.riskSummary || []).filter(item => item.impacted);
+    // Warning if margin is within 6mm of a zone boundary
+    const warning = !impacted.length && nearest && nearest.marginDeltaMm <= 6;
+
+    const tone = impacted.length ? '#ef5070ff' : warning ? '#ff9100' : '#10b981';
+
+    const label = impacted.length
+      ? `NGUY HIỂM: ${impacted.length} vùng bị xâm phạm`
+      : warning
+        ? 'CẢNH BÁO: Sát ranh giới chức năng'
+        : 'AN TOÀN: Ngoài vùng rủi ro';
+
+    return {
+      nearest,
+      impacted,
+      warning,
+      tone,
+      label,
+    };
   }
 
   function normalizeEntryPoint(value) {
@@ -531,6 +699,94 @@
     sprite.scale.set(heightUnits * scaleFactor, heightUnits, 1);
     sprite.renderOrder = 14;
     return sprite;
+  }
+
+  // Thông tin từ heatmap <-------------------------
+  function decodeHeatmapSamples(dataUrl) {
+    return new Promise(resolve => {
+      if (!dataUrl || typeof Image === 'undefined') {
+        resolve([]);
+        return;
+      }
+      const image = new Image();
+      image.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 64;
+          canvas.height = 64;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          if (!ctx) {
+            resolve([]);
+            return;
+          }
+          ctx.drawImage(image, 0, 0, 64, 64);
+          const pixels = ctx.getImageData(0, 0, 64, 64).data;
+          const samples = [];
+          for (let y = 0; y < 64; y += 2) {
+            for (let x = 0; x < 64; x += 2) {
+              const idx = (y * 64 + x) * 4;
+              const intensity = (pixels[idx] + pixels[idx + 1] + pixels[idx + 2]) / (255 * 3);
+              if (intensity < 0.12) continue;
+              samples.push({
+                u: x / 63,
+                v: y / 63,
+                intensity,
+              });
+            }
+          }
+          resolve(samples);
+        } catch (error) {
+          resolve([]);
+        }
+      };
+      image.onerror = () => resolve([]);
+      image.src = dataUrl;
+    });
+  }
+
+  function queueAttentionCloudSampleRefresh() {
+    const gradcam = MAIN.diagnosisData?.xai?.gradcam || MAIN.diagnosisData?.xai_data?.gradcam || null;
+    const heatmap = gradcam?.heatmap_base64 || '';
+    const cacheKey = `${MAIN.diagnosisContextKey}|${heatmap.slice(0, 48)}|${heatmap.length}`;
+    if (!heatmap) {
+      MAIN.attentionCloudSamples = [];
+      MAIN.attentionCloudCacheKey = '';
+      return Promise.resolve([]);
+    }
+    if (MAIN.attentionCloudCacheKey === cacheKey && Array.isArray(MAIN.attentionCloudSamples)) {
+      return Promise.resolve(MAIN.attentionCloudSamples);
+    }
+    MAIN.attentionCloudCacheKey = cacheKey;
+    const loadId = ++MAIN.attentionCloudLoadId;
+    return decodeHeatmapSamples(heatmap).then(samples => {
+      if (loadId !== MAIN.attentionCloudLoadId) return MAIN.attentionCloudSamples || [];
+      MAIN.attentionCloudSamples = samples;
+      applyMainAttentionCloud();
+      syncMainUI();
+      return samples;
+    });
+  }
+
+  function buildOrganicWireframeGeometry(radius, seed) {
+    const geometry = new THREE.IcosahedronGeometry(radius, 2);
+    const pos = geometry.attributes.position;
+    const point = new THREE.Vector3();
+    const stretchX = 0.92 + pseudoRandom(seed + 1.3) * 0.22;
+    const stretchY = 0.88 + pseudoRandom(seed + 2.7) * 0.18;
+    const stretchZ = 0.94 + pseudoRandom(seed + 4.1) * 0.20;
+
+    for (let idx = 0; idx < pos.count; idx += 1) {
+      point.fromBufferAttribute(pos, idx);
+      const wobble = 0.88 + pseudoRandom(seed + idx * 0.73) * 0.28;
+      point.x *= stretchX * wobble;
+      point.y *= stretchY * (0.95 + pseudoRandom(seed + idx * 0.29) * 0.10);
+      point.z *= stretchZ * (0.92 + pseudoRandom(seed + idx * 0.51) * 0.14);
+      pos.setXYZ(idx, point.x, point.y, point.z);
+    }
+
+    pos.needsUpdate = true;
+    geometry.computeVertexNormals();
+    return geometry;
   }
 
   function loadStoredTooltipSelections() {
@@ -1051,6 +1307,124 @@
         font-weight: 800;
         color: #0369a1;
         white-space: nowrap;
+      }
+      .brain-risk-card,
+      .brain-reference-card {
+        display: grid;
+        gap: 10px;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+      }
+      .brain-risk-empty {
+        font-size: 10px;
+        line-height: 1.6;
+        color: #64748b;
+      }
+      .brain-risk-head,
+      .brain-reference-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      @keyframes pulse-fast {
+        0% { transform: scale(1); box-shadow: 0 0 0 0px rgba(255, 23, 68, 0.4); }
+        50% { transform: scale(1.4); box-shadow: 0 0 0 8px rgba(255, 23, 68, 0); }
+        100% { transform: scale(1); box-shadow: 0 0 0 0px rgba(255, 23, 68, 0); }
+      }
+      .pulse-fast {
+        animation: pulse-fast 0.8s infinite cubic-bezier(0.4, 0, 0.6, 1);
+      }
+      .brain-risk-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.10);
+        transition: background 0.3s ease;
+      }
+      .brain-risk-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: #0f172a;
+        line-height: 1.35;
+      }
+      .brain-risk-subtitle {
+        font-size: 10px;
+        color: #64748b;
+        line-height: 1.45;
+      }
+      .brain-risk-bar {
+        position: relative;
+        height: 8px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #eff6ff;
+      }
+      .brain-risk-fill {
+        height: 100%;
+        border-radius: inherit;
+      }
+      .brain-risk-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .brain-risk-metric {
+        display: grid;
+        gap: 2px;
+        padding: 7px 8px;
+        border-radius: 8px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+      }
+      .brain-risk-metric span {
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: #64748b;
+      }
+      .brain-risk-metric strong {
+        font-size: 11px;
+        color: #0f172a;
+        line-height: 1.4;
+      }
+      .brain-risk-list {
+        display: grid;
+        gap: 6px;
+      }
+      .brain-risk-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        font-size: 10px;
+        color: #475569;
+      }
+      .brain-risk-row-label {
+        font-weight: 600;
+      }
+      .brain-risk-row-value {
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      .brain-reference-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 54px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        color: #ffffff;
+        font-size: 10px;
+        font-weight: 800;
+      }
+      .brain-reference-copy {
+        font-size: 10px;
+        line-height: 1.6;
+        color: #475569;
       }
       .brain-clinical-slices {
         display: grid;
@@ -1850,12 +2224,16 @@
       }
 
       /* ── Unified Accordion Styles ───────────────────────── */
-      .brain-sliders-accordion, .brain-entry-accordion, .brain-tooltip-accordion {
+      .brain-sliders-accordion, .brain-entry-accordion, .brain-tooltip-accordion, .brain-clipping-accordion, .brain-layers-accordion, .brain-tumor-accordion, .brain-analysis-accordion {
         margin: 0 0 0 0;
       }
       .brain-sliders-accordion-toggle, 
       .brain-entry-accordion-toggle, 
-      .brain-tooltip-accordion-toggle {
+      .brain-tooltip-accordion-toggle,
+      .brain-clipping-accordion-toggle,
+      .brain-layers-accordion-toggle,
+      .brain-tumor-accordion-toggle,
+      .brain-analysis-accordion-toggle {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -1871,14 +2249,22 @@
       }
       .brain-sliders-accordion-toggle:hover,
       .brain-entry-accordion-toggle:hover,
-      .brain-tooltip-accordion-toggle:hover {
+      .brain-tooltip-accordion-toggle:hover,
+      .brain-clipping-accordion-toggle:hover,
+      .brain-layers-accordion-toggle:hover,
+      .brain-tumor-accordion-toggle:hover,
+      .brain-analysis-accordion-toggle:hover {
         background: #f1f5f9;
         border-color: #cbd5e1;
         box-shadow: 0 2px 8px rgba(0,0,0,0.04);
       }
       .brain-sliders-accordion-toggle.is-open,
       .brain-entry-accordion-toggle.is-open,
-      .brain-tooltip-accordion-toggle.is-open {
+      .brain-tooltip-accordion-toggle.is-open,
+      .brain-clipping-accordion-toggle.is-open,
+      .brain-layers-accordion-toggle.is-open,
+      .brain-tumor-accordion-toggle.is-open,
+      .brain-analysis-accordion-toggle.is-open {
         background: #ffffff;
         border-color: #cbd5e1;
         border-bottom-left-radius: 0;
@@ -1888,7 +2274,11 @@
       }
       .brain-sliders-accordion-left,
       .brain-entry-accordion-left,
-      .brain-tooltip-accordion-left {
+      .brain-tooltip-accordion-left,
+      .brain-clipping-accordion-left,
+      .brain-layers-accordion-left,
+      .brain-tumor-accordion-left,
+      .brain-analysis-accordion-left {
         display: flex;
         align-items: center;
         gap: 10px;
@@ -1896,7 +2286,11 @@
       }
       .brain-sliders-accordion-label,
       .brain-entry-accordion-label,
-      .brain-tooltip-accordion-label {
+      .brain-tooltip-accordion-label,
+      .brain-clipping-accordion-label,
+      .brain-layers-accordion-label,
+      .brain-tumor-accordion-label,
+      .brain-analysis-accordion-label {
         font-size: 11px;
         font-weight: 700;
         color: #1e293b;
@@ -1906,7 +2300,11 @@
       }
       .brain-sliders-accordion-pill,
       .brain-entry-accordion-badge,
-      .brain-tooltip-accordion-badge {
+      .brain-tooltip-accordion-badge,
+      .brain-clipping-accordion-badge,
+      .brain-layers-accordion-badge,
+      .brain-tumor-accordion-badge,
+      .brain-analysis-accordion-badge {
         font-size: 9px;
         font-weight: 700;
         padding: 2px 8px;
@@ -1949,12 +2347,20 @@
       }
       .is-open .brain-sliders-accordion-chevron,
       .is-open .brain-entry-accordion-chevron,
-      .is-open .brain-tooltip-accordion-chevron {
+      .is-open .brain-tooltip-accordion-chevron,
+      .is-open .brain-clipping-accordion-chevron,
+      .is-open .brain-layers-accordion-chevron,
+      .is-open .brain-tumor-accordion-chevron,
+      .is-open .brain-analysis-accordion-chevron {
         transform: rotate(180deg);
       }
       .brain-sliders-accordion-body,
       .brain-entry-accordion-body,
-      .brain-tooltip-accordion-body {
+      .brain-tooltip-accordion-body,
+      .brain-clipping-accordion-body,
+      .brain-layers-accordion-body,
+      .brain-tumor-accordion-body,
+      .brain-analysis-accordion-body {
         display: none;
         flex-direction: column;
         border: 1px solid #e2e8f0;
@@ -1967,7 +2373,11 @@
       }
       .brain-sliders-accordion-body.is-open,
       .brain-entry-accordion-body.is-open,
-      .brain-tooltip-accordion-body.is-open {
+      .brain-tooltip-accordion-body.is-open,
+      .brain-clipping-accordion-body.is-open,
+      .brain-layers-accordion-body.is-open,
+      .brain-tumor-accordion-body.is-open,
+      .brain-analysis-accordion-body.is-open {
         display: flex;
       }
       @keyframes accordionIn {
@@ -2011,6 +2421,425 @@
         border-radius: 0;
         background: transparent;
         padding: 12px 14px 14px;
+      }
+      
+      .brain-analysis-sub {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .brain-analysis-sub-title {
+        font-size: 10px;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 2px;
+      }
+
+      /* ══════════════════════════════════════════════════════════════
+         DARK THEME OVERRIDES — Clinical Panel (ĐIỀU HƯỚNG LÂM SÀNG)
+         Applied when html[data-theme="dark"] is set
+         ══════════════════════════════════════════════════════════════ */
+
+      html[data-theme="dark"] .brain-clinical-dock {
+        background: #0b1220 !important;
+        border-color: rgba(148, 163, 184, 0.18) !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+      }
+
+      /* Header bar */
+      html[data-theme="dark"] .brain-clinical-resizer {
+        background: linear-gradient(180deg, #0b1220 0%, #0d1629 100%) !important;
+        border-bottom-color: rgba(148, 163, 184, 0.14) !important;
+      }
+      html[data-theme="dark"] .brain-clinical-resizer-label {
+        color: rgba(193, 207, 232, 0.65) !important;
+      }
+      html[data-theme="dark"] .brain-clinical-title {
+        color: #e5eefc !important;
+      }
+      html[data-theme="dark"] .brain-clinical-subtitle {
+        color: rgba(193, 207, 232, 0.60) !important;
+      }
+
+      /* Body & controls */
+      html[data-theme="dark"] .brain-clinical-controls,
+      html[data-theme="dark"] .brain-clinical-slices {
+        background: #0f1a2d !important;
+        border-color: rgba(148, 163, 184, 0.18) !important;
+      }
+      html[data-theme="dark"] .brain-control-title,
+      html[data-theme="dark"] .brain-slider-col-label,
+      html[data-theme="dark"] .brain-entry-accordion-title {
+        color: rgba(193, 207, 232, 0.60) !important;
+      }
+      html[data-theme="dark"] .brain-slider-label {
+        color: #c1cfe8 !important;
+      }
+      html[data-theme="dark"] .brain-slider-value,
+      html[data-theme="dark"] .brain-slider-col-value {
+        color: #38bdf8 !important;
+      }
+
+      /* Slider grid background */
+      html[data-theme="dark"] .brain-slider-grid-221 {
+        background: #0b1220 !important;
+        border-color: rgba(148, 163, 184, 0.14) !important;
+        box-shadow: none !important;
+      }
+
+      /* Toggle / segment buttons */
+      html[data-theme="dark"] .brain-toggle-btn,
+      html[data-theme="dark"] .brain-segment-btn,
+      html[data-theme="dark"] .brain-mini-btn {
+        background: #0f1a2d !important;
+        border-color: rgba(148, 163, 184, 0.22) !important;
+        color: rgba(193, 207, 232, 0.80) !important;
+      }
+      html[data-theme="dark"] .brain-toggle-btn:hover,
+      html[data-theme="dark"] .brain-segment-btn:hover,
+      html[data-theme="dark"] .brain-mini-btn:hover {
+        border-color: rgba(14, 165, 233, 0.45) !important;
+        color: #38bdf8 !important;
+        background: rgba(14, 165, 233, 0.08) !important;
+      }
+      html[data-theme="dark"] .brain-toggle-btn.is-on,
+      html[data-theme="dark"] .brain-segment-btn.is-on,
+      html[data-theme="dark"] .brain-mini-btn.is-on {
+        color: #38bdf8 !important;
+        background: rgba(14, 165, 233, 0.14) !important;
+        border-color: rgba(14, 165, 233, 0.38) !important;
+      }
+      html[data-theme="dark"] .brain-toggle-btn:disabled,
+      html[data-theme="dark"] .brain-segment-btn:disabled,
+      html[data-theme="dark"] .brain-mini-btn:disabled {
+        background: #0b1220 !important;
+        border-color: rgba(148, 163, 184, 0.14) !important;
+        color: rgba(148, 163, 184, 0.35) !important;
+      }
+
+      /* Chips */
+      html[data-theme="dark"] .brain-chip {
+        background: #0f1a2d !important;
+        border-color: rgba(148, 163, 184, 0.20) !important;
+        color: rgba(193, 207, 232, 0.65) !important;
+      }
+      html[data-theme="dark"] .brain-chip.active {
+        color: #38bdf8 !important;
+        background: rgba(14, 165, 233, 0.10) !important;
+        border-color: rgba(14, 165, 233, 0.30) !important;
+      }
+
+      /* Accordion toggles */
+      html[data-theme="dark"] .brain-sliders-accordion-toggle,
+      html[data-theme="dark"] .brain-entry-accordion-toggle,
+      html[data-theme="dark"] .brain-tooltip-accordion-toggle,
+      html[data-theme="dark"] .brain-clipping-accordion-toggle,
+      html[data-theme="dark"] .brain-layers-accordion-toggle,
+      html[data-theme="dark"] .brain-tumor-accordion-toggle,
+      html[data-theme="dark"] .brain-analysis-accordion-toggle {
+        background: #0f1a2d !important;
+        border-color: rgba(148, 163, 184, 0.20) !important;
+        color: #e5eefc !important;
+      }
+      html[data-theme="dark"] .brain-sliders-accordion-toggle:hover,
+      html[data-theme="dark"] .brain-entry-accordion-toggle:hover,
+      html[data-theme="dark"] .brain-tooltip-accordion-toggle:hover,
+      html[data-theme="dark"] .brain-clipping-accordion-toggle:hover,
+      html[data-theme="dark"] .brain-layers-accordion-toggle:hover,
+      html[data-theme="dark"] .brain-tumor-accordion-toggle:hover,
+      html[data-theme="dark"] .brain-analysis-accordion-toggle:hover {
+        background: rgba(14, 165, 233, 0.06) !important;
+        border-color: rgba(14, 165, 233, 0.28) !important;
+      }
+      html[data-theme="dark"] .brain-sliders-accordion-toggle.is-open,
+      html[data-theme="dark"] .brain-entry-accordion-toggle.is-open,
+      html[data-theme="dark"] .brain-tooltip-accordion-toggle.is-open,
+      html[data-theme="dark"] .brain-clipping-accordion-toggle.is-open,
+      html[data-theme="dark"] .brain-layers-accordion-toggle.is-open,
+      html[data-theme="dark"] .brain-tumor-accordion-toggle.is-open,
+      html[data-theme="dark"] .brain-analysis-accordion-toggle.is-open {
+        background: #0b1220 !important;
+        border-color: rgba(148, 163, 184, 0.22) !important;
+      }
+      html[data-theme="dark"] .brain-sliders-accordion-label,
+      html[data-theme="dark"] .brain-entry-accordion-label,
+      html[data-theme="dark"] .brain-tooltip-accordion-label,
+      html[data-theme="dark"] .brain-clipping-accordion-label,
+      html[data-theme="dark"] .brain-layers-accordion-label,
+      html[data-theme="dark"] .brain-tumor-accordion-label,
+      html[data-theme="dark"] .brain-analysis-accordion-label {
+        color: #e5eefc !important;
+      }
+      html[data-theme="dark"] .brain-sliders-accordion-chevron,
+      html[data-theme="dark"] .brain-entry-accordion-chevron,
+      html[data-theme="dark"] .brain-tooltip-accordion-chevron,
+      html[data-theme="dark"] .brain-clipping-accordion-chevron,
+      html[data-theme="dark"] .brain-layers-accordion-chevron,
+      html[data-theme="dark"] .brain-tumor-accordion-chevron,
+      html[data-theme="dark"] .brain-analysis-accordion-chevron {
+        color: rgba(148, 163, 184, 0.65) !important;
+      }
+      html[data-theme="dark"] .brain-sliders-accordion-body,
+      html[data-theme="dark"] .brain-entry-accordion-body,
+      html[data-theme="dark"] .brain-tooltip-accordion-body,
+      html[data-theme="dark"] .brain-clipping-accordion-body,
+      html[data-theme="dark"] .brain-layers-accordion-body,
+      html[data-theme="dark"] .brain-tumor-accordion-body,
+      html[data-theme="dark"] .brain-analysis-accordion-body {
+        background: #0b1220 !important;
+        border-color: rgba(148, 163, 184, 0.18) !important;
+      }
+
+      /* Functional zone list */
+      html[data-theme="dark"] .brain-functional-item {
+        background: #0f1a2d !important;
+        border-color: rgba(148, 163, 184, 0.16) !important;
+      }
+      html[data-theme="dark"] .brain-functional-name {
+        color: #e5eefc !important;
+      }
+      html[data-theme="dark"] .brain-functional-risk {
+        color: rgba(193, 207, 232, 0.60) !important;
+      }
+      html[data-theme="dark"] .brain-functional-distance {
+        color: #38bdf8 !important;
+      }
+
+      /* Trajectory card */
+      html[data-theme="dark"] .brain-trajectory-card {
+        background: #0f1a2d !important;
+        border-color: rgba(148, 163, 184, 0.16) !important;
+      }
+      html[data-theme="dark"] .brain-trajectory-title {
+        color: #e5eefc !important;
+      }
+      html[data-theme="dark"] .brain-trajectory-meta,
+      html[data-theme="dark"] .brain-trajectory-list {
+        color: rgba(193, 207, 232, 0.65) !important;
+      }
+      html[data-theme="dark"] .brain-trajectory-metric {
+        background: #0b1220 !important;
+        border-color: rgba(148, 163, 184, 0.16) !important;
+      }
+      html[data-theme="dark"] .brain-trajectory-metric span {
+        color: rgba(193, 207, 232, 0.65) !important;
+      }
+      html[data-theme="dark"] .brain-trajectory-metric strong {
+        color: #38bdf8 !important;
+      }
+      html[data-theme="dark"] .brain-risk-card,
+      html[data-theme="dark"] .brain-reference-card {
+        background: #0f1a2d !important;
+        border-color: rgba(148, 163, 184, 0.16) !important;
+      }
+      html[data-theme="dark"] .brain-risk-empty,
+      html[data-theme="dark"] .brain-reference-copy,
+      html[data-theme="dark"] .brain-risk-row {
+        color: rgba(193, 207, 232, 0.68) !important;
+      }
+      html[data-theme="dark"] .brain-risk-title,
+      html[data-theme="dark"] .brain-risk-metric strong {
+        color: #e5eefc !important;
+      }
+      html[data-theme="dark"] .brain-risk-subtitle,
+      html[data-theme="dark"] .brain-risk-metric span {
+        color: rgba(193, 207, 232, 0.62) !important;
+      }
+      html[data-theme="dark"] .brain-risk-bar {
+        background: rgba(56, 189, 248, 0.12) !important;
+      }
+      html[data-theme="dark"] .brain-risk-metric {
+        background: #0b1220 !important;
+        border-color: rgba(148, 163, 184, 0.16) !important;
+      }
+
+      /* Tooltip panel */
+      html[data-theme="dark"] .brain-tooltip-panel {
+        background: #0f1a2d !important;
+        border-color: rgba(148, 163, 184, 0.18) !important;
+      }
+      html[data-theme="dark"] .brain-tooltip-item {
+        background: #0b1220 !important;
+        border-color: rgba(148, 163, 184, 0.16) !important;
+      }
+      html[data-theme="dark"] .brain-tooltip-name {
+        color: #e5eefc !important;
+      }
+      html[data-theme="dark"] .brain-tooltip-meta,
+      html[data-theme="dark"] .brain-tooltip-panel-note {
+        color: rgba(193, 207, 232, 0.60) !important;
+      }
+      html[data-theme="dark"] .brain-tooltip-empty {
+        background: #0b1220 !important;
+        border-color: rgba(148, 163, 184, 0.20) !important;
+        color: rgba(148, 163, 184, 0.50) !important;
+      }
+
+      /* Entry point panel */
+      html[data-theme="dark"] .brain-entry-zone-btn {
+        background: #0f1a2d !important;
+        border-color: rgba(148, 163, 184, 0.20) !important;
+      }
+      html[data-theme="dark"] .brain-entry-zone-btn:hover {
+        background: rgba(14, 165, 233, 0.06) !important;
+        border-color: rgba(14, 165, 233, 0.30) !important;
+      }
+      html[data-theme="dark"] .brain-entry-zone-btn.is-selected {
+        background: rgba(34, 197, 94, 0.08) !important;
+        border-color: rgba(34, 197, 94, 0.35) !important;
+      }
+      html[data-theme="dark"] .brain-entry-zone-label {
+        color: #e5eefc !important;
+      }
+      html[data-theme="dark"] .brain-entry-zone-dist {
+        color: rgba(193, 207, 232, 0.60) !important;
+      }
+      html[data-theme="dark"] .brain-entry-zone-risk {
+        background: rgba(148, 163, 184, 0.10) !important;
+        color: rgba(193, 207, 232, 0.70) !important;
+        border-color: rgba(148, 163, 184, 0.18) !important;
+      }
+      html[data-theme="dark"] .brain-entry-empty {
+        background: #0b1220 !important;
+        border-color: rgba(148, 163, 184, 0.20) !important;
+        color: rgba(148, 163, 184, 0.50) !important;
+      }
+      html[data-theme="dark"] .brain-entry-note {
+        background: rgba(14, 165, 233, 0.06) !important;
+        border-color: rgba(14, 165, 233, 0.18) !important;
+        color: rgba(193, 207, 232, 0.65) !important;
+      }
+      html[data-theme="dark"] .brain-entry-all-btn {
+        background: rgba(14, 165, 233, 0.06) !important;
+        border-color: rgba(14, 165, 233, 0.28) !important;
+        color: #38bdf8 !important;
+      }
+      html[data-theme="dark"] .brain-entry-all-btn:hover:not(:disabled) {
+        background: rgba(14, 165, 233, 0.12) !important;
+        border-color: rgba(14, 165, 233, 0.50) !important;
+      }
+
+      /* Legend button & panel */
+      html[data-theme="dark"] .brain-legend-btn {
+        background: rgba(14, 165, 233, 0.08) !important;
+        border-color: rgba(14, 165, 233, 0.25) !important;
+        color: #38bdf8 !important;
+      }
+      html[data-theme="dark"] .brain-legend-btn:hover {
+        background: rgba(14, 165, 233, 0.14) !important;
+        border-color: rgba(14, 165, 233, 0.40) !important;
+        box-shadow: 0 2px 8px rgba(14, 165, 233, 0.15) !important;
+      }
+      html[data-theme="dark"] .brain-legend-btn.is-open {
+        background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%) !important;
+        color: #ffffff !important;
+        border-color: #0284c7 !important;
+      }
+      html[data-theme="dark"] .brain-legend-panel {
+        background: linear-gradient(160deg, #0b1a2e 0%, #0f1a2d 55%, #0d1628 100%) !important;
+        border-color: rgba(14, 165, 233, 0.22) !important;
+        box-shadow: 0 4px 16px rgba(0, 229, 255, 0.07), 0 1px 4px rgba(0,0,0,0.3) !important;
+      }
+      html[data-theme="dark"] .brain-legend-heading {
+        color: #7dd3fc !important;
+        border-bottom-color: rgba(14, 165, 233, 0.22) !important;
+      }
+      html[data-theme="dark"] .brain-legend-section-title {
+        color: rgba(193, 207, 232, 0.55) !important;
+      }
+      html[data-theme="dark"] .brain-legend-row {
+        background: rgba(255,255,255,0.03) !important;
+        border-color: rgba(148, 163, 184, 0.14) !important;
+      }
+      html[data-theme="dark"] .brain-legend-label {
+        color: #e5eefc !important;
+      }
+      html[data-theme="dark"] .brain-legend-desc {
+        color: rgba(193, 207, 232, 0.60) !important;
+      }
+      html[data-theme="dark"] .brain-legend-divider {
+        background: linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.25) 30%, rgba(14, 165, 233, 0.25) 70%, transparent) !important;
+      }
+      html[data-theme="dark"] .brain-legend-tip {
+        background: linear-gradient(135deg, rgba(253, 230, 138, 0.06) 0%, rgba(254, 243, 199, 0.04) 100%) !important;
+        border-color: rgba(253, 230, 138, 0.20) !important;
+        color: rgba(253, 230, 138, 0.80) !important;
+      }
+
+      /* Slice foot area */
+      html[data-theme="dark"] .brain-slice-foot {
+        background: #0f1a2d !important;
+      }
+      html[data-theme="dark"] .brain-slice-foot span {
+        color: rgba(193, 207, 232, 0.65) !important;
+      }
+      html[data-theme="dark"] .brain-slice-foot strong {
+        color: #38bdf8 !important;
+      }
+      html[data-theme="dark"] .brain-slice-empty {
+        background: #0f1a2d !important;
+        border-color: rgba(148, 163, 184, 0.18) !important;
+        color: rgba(148, 163, 184, 0.50) !important;
+      }
+      html[data-theme="dark"] .brain-slice-note {
+        color: rgba(193, 207, 232, 0.50) !important;
+      }
+      html[data-theme="dark"] .brain-slice-card {
+        border-color: rgba(148, 163, 184, 0.18) !important;
+      }
+
+      /* Compare toolbar & panels */
+      html[data-theme="dark"] .compare-clinical-toolbar {
+        background: linear-gradient(180deg, #0b1a2e 0%, #0f1a2d 100%) !important;
+        border-bottom-color: rgba(148, 163, 184, 0.16) !important;
+      }
+      html[data-theme="dark"] .compare-clinical-panel {
+        background: #0f1a2d !important;
+        border-color: rgba(148, 163, 184, 0.18) !important;
+      }
+      html[data-theme="dark"] .compare-clinical-label {
+        color: rgba(193, 207, 232, 0.55) !important;
+      }
+      html[data-theme="dark"] .compare-range-row span {
+        color: #c1cfe8 !important;
+      }
+      html[data-theme="dark"] .compare-range-row strong {
+        color: #38bdf8 !important;
+      }
+      html[data-theme="dark"] .compare-slices-context {
+        background: linear-gradient(180deg, rgba(14,165,233,0.07) 0%, rgba(14,165,233,0.04) 100%) !important;
+        border-color: rgba(14, 165, 233, 0.20) !important;
+      }
+      html[data-theme="dark"] .compare-slices-context-head span {
+        color: #e5eefc !important;
+      }
+      html[data-theme="dark"] .compare-slices-context-head strong {
+        color: #38bdf8 !important;
+      }
+      html[data-theme="dark"] .compare-slice-card-foot {
+        background: #0f1a2d !important;
+        color: rgba(193, 207, 232, 0.65) !important;
+      }
+      html[data-theme="dark"] .compare-note-card {
+        background: #0f1a2d !important;
+        border-color: rgba(148, 163, 184, 0.18) !important;
+      }
+      html[data-theme="dark"] .compare-note-pill {
+        background: #0b1220 !important;
+        border-color: rgba(148, 163, 184, 0.20) !important;
+        color: rgba(193, 207, 232, 0.65) !important;
+      }
+      html[data-theme="dark"] .compare-note-text {
+        color: rgba(193, 207, 232, 0.65) !important;
+      }
+
+      /* Badge muted dark override */
+      html[data-theme="dark"] .brain-badge-muted {
+        background: rgba(148, 163, 184, 0.10) !important;
+        color: rgba(148, 163, 184, 0.55) !important;
+        border-color: rgba(148, 163, 184, 0.18) !important;
       }
     `;
     document.head.appendChild(style);
@@ -2061,7 +2890,7 @@
             <div class="brain-legend-icon" style="background:rgba(250,204,21,0.15); display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-circle" style="color:#facc15; font-size:10px;"></i></div>
             <div class="brain-legend-text">
               <div class="brain-legend-label">Vùng tăng cường tương phản (Enhancing Tumor)</div>
-              <div class="brain-legend-desc">Lưới wireframe vàng bao quanh nhân. Mô u đang tăng sinh mạch máu — tương ứng vùng sáng thuốc cản quang trên MRI Gd+. Là vùng hoạt động sinh học nhất của khối u.</div>
+              <div class="brain-legend-desc">Khung lưới vàng bao quanh nhân. Mô u đang tăng sinh mạch máu — tương ứng vùng sáng thuốc cản quang trên MRI Gd+. Là vùng hoạt động sinh học nhất của khối u.</div>
             </div>
             <span class="brain-legend-badge badge-warn">Hoạt động cao</span>
           </div>
@@ -2141,7 +2970,7 @@
               <div class="brain-legend-label">Crosshair đồng bộ 2D/3D — đường chữ thập xanh</div>
               <div class="brain-legend-desc">Giao điểm hai đường kẻ xanh trên mỗi ảnh MPR 2D đánh dấu vị trí tham chiếu tương ứng với vị trí cắt trong viewer 3D. Click lên ảnh để cập nhật vị trí crosshair.</div>
             </div>
-            <span class="brain-legend-badge badge-info">MPR Sync</span>
+            <span class="brain-legend-badge badge-info">Đồng bộ MPR</span>
           </div>
         </div>
 
@@ -2214,6 +3043,18 @@
                 </div>
                 <input class="brain-range" type="range" min="5" max="100" value="21" data-opacity="deep" />
               </div>
+              <div class="brain-slider-col">
+                <div class="brain-slider-col-head">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <button class="brain-mini-btn" id="brainToggleSafetyMarginBtn" style="padding: 3px 6px; font-size: 10px;" title="Bật/Tắt hiển thị biên an toàn">
+                      <i class="fa-solid fa-eye"></i>
+                    </button>
+                    <span class="brain-slider-col-label">Biên an toàn</span>
+                  </div>
+                  <span class="brain-slider-col-value" id="brainValueSafetyMargin">8 mm</span>
+                </div>
+                <input class="brain-range" type="range" min="0" max="20" value="8" data-safety-margin="true" />
+              </div>
             </div>
           </div>
         </div>
@@ -2261,37 +3102,56 @@
           </div>
         </div>
 
-        <div class="brain-clinical-grid">
-          <div class="brain-clinical-controls">
-            <div class="brain-control-section">
-              <div class="brain-clinical-topline">
-                <div class="brain-control-title">Cắt lớp 3 trục (Clipping)</div>
-                <button class="brain-mini-btn" id="brainResetClipBtn">Tâm u</button>
+        <div class="brain-analysis-accordion" id="brainAnalysisAccordion">
+          <button class="brain-analysis-accordion-toggle is-open" id="brainAnalysisAccordionToggle" type="button">
+            <span class="brain-analysis-accordion-left">
+              <i class="fa-solid fa-microscope" style="color:#64748b;font-size:13px;"></i>
+              <span class="brain-analysis-accordion-label">Phân tích & Lớp phủ 3D</span>
+              <span class="brain-analysis-accordion-badge" id="brainAnalysisAccordionBadge">Hoạt động</span>
+            </span>
+            <i class="fa-solid fa-chevron-down brain-analysis-accordion-chevron"></i>
+          </button>
+          <div class="brain-analysis-accordion-body is-open" id="brainAnalysisAccordionBody" style="padding: 12px 14px; gap: 12px;">
+            
+            <!-- Sub-section: Layers -->
+            <div class="brain-analysis-sub">
+              <div class="brain-analysis-sub-title">Lớp phủ / Kế hoạch</div>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div class="brain-toggle-row">
+                  <button class="brain-toggle-btn is-on warn" data-action="risk"><i class="fa-solid fa-eye"></i> Biên an toàn</button>
+                  <button class="brain-toggle-btn is-on" data-action="functional">Vùng chức năng</button>
+                  <button class="brain-toggle-btn is-on warn" data-action="path">Đường mổ</button>
+                  <button class="brain-toggle-btn is-on info" data-action="tooltips">Tooltip 3D</button>
+                </div>
+                <div class="brain-toggle-row">
+                  <button class="brain-toggle-btn is-on" data-action="attention">Bản đồ chú ý AI</button>
+                  <button class="brain-toggle-btn is-on info" data-action="similar">Mô hình đối chiếu</button>
+                </div>
               </div>
-              <!-- Slice sliders moved to main top bar -->
             </div>
 
-            <div class="brain-control-section">
-              <div class="brain-control-title">Lớp phủ / Kế hoạch</div>
-              <div class="brain-toggle-row">
-                <button class="brain-toggle-btn is-on" data-action="functional">Vùng chức năng</button>
-                <button class="brain-toggle-btn is-on warn" data-action="path">Đường mổ</button>
-                <button class="brain-toggle-btn is-on info" data-action="tooltips">Tooltip 3D</button>
-              </div>
-            </div>
+            <div class="brain-control-section" id="brainEntrySection" style="display:none; padding:0; margin:0; border:none; background:transparent;"></div>
+            <div class="brain-control-section" id="brainTooltipSection" style="display:none; padding:0; margin:0; border:none; background:transparent;"></div>
 
-            <div class="brain-control-section" id="brainEntrySection" style="display:none;"></div>
-
-            <div class="brain-control-section" id="brainTooltipSection" style="display:none;"></div>
-
-            <div class="brain-control-section">
-              <div class="brain-control-title">Thành phần khối u</div>
+            <!-- Sub-section: Tumor Components -->
+            <div class="brain-analysis-sub">
+              <div class="brain-analysis-sub-title">Thành phần khối u</div>
               <div class="brain-segment-row">
                 <button class="brain-segment-btn is-on" data-component="core">Nhân / Hoại tử</button>
                 <button class="brain-segment-btn is-on" data-component="enhancing">Tăng cường</button>
                 <button class="brain-segment-btn is-on" data-component="edema">Phù nề</button>
               </div>
-              <!-- Opacity sliders moved to main top bar -->
+            </div>
+
+          </div>
+        </div>
+
+        <div class="brain-clinical-grid">
+          <div class="brain-clinical-controls">
+
+            <div class="brain-control-section">
+              <div class="brain-control-title">Ca tham chiếu 3D</div>
+              <div class="brain-reference-card" id="brainReferenceCard"></div>
             </div>
 
 
@@ -2357,7 +3217,9 @@
         cortex: panel.querySelector('#brainValueCortex'),
         deep: panel.querySelector('#brainValueDeep'),
       },
-      // Sliders accordion
+      safetyMarginRange: panel.querySelector('input[data-safety-margin="true"]'),
+      safetyMarginValue: panel.querySelector('#brainValueSafetyMargin'),
+      // Sliders accordion < -----------------------------------------------------------
       slidersAccordionToggle: panel.querySelector('#brainSlidersAccordionToggle'),
       slidersAccordionBody: panel.querySelector('#brainSlidersAccordionBody'),
       sliderPills: {
@@ -2367,7 +3229,7 @@
         cortex: panel.querySelector('#brainPillCortex'),
         deep: panel.querySelector('#brainPillDeep'),
       },
-      // Entry accordion
+      // Entry accordion < -----------------------------------------------------------
       entryPanel: panel.querySelector('#brainEntryPanel'),
       entryNote: panel.querySelector('#brainEntryNote'),
       clearEntryButton: panel.querySelector('#brainClearEntryBtn2'),
@@ -2375,7 +3237,10 @@
       entryAccordionToggle: panel.querySelector('#brainEntryAccordionToggle'),
       entryAccordionBody: panel.querySelector('#brainEntryAccordionBody'),
       entryAccordionBadge: panel.querySelector('#brainEntryAccordionBadge'),
-      // Tooltip accordion
+      riskCard: document.getElementById('brainRiskCardCenter'),
+      riskCardHost: document.getElementById('centerRiskHeatmapHost'),
+      referenceCard: panel.querySelector('#brainReferenceCard'),
+      // Tooltip accordion < -----------------------------------------------------------
       tooltipPanel: panel.querySelector('#brainTooltipPanel'),
       tooltipList: panel.querySelector('#brainTooltipList'),
       tooltipPanelNote: panel.querySelector('#brainTooltipPanelNote'),
@@ -2384,6 +3249,12 @@
       tooltipAccordionBadge: panel.querySelector('#brainTooltipAccordionBadge'),
       toggleButtons: panel.querySelectorAll('.brain-toggle-btn'),
       segmentButtons: panel.querySelectorAll('.brain-segment-btn'),
+      safetyMarginToggle: panel.querySelector('#brainToggleSafetyMarginBtn'),
+      headerSafetyMarginToggle: panel.querySelector('#brainHeaderToggleSafetyMarginBtn'),
+      // Consolidated Analysis accordion < -----------------------------------------------------------
+      analysisAccordionToggle: panel.querySelector('#brainAnalysisAccordionToggle'),
+      analysisAccordionBody: panel.querySelector('#brainAnalysisAccordionBody'),
+      analysisAccordionBadge: panel.querySelector('#brainAnalysisAccordionBadge'),
     };
 
     setupMainResizer();
@@ -2428,18 +3299,29 @@
       });
     }
 
+    // ── Analysis Accordion toggle ────────────────────────────────
+    if (MAIN.ui.analysisAccordionToggle && MAIN.ui.analysisAccordionBody) {
+      MAIN.ui.analysisAccordionToggle.addEventListener('click', () => {
+        const isOpen = MAIN.ui.analysisAccordionBody.classList.toggle('is-open');
+        MAIN.ui.analysisAccordionToggle.classList.toggle('is-open', isOpen);
+      });
+    }
+
     // tooltipPanelBtn removed (now handled by accordion)
 
-    MAIN.ui.resetClipBtn.addEventListener('click', () => {
-      if (MAIN.diagnosisData) {
-        MAIN.state.clip = buildClipFromDiagnosis(MAIN.diagnosisData);
-        clearCustomEntryPoints(MAIN.state);
-        syncMainUI();
-        applyMainState();
-      }
-    });
+    if (MAIN.ui.resetClipBtn) {
+      MAIN.ui.resetClipBtn.addEventListener('click', () => {
+        if (MAIN.diagnosisData) {
+          MAIN.state.clip = buildClipFromDiagnosis(MAIN.diagnosisData);
+          clearCustomEntryPoints(MAIN.state);
+          syncMainUI();
+          applyMainState();
+        }
+      });
+    }
 
     Object.entries(MAIN.ui.axisRanges).forEach(([axis, input]) => {
+      if (!input) return;
       input.addEventListener('input', (event) => {
         MAIN.state.clip[axis] = clamp01(Number(event.target.value) / 100);
         MAIN.state.manualClipAdjusted = true; // Mark as manually adjusted
@@ -2451,6 +3333,7 @@
     });
 
     Object.entries(MAIN.ui.opacityRanges).forEach(([key, input]) => {
+      if (!input) return;
       input.addEventListener('input', (event) => {
         MAIN.state[key + 'Opacity'] = clamp01(Number(event.target.value) / 100);
         syncMainUI();
@@ -2459,10 +3342,41 @@
       });
     });
 
+    if (MAIN.ui.safetyMarginRange) {
+      MAIN.ui.safetyMarginRange.addEventListener('input', event => {
+        MAIN.state.safetyMarginMm = clamp(Number(event.target.value), 0, 20);
+        refreshMainRiskSummary();
+        syncMainUI();
+        applyMainState();
+        persistClinicalState();
+      });
+    }
+
+    if (MAIN.ui.safetyMarginToggle) {
+      MAIN.ui.safetyMarginToggle.addEventListener('click', () => {
+        MAIN.state.showRiskShell = !MAIN.state.showRiskShell;
+        syncMainUI();
+        applyMainState();
+        persistClinicalState();
+      });
+    }
+
+    if (MAIN.ui.headerSafetyMarginToggle) {
+      MAIN.ui.headerSafetyMarginToggle.addEventListener('click', () => {
+        MAIN.state.showRiskShell = !MAIN.state.showRiskShell;
+        syncMainUI();
+        applyMainState();
+        persistClinicalState();
+      });
+    }
+
     MAIN.ui.toggleButtons.forEach(button => {
       button.addEventListener('click', () => {
         const action = button.getAttribute('data-action');
         if (action === 'functional') MAIN.state.showFunctional = !MAIN.state.showFunctional;
+        if (action === 'risk') MAIN.state.showRiskShell = !MAIN.state.showRiskShell;
+        if (action === 'attention') MAIN.state.showAttentionCloud = !MAIN.state.showAttentionCloud;
+        if (action === 'similar') MAIN.state.showSimilarWireframe = !MAIN.state.showSimilarWireframe;
         if (action === 'path') MAIN.state.showPath = !MAIN.state.showPath;
         if (action === 'tooltips') MAIN.state.showTooltips = !MAIN.state.showTooltips;
         syncMainUI();
@@ -2534,6 +3448,7 @@
     button.classList.toggle('is-on', !!isOn);
   }
 
+  // 2. Cập Nhật Giao Diện (UI) — The Conductor < -------------
   function syncMainUI() {
     const trajectoryEntries = getTrajectoryEntries(
       MAIN.tumorCenter,
@@ -2559,7 +3474,27 @@
       MAIN.ui.opacityValues[key].textContent = value + '%';
     });
 
-    // Update slider accordion pills (shown when accordion is collapsed)
+    // Ẩn / hiện biên an toàn <------------------------------------------------------------
+    if (MAIN.ui.safetyMarginRange) {
+      const marginValue = Math.round(clamp(MAIN.state.safetyMarginMm, 0, 20));
+      MAIN.ui.safetyMarginRange.value = String(marginValue);
+      if (MAIN.ui.safetyMarginValue) {
+        MAIN.ui.safetyMarginValue.textContent = `${marginValue} mm`;
+      }
+      if (MAIN.ui.safetyMarginToggle) {
+        const on = !!MAIN.state.showRiskShell;
+        MAIN.ui.safetyMarginToggle.classList.toggle('is-on', on);
+        MAIN.ui.safetyMarginToggle.innerHTML = on ? '<i class="fa-solid fa-eye"></i>' : '<i class="fa-solid fa-eye-slash"></i>';
+        MAIN.ui.safetyMarginToggle.title = on ? 'Ẩn biên an toàn' : 'Hiện biên an toàn';
+      }
+      if (MAIN.ui.headerSafetyMarginToggle) {
+        const on = !!MAIN.state.showRiskShell;
+        MAIN.ui.headerSafetyMarginToggle.classList.toggle('is-on', on);
+        MAIN.ui.headerSafetyMarginToggle.innerHTML = on ? '<i class="fa-solid fa-eye"></i> Biên an toàn' : '<i class="fa-solid fa-eye-slash"></i> Biên an toàn';
+      }
+    }
+
+    // Cập nhật các thanh trượt slider <--------------------------------------------------------
     if (MAIN.ui.sliderPills) {
       const axialVal = Math.round(clamp01(MAIN.state.clip.axial) * 100);
       const coronalVal = Math.round(clamp01(MAIN.state.clip.coronal) * 100);
@@ -2583,9 +3518,15 @@
       const action = button.getAttribute('data-action');
       const on =
         (action === 'functional' && MAIN.state.showFunctional) ||
+        (action === 'risk' && MAIN.state.showRiskShell) ||
+        (action === 'attention' && MAIN.state.showAttentionCloud) ||
+        (action === 'similar' && MAIN.state.showSimilarWireframe) ||
         (action === 'path' && MAIN.state.showPath) ||
         (action === 'tooltips' && MAIN.state.showTooltips);
       setButtonState(button, on);
+      if (action === 'risk') {
+        button.innerHTML = on ? '<i class="fa-solid fa-eye"></i> Biên an toàn' : '<i class="fa-solid fa-eye-slash"></i> Biên an toàn';
+      }
     });
 
     if (MAIN.ui.clearEntryButton) {
@@ -2608,6 +3549,23 @@
         MAIN.ui.entryAccordionBadge.textContent = `${customEntryCount} điểm vào`;
         MAIN.ui.entryAccordionBadge.className = 'brain-entry-accordion-badge brain-badge-active-blue';
       }
+    }
+
+    // Update analysis accordion badge
+    if (MAIN.ui.analysisAccordionBadge) {
+      const activeItems = [
+        MAIN.state.showRiskShell,
+        MAIN.state.showFunctional,
+        MAIN.state.showPath,
+        MAIN.state.showTooltips,
+        MAIN.state.showAttentionCloud,
+        MAIN.state.showSimilarWireframe,
+        MAIN.state.showCore,
+        MAIN.state.showEnhancing,
+        MAIN.state.showEdema
+      ].filter(Boolean).length;
+      MAIN.ui.analysisAccordionBadge.textContent = `${activeItems} mục đang bật`;
+      MAIN.ui.analysisAccordionBadge.className = activeItems > 0 ? 'brain-analysis-accordion-badge brain-badge-active-blue' : 'brain-analysis-accordion-badge brain-badge-muted';
     }
 
     renderEntryPointPanel();
@@ -2640,6 +3598,8 @@
 
     renderMainSliceGrid(MAIN.diagnosisData);
 
+    renderMainRiskCard();
+    renderMainReferenceCard();
     renderMainTrajectoryCard(trajectoryEntries);
     renderMainTooltipManager();
     updateMainViewerTooltips();
@@ -2730,6 +3690,135 @@
           `).join('')}
         </div>
       ` : ''}
+    `;
+  }
+
+  function renderMainRiskCard() {
+    if (!MAIN.ui?.riskCard) return;
+
+    const isDetected = MAIN.diagnosisData?.prediction?.tumor_detected;
+    const hasRisk = MAIN.riskSummary && MAIN.riskSummary.length > 0;
+
+    // Toggle center host visibility
+    if (MAIN.ui.riskCardHost) {
+      const shouldShow = !!(isDetected && hasRisk);
+      if (MAIN.ui.riskCardHost.style.display !== (shouldShow ? 'block' : 'none')) {
+        MAIN.ui.riskCardHost.style.display = shouldShow ? 'block' : 'none';
+        // Force a resize event to ensure 3D viewer and other components adapt to layout change
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+      }
+    }
+
+    if (!isDetected || !hasRisk) {
+      MAIN.ui.riskCard.innerHTML = '<div class="brain-risk-empty">Chạy chẩn đoán để kích hoạt bản đồ nhiệt rủi ro.</div>';
+      return;
+    }
+
+    const summary = computeSafetyMarginSummary();
+    const nearest = summary.nearest;
+    const margin = Math.round(MAIN.state.safetyMarginMm);
+
+    // Progress bar shows how much of the safety gap is "consumed" by the margin
+    const distToZone = nearest ? Math.max(0.1, nearest.distanceMm) : 20;
+    const progress = clamp((margin / distToZone) * 100, 0, 100);
+    const isCritical = summary.impacted.length > 0;
+
+    MAIN.ui.riskCard.innerHTML = `
+      <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 24px; align-items: start;">
+        <div>
+          <div class="brain-risk-head">
+            <span class="brain-risk-dot ${isCritical ? 'pulse-fast' : ''}" style="background:${summary.tone}; width: 14px; height: 14px;"></span>
+            <div>
+              <div class="brain-risk-title" style="color:${summary.tone}; font-weight:800; font-size: 16px; letter-spacing: -0.2px;">${summary.label}</div>
+              <div class="brain-risk-subtitle" style="font-size: 12px; margin-top: 2px;">Biên an toàn hiện tại: <strong>${margin} mm</strong></div>
+            </div>
+          </div>
+          
+          <div class="brain-risk-bar" style="background:var(--bg-deep); height:10px; border-radius:5px; overflow:hidden; margin: 16px 0; border: 1px solid var(--border);">
+            <div class="brain-risk-fill" style="width:${progress}%; background:${summary.tone}; height:100%; transition: width 0.3s ease, background 0.3s ease;"></div>
+          </div>
+
+          <div class="brain-risk-list" style="margin-top: 16px; gap: 8px;">
+            ${(MAIN.riskSummary || []).slice(0, 5).map(item => `
+              <div class="brain-risk-row" style="padding: 6px 10px; border-radius: 8px; ${item.impacted ? 'background:rgba(255,23,68,0.08); border-left:3px solid #ff1744;' : 'background:rgba(148, 163, 184, 0.04);'}">
+                <span class="brain-risk-row-label" style="font-size: 11px;">${item.label}</span>
+                <span class="brain-risk-row-value" style="color:${item.impacted ? '#ff1744' : item.collisionState === 'warning' ? '#ff9100' : 'var(--text-sec)'}; font-weight:700; font-family: 'Roboto Condensed', sans-serif;">
+                  ${formatMm(item.distanceMm)}
+                </span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="brain-risk-grid" style="grid-template-columns: repeat(2, 1fr); gap: 12px; align-content: start;">
+          <div class="brain-risk-metric" style="padding: 12px; background: var(--bg-deep);">
+            <span style="font-size: 10px; opacity: 0.7;">Vùng gần nhất</span>
+            <strong style="font-size: 14px; margin-top: 4px;">${nearest?.label || 'N/A'}</strong>
+          </div>
+          <div class="brain-risk-metric" style="padding: 12px; background: var(--bg-deep);">
+            <span style="font-size: 10px; opacity: 0.7;">Khoảng cách u</span>
+            <strong style="font-size: 18px; margin-top: 4px; font-family: 'Roboto Condensed', sans-serif;">${nearest ? formatMm(nearest.distanceMm) : 'N/A'}</strong>
+          </div>
+          <div class="brain-risk-metric" style="padding: 12px; background: var(--bg-deep);">
+            <span style="font-size: 10px; opacity: 0.7;">Dư địa biên</span>
+            <strong style="color:${summary.tone}; font-size: 20px; margin-top: 4px; font-family: 'Roboto Condensed', sans-serif;">${nearest ? formatMm(nearest.marginDeltaMm) : 'N/A'}</strong>
+          </div>
+          <div class="brain-risk-metric" style="padding: 12px; background: var(--bg-deep); ">
+            <span style="font-size: 10px; opacity: 0.7;">Vùng rủi ro</span>
+            <strong style="color:${isCritical ? '#ff1744' : 'inherit'}; font-size: 20px; margin-top: 4px; font-family: 'Roboto Condensed', sans-serif;">${summary.impacted.length}</strong>
+          </div>
+          <div style="grid-column: span 2; padding: 12px; background: rgba(14, 165, 233, 0.04); border: 1px dashed rgba(14, 165, 233, 0.2); border-radius: 12px; font-size: 11px; color: var(--text-sec); line-height: 1.5;">
+            <i class="fa-solid fa-circle-info" style="color: var(--cyan); margin-right: 6px;"></i>
+            Bản đồ nhiệt rủi ro tính toán khả năng xâm lấn của biên an toàn ${margin}mm vào các cấu trúc chức năng quan trọng.
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderMainReferenceCard() {
+    if (!MAIN.ui?.referenceCard) return;
+    const selected = pickReferenceSimilarCase();
+    if (!selected) {
+      MAIN.ui.referenceCard.innerHTML = `
+        <div class="brain-risk-empty">
+          <i class="fa-solid fa-database" style="display:block; font-size: 24px; margin-bottom: 12px; opacity: 0.3;"></i>
+          Không tìm thấy dữ liệu ca bệnh tương đồng phù hợp để đối chiếu hình thái trong cơ sở dữ liệu lâm sàng.
+        </div>
+      `;
+      return;
+    }
+
+    const similarityPct = Math.round(selected.similarity * 100);
+    const locationText = window.translateLocationToVi ? window.translateLocationToVi(selected.refKey) : selected.refKey.replace(/_/g, ' ');
+    const badgeColor = selected.sameLobe ? 'var(--emerald)' : 'var(--cyan)';
+
+    MAIN.ui.referenceCard.innerHTML = `
+      <div class="brain-reference-head">
+        <div>
+          <div class="brain-risk-title">Ca bệnh tham chiếu #${selected.caseItem?.case_id ?? 'N/A'}</div>
+          <div class="brain-risk-subtitle" style="text-transform: capitalize;">${locationText}</div>
+        </div>
+        <div class="brain-reference-score">
+          <span class="brain-reference-badge" style="background:${badgeColor};">${similarityPct}%</span>
+          <div style="font-size: 9px; color: var(--text-dim); text-align: center; margin-top: 4px; font-weight: 600;">TƯƠNG ĐỒNG</div>
+        </div>
+      </div>
+      <div class="brain-reference-copy">
+        <i class="fa-solid fa-microscope" style="color: var(--cyan); margin-right: 6px;"></i>
+        ${selected.sameLobe ? 'Mô hình đối chiếu được canh chỉnh <strong>cùng thùy não</strong> để so sánh hình thái trực tiếp.' : 'Mô hình đối chiếu được đặt tại thùy não tương ứng của ca bệnh tham khảo.'}
+      </div>
+      <div class="brain-risk-grid" style="margin-top: 14px;">
+        <div class="brain-risk-metric">
+          <span>Phân thùy</span>
+          <strong>${selected.sameLobe ? 'Trùng khớp' : 'Khác biệt'}</strong>
+        </div>
+        <div class="brain-risk-metric">
+          <span>Bên não</span>
+          <strong>${selected.sameSide ? 'Cùng bên' : 'Đối bên'}</strong>
+        </div>
+      </div>
+     
     `;
   }
 
@@ -2864,43 +3953,100 @@
   function buildFunctionalGroup(sceneRadius, riskSummary) {
     const group = new THREE.Group();
     group.name = 'ClinicalFunctionalGroup';
+    group.userData.pulseNodes = [];
+
     riskSummary.forEach(item => {
+      const isCritical = item.impacted;
+      const isWarning = item.collisionState === 'warning';
+
+      // Use more vibrant colors for risk states
+      let colorHex = item.color;
+      if (isCritical) colorHex = '#ff1744'; // Bright Red
+      else if (isWarning) colorHex = '#ff9100'; // Deep Orange
+
+      const accentColor = new THREE.Color(colorHex);
+
+      // 1. Base Patch (Functional Zone Disk)
       const patch = new THREE.Mesh(
         new THREE.CircleGeometry(item.radius, 32),
-        new THREE.MeshBasicMaterial({
-          color: item.color,
+        new THREE.MeshStandardMaterial({
+          color: accentColor,
+          emissive: accentColor,
+          emissiveIntensity: isCritical ? 0.6 : isWarning ? 0.3 : 0.1,
           transparent: true,
-          opacity: 0.16,
+          opacity: isCritical ? 0.45 : isWarning ? 0.35 : 0.2,
           side: THREE.DoubleSide,
           depthWrite: false,
+          blending: THREE.AdditiveBlending
         })
       );
       patch.position.copy(item.position);
       patch.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), item.position.clone().normalize());
 
+      // 2. Outer Glow / Rim
+      const rimRadius = item.radius * (isCritical ? 1.15 : 1.05);
       const rim = new THREE.LineLoop(
         new THREE.BufferGeometry().setFromPoints(
-          Array.from({ length: 41 }, (_, idx) => {
-            const angle = (idx / 40) * Math.PI * 2;
-            return new THREE.Vector3(Math.cos(angle) * item.radius, Math.sin(angle) * item.radius, 0);
+          Array.from({ length: 64 }, (_, idx) => {
+            const angle = (idx / 63) * Math.PI * 2;
+            return new THREE.Vector3(Math.cos(angle) * rimRadius, Math.sin(angle) * rimRadius, 0);
           })
         ),
-        new THREE.LineBasicMaterial({ color: item.color, transparent: true, opacity: 0.55 })
+        new THREE.LineBasicMaterial({
+          color: accentColor,
+          transparent: true,
+          opacity: isCritical ? 1.0 : isWarning ? 0.8 : 0.5,
+          linewidth: isCritical ? 3 : 1
+        })
       );
       rim.position.copy(item.position);
       rim.quaternion.copy(patch.quaternion);
 
+      // 3. Danger Aura for critical zones
+      let aura = null;
+      if (isCritical) {
+        aura = new THREE.Mesh(
+          new THREE.CircleGeometry(item.radius * 1.4, 32),
+          new THREE.MeshBasicMaterial({
+            color: accentColor,
+            transparent: true,
+            opacity: 0.1,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+          })
+        );
+        aura.position.copy(item.position).multiplyScalar(0.99); // Slightly below
+        aura.quaternion.copy(patch.quaternion);
+        group.add(aura);
+      }
+
+      // 4. Stem (Line to brain surface/interior)
       const stem = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([
-          item.position.clone().multiplyScalar(0.94),
-          item.position.clone().multiplyScalar(1.08),
+          item.position.clone().multiplyScalar(0.92),
+          item.position.clone().multiplyScalar(1.1),
         ]),
-        new THREE.LineBasicMaterial({ color: item.color, transparent: true, opacity: 0.44 })
+        new THREE.LineBasicMaterial({
+          color: accentColor,
+          transparent: true,
+          opacity: isCritical ? 0.9 : isWarning ? 0.7 : 0.4
+        })
       );
 
       group.add(patch);
       group.add(rim);
       group.add(stem);
+
+      if (isCritical || isWarning) {
+        group.userData.pulseNodes.push({
+          patch,
+          rim,
+          stem,
+          aura,
+          mode: isCritical ? 'critical' : 'warning',
+          baseRadius: item.radius
+        });
+      }
     });
     return group;
   }
@@ -2920,20 +4066,28 @@
   function applyMainTumorComponents() {
     ensureMainOverlayRoot();
     if (MAIN.tumorComponentGroup) {
+      disposeObject3D(MAIN.tumorComponentGroup);
       MAIN.overlayRoot.remove(MAIN.tumorComponentGroup);
       MAIN.tumorComponentGroup = null;
     }
     if (!MAIN.diagnosisData?.prediction?.tumor_detected || !MAIN.tumorCenter) return;
 
+    const summary = computeSafetyMarginSummary();
+    const isCritical = summary.impacted.length > 0;
+    const isWarning = summary.warning && !isCritical;
+
     const fractions = extractComponentFractions(MAIN.diagnosisData);
     const base = MAIN.tumorRadius || 0.11;
     const group = new THREE.Group();
+    group.name = 'ClinicalTumorGroup';
 
+    // 1. Edema Layer (Greenish)
     if (MAIN.state.showEdema) {
+      const edemaColor = '#a5d6a7';
       const edema = new THREE.Mesh(
-        new THREE.SphereGeometry(base * (1.45 + fractions.ed * 0.35), 24, 24),
-        new THREE.MeshBasicMaterial({
-          color: 0x22c55e,
+        new THREE.SphereGeometry(base * (1.45 + fractions.ed * 0.35), 32, 32),
+        new THREE.MeshStandardMaterial({
+          color: edemaColor,
           transparent: true,
           opacity: 0.11,
           depthWrite: false,
@@ -2943,11 +4097,13 @@
       group.add(edema);
     }
 
+    // 2. Enhancing Layer (Yellowish Wireframe)
     if (MAIN.state.showEnhancing) {
+      const enhancingColor = '#fff59d';
       const enhancing = new THREE.Mesh(
-        new THREE.SphereGeometry(base * (1.12 + fractions.et * 0.24), 24, 24),
-        new THREE.MeshBasicMaterial({
-          color: 0xfacc15,
+        new THREE.SphereGeometry(base * (1.12 + fractions.et * 0.24), 28, 28),
+        new THREE.MeshStandardMaterial({
+          color: enhancingColor,
           transparent: true,
           opacity: 0.30,
           wireframe: true,
@@ -2958,11 +4114,13 @@
       group.add(enhancing);
     }
 
+    // 3. Tumor Core (Reddish)
     if (MAIN.state.showCore) {
+      const coreColor = '#ffab91';
       const core = new THREE.Mesh(
-        new THREE.SphereGeometry(base * (0.62 + fractions.ncr * 0.25), 24, 24),
-        new THREE.MeshBasicMaterial({
-          color: 0xf43f5e,
+        new THREE.SphereGeometry(base * (0.62 + fractions.ncr * 0.25), 32, 32),
+        new THREE.MeshStandardMaterial({
+          color: coreColor,
           transparent: true,
           opacity: 0.62,
           depthWrite: false,
@@ -2972,8 +4130,317 @@
       group.add(core);
     }
 
+    // 4. Acoustic Wave Ripples (Cảnh báo sóng âm) - Luôn hiển thị để đánh dấu vị trí khối u
+    const waveCount = 3;
+    group.userData.waves = [];
+    const waveColor = isCritical ? '#ff8a80' : isWarning ? '#ffcc80' : '#a5d6a7';
+
+    for (let i = 0; i < waveCount; i++) {
+      const wave = new THREE.Mesh(
+        new THREE.SphereGeometry(base * 0.8, 32, 32),
+        new THREE.MeshBasicMaterial({
+          color: waveColor,
+          transparent: true,
+          opacity: 0,
+          wireframe: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        })
+      );
+      wave.position.copy(MAIN.tumorCenter);
+      group.add(wave);
+      group.userData.waves.push({
+        mesh: wave,
+        phase: i / waveCount,
+
+      });
+    }
+
+    group.userData.severity = isCritical ? 'critical' : isWarning ? 'warning' : 'safe';
+
     MAIN.overlayRoot.add(group);
     MAIN.tumorComponentGroup = group;
+  }
+
+  function applyMainSafetyMarginOverlay() {
+    ensureMainOverlayRoot();
+    if (MAIN.safetyMarginGroup) {
+      disposeObject3D(MAIN.safetyMarginGroup);
+      MAIN.overlayRoot.remove(MAIN.safetyMarginGroup);
+      MAIN.safetyMarginGroup = null;
+    }
+    if (!MAIN.state.showRiskShell || !MAIN.diagnosisData?.prediction?.tumor_detected || !MAIN.tumorCenter) return;
+
+    const summary = computeSafetyMarginSummary();
+    const isCritical = summary.impacted.length > 0;
+    const isWarning = summary.warning && !isCritical;
+
+    // Safety margin color: Force bright red if impacted
+    const toneHex = isCritical ? '#ff1744' : summary.tone;
+    const tone = new THREE.Color(toneHex);
+
+    const marginRadius = MAIN.tumorRadius + mmToScene(MAIN.state.safetyMarginMm, MAIN_SCENE_RADIUS);
+    const group = new THREE.Group();
+    group.name = 'ClinicalSafetyMarginGroup';
+
+    const shell = new THREE.Mesh(
+      new THREE.SphereGeometry(marginRadius, 32, 32),
+      new THREE.MeshStandardMaterial({
+        color: tone,
+        emissive: tone,
+        emissiveIntensity: isCritical ? 0.4 : isWarning ? 0.2 : 0.05,
+        transparent: true,
+        opacity: isCritical ? 0.18 : isWarning ? 0.12 : 0.07,
+        depthWrite: false,
+        roughness: 0.1,
+        metalness: 0.2
+      })
+    );
+    shell.position.copy(MAIN.tumorCenter);
+
+    const rim = new THREE.Mesh(
+      new THREE.SphereGeometry(marginRadius * 1.015, 24, 24),
+      new THREE.MeshBasicMaterial({
+        color: tone,
+        wireframe: true,
+        transparent: true,
+        opacity: isCritical ? 0.75 : isWarning ? 0.45 : 0.25,
+        depthWrite: false,
+      })
+    );
+    rim.position.copy(MAIN.tumorCenter);
+
+    group.add(shell);
+    group.add(rim);
+
+    // Connecting lines to functional zones
+    (MAIN.riskSummary || []).slice(0, 4).forEach((item, index) => {
+      const itemIsCritical = item.impacted;
+      const itemIsWarning = item.collisionState === 'warning';
+
+      const accentHex = itemIsCritical ? '#ff1744' : itemIsWarning ? '#ff9100' : item.color;
+      const accent = new THREE.Color(accentHex);
+
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([MAIN.tumorCenter, item.position]),
+        new THREE.LineBasicMaterial({
+          color: accent,
+          transparent: true,
+          opacity: itemIsCritical ? 0.85 : itemIsWarning ? 0.50 : 0.25,
+        })
+      );
+
+      // Node on the line
+      const node = new THREE.Mesh(
+        new THREE.SphereGeometry(item.radius * 0.16, 16, 16),
+        new THREE.MeshBasicMaterial({
+          color: accent,
+          transparent: true,
+          opacity: itemIsCritical ? 0.95 : 0.80,
+          depthWrite: false,
+        })
+      );
+      // Position the node at the intersection with the margin shell or closer to zone
+      const lerpFactor = itemIsCritical ? 0.25 : 0.12 + index * 0.04;
+      node.position.copy(item.position.clone().lerp(MAIN.tumorCenter, lerpFactor));
+
+      group.add(line);
+      group.add(node);
+    });
+
+    group.userData = {
+      shell,
+      rim,
+      severity: isCritical ? 'critical' : isWarning ? 'warning' : 'safe',
+      baseShellOpacity: shell.material.opacity,
+      baseRimOpacity: rim.material.opacity,
+      baseEmissiveIntensity: shell.material.emissiveIntensity
+    };
+
+    MAIN.overlayRoot.add(group);
+    MAIN.safetyMarginGroup = group;
+  }
+
+  function applyMainAttentionCloud() {
+    ensureMainOverlayRoot();
+    if (MAIN.attentionCloudGroup) {
+      disposeObject3D(MAIN.attentionCloudGroup);
+      MAIN.overlayRoot.remove(MAIN.attentionCloudGroup);
+      MAIN.attentionCloudGroup = null;
+    }
+    if (!MAIN.state.showAttentionCloud || !MAIN.diagnosisData?.prediction?.tumor_detected || !MAIN.tumorCenter) return;
+    const samples = Array.isArray(MAIN.attentionCloudSamples) ? MAIN.attentionCloudSamples : null;
+    if (!samples || !samples.length) {
+      queueAttentionCloudSampleRefresh();
+      return;
+    }
+
+    const normal = MAIN.tumorCenter.clone().lengthSq() > 0.0001
+      ? MAIN.tumorCenter.clone().normalize()
+      : new THREE.Vector3(0, 0, 1);
+    const tangentSeed = Math.abs(normal.y) > 0.84 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+    const tangentX = tangentSeed.clone().cross(normal).normalize();
+    const tangentY = normal.clone().cross(tangentX).normalize();
+    const group = new THREE.Group();
+    group.name = 'ClinicalAttentionCloudGroup';
+    const spread = MAIN.tumorRadius * 2.3;
+    const bins = [
+      { min: 0.00, max: 0.42, size: 0.024, opacity: 0.18, positions: [], colors: [] },
+      { min: 0.42, max: 0.72, size: 0.034, opacity: 0.28, positions: [], colors: [] },
+      { min: 0.72, max: 2.00, size: 0.048, opacity: 0.46, positions: [], colors: [] },
+    ];
+
+    samples.forEach((sample, sampleIndex) => {
+      const intensity = clamp(sample.intensity, 0, 1);
+      const density = Math.max(1, Math.round(1 + intensity * 5));
+      const bin = bins.find(entry => intensity >= entry.min && intensity < entry.max) || bins[bins.length - 1];
+      for (let copyIndex = 0; copyIndex < density; copyIndex += 1) {
+        const seed = sampleIndex * 17.13 + copyIndex * 5.17 + intensity * 13.0;
+        const localX = (sample.u - 0.5) * spread + (pseudoRandom(seed + 0.3) - 0.5) * MAIN.tumorRadius * 0.42;
+        const localY = (0.5 - sample.v) * spread * 0.86 + (pseudoRandom(seed + 1.3) - 0.5) * MAIN.tumorRadius * 0.36;
+        const normalOffset = MAIN.tumorRadius * (0.26 + intensity * 1.05 + pseudoRandom(seed + 2.3) * 0.32);
+        const point = MAIN.tumorCenter.clone()
+          .add(tangentX.clone().multiplyScalar(localX))
+          .add(tangentY.clone().multiplyScalar(localY))
+          .add(normal.clone().multiplyScalar(normalOffset));
+        const color = colorFromAttention(intensity);
+        bin.positions.push(point.x, point.y, point.z);
+        bin.colors.push(color.r, color.g, color.b);
+      }
+    });
+
+    bins.forEach(bin => {
+      if (!bin.positions.length) return;
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(bin.positions, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(bin.colors, 3));
+      const material = new THREE.PointsMaterial({
+        size: bin.size,
+        vertexColors: true,
+        transparent: true,
+        opacity: bin.opacity,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        sizeAttenuation: true,
+      });
+      const points = new THREE.Points(geometry, material);
+      group.add(points);
+    });
+
+    group.userData = { pulsePhase: 0 };
+    MAIN.overlayRoot.add(group);
+    MAIN.attentionCloudGroup = group;
+  }
+
+  function applyMainSimilarWireframeOverlay() {
+    ensureMainOverlayRoot();
+    if (MAIN.similarWireframeGroup) {
+      disposeObject3D(MAIN.similarWireframeGroup);
+      MAIN.overlayRoot.remove(MAIN.similarWireframeGroup);
+      MAIN.similarWireframeGroup = null;
+    }
+
+    // Check if toggled on and data exists
+    if (!MAIN.state.showSimilarWireframe || !MAIN.diagnosisData?.prediction?.tumor_detected || !MAIN.tumorCenter) {
+      return;
+    }
+
+    const selected = pickReferenceSimilarCase();
+    if (!selected) {
+      console.log('[Clinical3D] ℹ️ Không tìm thấy ca bệnh tương đồng phù hợp để hiển thị 3D.');
+      return;
+    }
+
+    console.log(`[Clinical3D] 🧬 Đang tích hợp ca tương đồng #${selected.caseItem?.case_id} vào không gian 3D...`);
+
+    const currentKey = locationHintToKey(MAIN.diagnosisData?.prediction?.location_hint);
+    const targetAnchor = getSceneAnchorFromLocationKey(selected.refKey, MAIN_SCENE_RADIUS);
+    const currentAnchor = getSceneAnchorFromLocationKey(currentKey, MAIN_SCENE_RADIUS);
+    const similarity = clamp(selected.similarity, 0, 1);
+
+    // Giảm blend factor để "bao quanh" khối u hiện tại tốt hơn nhưng vẫn giữ xu hướng vị trí
+    const blend = selected.sameLobe ? 0.04 : selected.sameSide ? 0.08 : 0.12;
+    const wireCenter = MAIN.tumorCenter.clone().add(
+      targetAnchor.clone().sub(currentAnchor).multiplyScalar(blend)
+    );
+
+    const seed = (Number(selected.caseItem?.case_id) || 0) + similarity * 100;
+    const sizeVariance = (pseudoRandom(seed + 4.7) - 0.5) * 0.22;
+    // Bán kính tham chiếu của ca tương tự
+    const refRadius = MAIN.tumorRadius * clamp(0.95 + (1 - similarity) * 0.18 + sizeVariance, 0.80, 1.25);
+
+    const geometry = buildOrganicWireframeGeometry(refRadius, seed);
+    const group = new THREE.Group();
+    group.name = 'ClinicalSimilarWireframeGroup';
+
+    // 1. Fill mờ (Cyan/Teal)
+    const fill = new THREE.Mesh(
+      geometry,
+      new THREE.MeshBasicMaterial({
+        color: 0x22d3ee,
+        transparent: true,
+        opacity: 0.08, // Tăng nhẹ độ mờ
+        depthWrite: false,
+      })
+    );
+    fill.position.copy(wireCenter);
+
+    // 2. Lưới Wireframe (Teal/Emerald)
+    const wire = new THREE.Mesh(
+      geometry,
+      new THREE.MeshBasicMaterial({
+        color: 0x2dd4bf,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.55, // Tăng độ hiển thị
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      })
+    );
+    wire.position.copy(wireCenter);
+
+    // 3. Vòng đai xích đạo (Rim)
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(refRadius * 0.95, Math.max(refRadius * 0.02, 0.005), 12, 72),
+      new THREE.MeshBasicMaterial({
+        color: 0xa7f3d0,
+        transparent: true,
+        opacity: 0.35,
+        depthWrite: false,
+      })
+    );
+    ring.position.copy(wireCenter);
+    ring.rotation.x = Math.PI / 2;
+
+    group.add(fill);
+    group.add(wire);
+    group.add(ring);
+
+    // Dây nối (Tether) nếu có khoảng cách đáng kể
+    if (wireCenter.distanceTo(MAIN.tumorCenter) > MAIN.tumorRadius * 0.12) {
+      const tether = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([MAIN.tumorCenter, wireCenter]),
+        new THREE.LineBasicMaterial({
+          color: 0x67e8f9,
+          transparent: true,
+          opacity: 0.3,
+        })
+      );
+      group.add(tether);
+    }
+
+    group.userData = {
+      fill,
+      wire,
+      ring,
+      center: wireCenter.clone(),
+      meta: selected,
+      pulsePhase: 0
+    };
+
+    MAIN.overlayRoot.add(group);
+    MAIN.similarWireframeGroup = group;
+    console.log('[Clinical3D] ✅ Đã hiển thị khung vỏ u đối chiếu.');
   }
 
   function computeTrajectorySummary(diagnosisData, tumorCenter, trajectoryEntries, riskSummary, showPath, selectingEntry) {
@@ -3100,7 +4567,9 @@
     MAIN.riskSummary = computeFunctionalRiskSummary(
       MAIN.tumorCenter,
       MAIN_SCENE_RADIUS,
-      MAIN.diagnosisData?.prediction?.location_hint
+      MAIN.diagnosisData?.prediction?.location_hint,
+      MAIN.tumorRadius,
+      MAIN.state?.safetyMarginMm || 0
     );
   }
 
@@ -3127,7 +4596,10 @@
     updateMainClipPlanes();
     applyMainOpacityProfile();
     applyMainFunctionalOverlay();
+    applyMainSafetyMarginOverlay();
     applyMainTumorComponents();
+    applyMainAttentionCloud();
+    applyMainSimilarWireframeOverlay();
     applyMainTrajectory();
     updateMainViewerTooltips();
   }
@@ -3280,6 +4752,56 @@
       });
     }
 
+    if (MAIN.state.showRiskShell) {
+      const riskSummary = computeSafetyMarginSummary();
+      specs.push({
+        key: 'safety-shell',
+        anchor: tumorCenter.clone().add(new THREE.Vector3(tumorRadius * 1.28, -tumorRadius * 0.74, tumorRadius * 0.20)),
+        accent: riskSummary.tone,
+        eyebrow: 'BIÊN AN TOÀN',
+        title: 'Biên an toàn quanh khối u',
+        description: 'Vỏ cầu bán trong suốt mô phỏng biên an toàn do bác sĩ muốn giữ trước khi chạm vào các vùng chức năng.',
+        meta: `${Math.round(MAIN.state.safetyMarginMm)} mm · ${riskSummary.label}`,
+        badge: riskSummary.impacted.length ? 'Xâm phạm' : riskSummary.warning ? 'Cảnh báo' : 'An toàn',
+        offsetX: 24,
+        offsetY: 28,
+      });
+    }
+
+    if (MAIN.state.showAttentionCloud && MAIN.attentionCloudSamples?.length) {
+      const attentionScore = MAIN.diagnosisData?.xai?.gradcam?.attention_score
+        ?? MAIN.diagnosisData?.xai_data?.gradcam?.attention_score
+        ?? 0;
+      specs.push({
+        key: 'xai-cloud',
+        anchor: tumorCenter.clone().add(new THREE.Vector3(-tumorRadius * 1.30, -tumorRadius * 0.64, tumorRadius * 0.26)),
+        accent: '#38bdf8',
+        eyebrow: 'BẢN ĐỒ CHÚ Ý AI',
+        title: 'Vùng tập trung chẩn đoán (AI)',
+        description: 'Tập hợp các điểm 3D mô phỏng vùng dữ liệu mà AI tập trung phân tích để đưa ra kết quả chẩn đoán.',
+        meta: `${Math.round(attentionScore * 100)}% chú ý · ${MAIN.attentionCloudSamples.length} mẫu`,
+        badge: 'Grad-CAM',
+        offsetX: -238,
+        offsetY: 34,
+      });
+    }
+
+    if (MAIN.state.showSimilarWireframe && MAIN.similarWireframeGroup?.userData?.meta) {
+      const refMeta = MAIN.similarWireframeGroup.userData.meta;
+      specs.push({
+        key: 'similar-wireframe',
+        anchor: MAIN.similarWireframeGroup.userData.center?.clone ? MAIN.similarWireframeGroup.userData.center.clone() : tumorCenter.clone().add(new THREE.Vector3(tumorRadius * 0.86, 0, -tumorRadius * 0.14)),
+        accent: '#2dd4bf',
+        eyebrow: 'CA THAM CHIẾU',
+        title: `Ca #${refMeta.caseItem?.case_id ?? 'N/A'} — mô hình vỏ u đối chiếu`,
+        description: 'Khung lưới màu xanh ngọc mô phỏng hình dạng khối u từ một ca bệnh tương tự để đối chiếu hình thái và khuynh hướng xâm lấn.',
+        meta: `${Math.round(refMeta.similarity * 100)}% tương đồng · ${refMeta.refKey.replace(/_/g, ' ')}`,
+        badge: refMeta.sameLobe ? 'Cùng thùy' : 'Dịch chuyển',
+        offsetX: 22,
+        offsetY: -52,
+      });
+    }
+
     if (typeof depthMm === 'number' && Array.isArray(depthMetrics?.nearest_cortex_point) && depthMetrics.nearest_cortex_point.length === 3) {
       const cortexPoint = new THREE.Vector3(
         mmToScene(depthMetrics.nearest_cortex_point[0], sceneRadius),
@@ -3294,7 +4816,7 @@
         title: 'Đường đo từ vỏ não đến tâm u',
         description: 'Đường màu này cho biết khoảng cách ước tính từ bề mặt vỏ não gần nhất đến trung tâm tổn thương.',
         meta: `${formatMm(depthMm)} · ${depthTone.label}`,
-        badge: 'Depth',
+        badge: 'Độ sâu',
         offsetX: 24,
         offsetY: -58,
       });
@@ -3653,6 +5175,7 @@
     MAIN.tumorCenter = deriveMainTumorCenter(MAIN.diagnosisData, payload?.tumorPoints || MAIN.ctx?.getTumorPoints?.());
     MAIN.tumorRadius = computeTumorRadiusFromPoints(payload?.tumorPoints || MAIN.ctx?.getTumorPoints?.(), MAIN.tumorCenter, MAIN_SCENE_RADIUS);
     refreshMainRiskSummary();
+    queueAttentionCloudSampleRefresh();
 
     if (isNewDiagnosis) {
       // 1. Tự động chọn tất cả 4 điểm vào vùng chức năng ngay khi có chẩn đoán mới < --------------------
@@ -3671,6 +5194,9 @@
       // Chỉ bật tooltip đường mổ
       setMainTooltipSelected('path-line', true);
       setMainTooltipSelected('entry-point', true);
+      setMainTooltipSelected('safety-shell', true);
+      setMainTooltipSelected('xai-cloud', true);
+      setMainTooltipSelected('similar-wireframe', true);
       persistTooltipSelections();
     }
 
@@ -3695,6 +5221,7 @@
       updateMainViewerTooltips();
       return;
     }
+    const time = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
     const rotation = getRotationEuler(MAIN.ctx);
     MAIN.overlayRoot.rotation.x = rotation.x;
     MAIN.overlayRoot.rotation.y = rotation.y;
@@ -3702,6 +5229,83 @@
     if (rotationKey !== MAIN.lastRotationKey) {
       MAIN.lastRotationKey = rotationKey;
       updateMainClipPlanes();
+    }
+    if (MAIN.functionalGroup?.userData?.pulseNodes?.length) {
+      MAIN.functionalGroup.userData.pulseNodes.forEach((entry, index) => {
+        const isCritical = entry.mode === 'critical';
+        const speed = isCritical ? 2.8 : 1.4;
+        const pulse = 0.5 + 0.5 * Math.sin(time * speed + index * 0.75);
+
+        if (entry.patch?.material) {
+          const baseOp = isCritical ? 0.40 : 0.25;
+          entry.patch.material.opacity = baseOp + pulse * (isCritical ? 0.25 : 0.15);
+          entry.patch.material.emissiveIntensity = (isCritical ? 0.6 : 0.3) + pulse * 0.4;
+        }
+        if (entry.rim?.material) {
+          entry.rim.material.opacity = (isCritical ? 0.85 : 0.65) + pulse * 0.15;
+          if (isCritical) {
+            const scale = 1 + pulse * 0.08;
+            entry.rim.scale.set(scale, scale, scale);
+          }
+        }
+        if (entry.aura?.material) {
+          entry.aura.material.opacity = pulse * 0.2;
+          const scale = 0.9 + pulse * 0.3;
+          entry.aura.scale.set(scale, scale, scale);
+        }
+        if (entry.stem?.material) {
+          entry.stem.material.opacity = (isCritical ? 0.75 : 0.55) + pulse * 0.2;
+        }
+      });
+    }
+    if (MAIN.safetyMarginGroup?.userData?.shell && MAIN.safetyMarginGroup?.userData?.rim) {
+      const severity = MAIN.safetyMarginGroup.userData.severity;
+      const isCritical = severity === 'critical';
+      const pulse = 0.5 + 0.5 * Math.sin(time * (isCritical ? 2.2 : 1.1));
+
+      const shellBase = MAIN.safetyMarginGroup.userData.baseShellOpacity || 0.07;
+      const rimBase = MAIN.safetyMarginGroup.userData.baseRimOpacity || 0.25;
+      const emissiveBase = MAIN.safetyMarginGroup.userData.baseEmissiveIntensity || 0;
+
+      MAIN.safetyMarginGroup.userData.shell.material.opacity = shellBase + pulse * (isCritical ? 0.12 : 0.05);
+      MAIN.safetyMarginGroup.userData.shell.material.emissiveIntensity = emissiveBase + pulse * (isCritical ? 0.6 : 0.2);
+
+      MAIN.safetyMarginGroup.userData.rim.material.opacity = rimBase + pulse * (isCritical ? 0.35 : 0.15);
+      MAIN.safetyMarginGroup.userData.rim.scale.setScalar(1 + pulse * (isCritical ? 0.04 : 0.015));
+    }
+
+    // Tumor components reaction
+    if (MAIN.tumorComponentGroup) {
+      const severity = MAIN.tumorComponentGroup.userData.severity;
+      const isCritical = severity === 'critical';
+
+      // Animate Acoustic Waves
+      if (MAIN.tumorComponentGroup.userData.waves) {
+        const speed = isCritical ? 0.7 : 0.35;
+        MAIN.tumorComponentGroup.userData.waves.forEach(waveObj => {
+          const progress = (time * speed + waveObj.phase) % 1.0;
+          const scale = 1.0 + progress * 2.2; // Expand
+          waveObj.mesh.scale.set(scale, scale, scale);
+          waveObj.mesh.material.opacity = (1.0 - progress) * (isCritical ? 0.15 : 0.06);
+        });
+      }
+    }
+    if (MAIN.attentionCloudGroup) {
+      MAIN.attentionCloudGroup.children.forEach((points, index) => {
+        if (!points.material) return;
+        const pulse = 0.5 + 0.5 * Math.sin(time * 2.1 + index * 0.7);
+        points.material.opacity = (index === 2 ? 0.36 : index === 1 ? 0.24 : 0.16) + pulse * 0.10;
+      });
+    }
+    if (MAIN.similarWireframeGroup?.userData?.ring) {
+      const ring = MAIN.similarWireframeGroup.userData.ring;
+      const wire = MAIN.similarWireframeGroup.userData.wire;
+      const fill = MAIN.similarWireframeGroup.userData.fill;
+      const pulse = 0.5 + 0.5 * Math.sin(time * 1.8);
+      ring.rotation.z += 0.006;
+      ring.material.opacity = 0.25 + pulse * 0.15;
+      if (wire?.material) wire.material.opacity = 0.45 + pulse * 0.15;
+      if (fill?.material) fill.material.opacity = 0.06 + pulse * 0.04;
     }
     updateMainViewerTooltips();
   }
@@ -3820,7 +5424,7 @@
     const gradCamCard = `
       <article class="compare-slice-card is-gradcam">
         <div class="compare-slice-card-head">
-          <span>Lớp phủ XAI</span>
+          <span>Bản đồ nhiệt AI</span>
           <strong>Grad-CAM</strong>
         </div>
         <div class="compare-slice-card-body">
@@ -4038,7 +5642,7 @@
   function buildCompareFunctionalGroup(ctx, state, sceneRadius) {
     if (!state.showFunctional || !ctx.tumorCenter) return null;
     const hint = ctx.isLeft ? ctx.diagData?.prediction?.location_hint : ctx.locKey;
-    const riskSummary = computeFunctionalRiskSummary(ctx.tumorCenter, sceneRadius, hint);
+    const riskSummary = computeFunctionalRiskSummary(ctx.tumorCenter, sceneRadius, hint, ctx.tumorRadius || sceneRadius * 0.08, 0);
     return buildFunctionalGroup(sceneRadius, riskSummary);
   }
 
@@ -4308,6 +5912,7 @@
         MAIN.state = defaultMainState();
       }
 
+      MAIN.similarData = window.lastSimilarData || (window._similarCasesData ? { similar_cases: window._similarCasesData } : null);
       MAIN.tooltipSelections = Object.assign({}, loadStoredTooltipSelections());
       ensureMainUI();
       if (payload.viewerElement && !payload.viewerElement.dataset.clinicalEntryBound) {
@@ -4332,6 +5937,14 @@
 
     onTumorFocusRequested(payload) {
       focusMainOnTumor(payload?.diagnosisData, payload?.depthMetrics);
+    },
+
+    onSimilarCasesUpdated(payload) {
+      MAIN.similarData = payload?.similarData || (window._similarCasesData ? { similar_cases: window._similarCasesData } : null);
+      syncMainUI();
+      applyMainSimilarWireframeOverlay();
+      renderMainTooltipManager();
+      updateMainViewerTooltips();
     },
 
     onViewerReset() {
@@ -4369,5 +5982,17 @@
       decorateDualScene(payload);
       syncCompareToolbar();
     },
+
+    toggleSafetyMargin() {
+      MAIN.state.showRiskShell = !MAIN.state.showRiskShell;
+      syncMainUI();
+      applyMainState();
+      persistClinicalState();
+      return MAIN.state.showRiskShell;
+    },
+
+    getSafetyMarginState() {
+      return MAIN.state.showRiskShell;
+    }
   };
 })();

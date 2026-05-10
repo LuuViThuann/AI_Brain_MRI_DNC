@@ -9,7 +9,9 @@ Provides:
   - Quantitative features extraction
 """
 
+# pyrefly: ignore [missing-import]
 import numpy as np
+# pyrefly: ignore [missing-import]
 import cv2
 from typing import Dict, List, Tuple
 
@@ -538,6 +540,7 @@ class RuleBasedAnalyzer:
         - Khoảng cách tới vỏ não
         - Tỷ lệ u / thể tích não
         """
+        # pyrefly: ignore [missing-import]
         import cv2
         
         # 1. TÌM CENTROID & TÍNH DIỆN TÍCH
@@ -634,6 +637,7 @@ class RuleBasedAnalyzer:
         - Độ sâu (depth)
         - Vector hướng (direction)
         """
+        # pyrefly: ignore [missing-import]
         import cv2
         
         # 1. TÌM CENTROID

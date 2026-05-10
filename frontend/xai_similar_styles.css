@@ -9,7 +9,7 @@
   margin-top: 64px;
   min-height: calc(100vh - 64px);
   padding: 20px 24px 40px;
-  background: var(--bg-main, #f8fafc);
+  background: var(--bg-deep);
   z-index: 100;
   display: none;
   /* Controlled by display: none/block in JS */
@@ -37,8 +37,8 @@
 
 /* XAI Card Styling */
 .xai-card {
-  background: #ffffff;
-  border: 1px solid #e8ecf0;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 18px;
   overflow: hidden;
@@ -47,7 +47,7 @@
 }
 
 .xai-card:hover {
-  border-color: #94a3b8;
+  border-color: var(--text-dim);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transform: translateY(-1px);
 }
@@ -58,7 +58,7 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
-  border-bottom: 1px solid #d1dde8;
+  border-bottom: 1px solid var(--border);
   padding-bottom: 12px;
 }
 
@@ -66,33 +66,33 @@
   margin: 0;
   font-size: 14px;
   font-weight: 500;
-  color: #1e293b;
+  color: var(--text-primary);
 }
 
 .xai-card-header .badge {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--bg-hover);
+  color: var(--text-sec);
   padding: 4px 12px;
   border-radius: 20px;
   font-size: 11px;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
 }
 
 /* XAI Card Body */
 .xai-card-body {
-  color: #4a5568;
+  color: var(--text-sec);
   font-size: 13px;
   line-height: 1.6;
 }
 
 /* ========== CLINICAL REPORT CARD ========== */
 .clinical-report-card {
-  background: #ffffff;
+  background: var(--bg-panel);
   border-radius: 16px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -107,13 +107,13 @@
 }
 
 .finding-item:hover {
-  background: #f7fafc;
+  background: var(--bg-hover);
   border-color: #0097b4;
   transform: translateX(4px);
 }
 
 .recommendation-item {
-  border-bottom: 1px solid #edf2f7;
+  border-bottom: 1px solid var(--border);
   padding: 10px 0;
 }
 
@@ -1480,4 +1480,488 @@
   .metric-boxes-grid {
     grid-template-columns: repeat(2, 1fr) !important;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   DARK THEME — XAI & SIMILAR CASES PANELS
+   Applies when html[data-theme="dark"] is set
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Similar Panel (full-screen overlay) ── */
+html[data-theme="dark"] .similar-panel {
+  background: #070b14 !important;
+}
+
+html[data-theme="dark"] .similar-header {
+  border-bottom-color: rgba(0, 229, 255, 0.12) !important;
+}
+html[data-theme="dark"] .similar-header h2 {
+  color: #38bdf8 !important;
+}
+html[data-theme="dark"] .similar-header h2 small,
+html[data-theme="dark"] .similar-header p,
+html[data-theme="dark"] .search-time {
+  color: rgba(193, 207, 232, 0.60) !important;
+  background: rgba(0, 151, 180, 0.10) !important;
+}
+
+/* ── Case Cards grid ── */
+html[data-theme="dark"] .case-card {
+  background: #0b1220 !important;
+  border-color: rgba(148, 163, 184, 0.20) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+html[data-theme="dark"] .case-card:hover {
+  border-color: #0097b4 !important;
+  box-shadow: 0 8px 24px rgba(0, 151, 180, 0.20) !important;
+}
+html[data-theme="dark"] .case-thumbnail {
+  background: #0f1a2d !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+html[data-theme="dark"] .no-thumbnail,
+html[data-theme="dark"] .no-image {
+  color: rgba(148, 163, 184, 0.50) !important;
+}
+html[data-theme="dark"] .similarity-score .label {
+  color: rgba(193, 207, 232, 0.60) !important;
+}
+html[data-theme="dark"] .score-bar {
+  background: rgba(148, 163, 184, 0.15) !important;
+}
+html[data-theme="dark"] .case-status {
+  color: rgba(193, 207, 232, 0.80) !important;
+}
+html[data-theme="dark"] .meta-label {
+  color: rgba(148, 163, 184, 0.65) !important;
+}
+html[data-theme="dark"] .meta-value {
+  color: #e5eefc !important;
+}
+
+/* ── Pagination ── */
+html[data-theme="dark"] .similar-panel .pagination button,
+html[data-theme="dark"] .similar-panel .page-btn,
+html[data-theme="dark"] .similar-panel button[data-page] {
+  background: #0f1a2d !important;
+  border-color: rgba(148, 163, 184, 0.22) !important;
+  color: rgba(193, 207, 232, 0.80) !important;
+}
+html[data-theme="dark"] .similar-panel .pagination button.active,
+html[data-theme="dark"] .similar-panel .page-btn.active,
+html[data-theme="dark"] .similar-panel button[data-page].active {
+  background: #0097b4 !important;
+  border-color: #0097b4 !important;
+  color: #ffffff !important;
+}
+html[data-theme="dark"] .similar-panel .pagination button:hover,
+html[data-theme="dark"] .similar-panel .page-btn:hover {
+  border-color: rgba(0, 151, 180, 0.50) !important;
+  color: #38bdf8 !important;
+}
+
+/* ── Compare picker sidebar (Chọn Ca Bệnh Tương Tự) ── */
+html[data-theme="dark"] #comparePicker,
+html[data-theme="dark"] .compare-picker-panel {
+  background: #070b14 !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+html[data-theme="dark"] #comparePicker h2,
+html[data-theme="dark"] .compare-picker-panel h2 {
+  color: #38bdf8 !important;
+}
+html[data-theme="dark"] #comparePicker p,
+html[data-theme="dark"] .compare-picker-panel p {
+  color: rgba(193, 207, 232, 0.65) !important;
+}
+html[data-theme="dark"] #comparePicker .case-card {
+  background: #0b1220 !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+html[data-theme="dark"] #comparePicker .case-card:hover {
+  border-color: #0097b4 !important;
+}
+
+/* ── Modal content ── */
+html[data-theme="dark"] .modal-content {
+  background: #0b1220 !important;
+  border-color: rgba(148, 163, 184, 0.20) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
+}
+html[data-theme="dark"] .modal-header {
+  background: #0b1220 !important;
+  border-bottom-color: rgba(148, 163, 184, 0.16) !important;
+}
+html[data-theme="dark"] .modal-header h2 {
+  color: #38bdf8 !important;
+}
+html[data-theme="dark"] .btn-close {
+  color: rgba(148, 163, 184, 0.65) !important;
+}
+html[data-theme="dark"] .btn-close:hover {
+  color: #00e5ff !important;
+}
+html[data-theme="dark"] .case-image-large {
+  background: #0f1a2d !important;
+  border-color: rgba(148, 163, 184, 0.16) !important;
+}
+html[data-theme="dark"] .detail-row {
+  background: rgba(0, 151, 180, 0.06) !important;
+  border-color: rgba(0, 151, 180, 0.18) !important;
+}
+html[data-theme="dark"] .detail-label {
+  color: rgba(148, 163, 184, 0.65) !important;
+}
+html[data-theme="dark"] .detail-value {
+  color: #e5eefc !important;
+}
+
+/* ── XAI Panel ── */
+html[data-theme="dark"] .xai-panel {
+  background: #070b14 !important;
+}
+
+/* ── XAI Sidebar ── */
+html[data-theme="dark"] .xai-sidebar {
+  background: #0b1220 !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+}
+html[data-theme="dark"] .xai-sidebar-header {
+  background: #0b1220 !important;
+  border-bottom-color: rgba(148, 163, 184, 0.16) !important;
+}
+html[data-theme="dark"] .xai-sidebar-title {
+  color: #e5eefc !important;
+}
+html[data-theme="dark"] .xai-sidebar-subtitle {
+  color: rgba(193, 207, 232, 0.60) !important;
+}
+
+/* ── XAI History items ── */
+html[data-theme="dark"] .xai-history-item {
+  background: #0b1220 !important;
+  border-color: rgba(148, 163, 184, 0.16) !important;
+}
+html[data-theme="dark"] .xai-history-item:hover {
+  background: #0f1a2d !important;
+  border-color: rgba(148, 163, 184, 0.30) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+html[data-theme="dark"] .xai-history-item.active {
+  background: rgba(0, 151, 180, 0.10) !important;
+  border-color: #0097b4 !important;
+}
+html[data-theme="dark"] .xai-history-id {
+  background: #0f1a2d !important;
+  color: rgba(148, 163, 184, 0.60) !important;
+}
+html[data-theme="dark"] .xai-history-date {
+  color: rgba(193, 207, 232, 0.65) !important;
+}
+html[data-theme="dark"] .xai-history-filename {
+  color: #e5eefc !important;
+}
+html[data-theme="dark"] .xai-history-footer {
+  border-top-color: rgba(148, 163, 184, 0.14) !important;
+}
+html[data-theme="dark"] .xai-history-conf {
+  color: rgba(148, 163, 184, 0.60) !important;
+}
+html[data-theme="dark"] .xai-history-thumbnail {
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+html[data-theme="dark"] .xai-history-badge.tumor {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: #f87171 !important;
+  border-color: rgba(239, 68, 68, 0.25) !important;
+}
+html[data-theme="dark"] .xai-history-badge.clear {
+  background: rgba(34, 197, 94, 0.10) !important;
+  color: #4ade80 !important;
+  border-color: rgba(34, 197, 94, 0.22) !important;
+}
+
+/* ── Rule-based & measurements ── */
+html[data-theme="dark"] .risk-indicator {
+  background: #0f1a2d !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+html[data-theme="dark"] .risk-label {
+  color: rgba(193, 207, 232, 0.60) !important;
+}
+html[data-theme="dark"] .measurement-item {
+  background: #0f1a2d !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+html[data-theme="dark"] .measurement-item .label {
+  color: rgba(148, 163, 184, 0.60) !important;
+}
+html[data-theme="dark"] .measurement-item .value {
+  color: #e5eefc !important;
+}
+
+/* ── Feature items (SHAP) ── */
+html[data-theme="dark"] .feature-item {
+  background: #0f1a2d !important;
+}
+html[data-theme="dark"] .feature-name {
+  color: #c1cfe8 !important;
+}
+html[data-theme="dark"] .feature-importance,
+html[data-theme="dark"] .feature-direction {
+  color: rgba(148, 163, 184, 0.60) !important;
+}
+html[data-theme="dark"] .feature-bar {
+  background: rgba(148, 163, 184, 0.15) !important;
+}
+
+/* ── Insight items ── */
+html[data-theme="dark"] .insight-item {
+  background: #0f1a2d !important;
+  border-color: rgba(148, 163, 184, 0.16) !important;
+}
+html[data-theme="dark"] .insight-text {
+  color: rgba(193, 207, 232, 0.70) !important;
+}
+
+/* ── Attention / score bars ── */
+html[data-theme="dark"] .attention-score .label {
+  color: rgba(148, 163, 184, 0.60) !important;
+}
+html[data-theme="dark"] .attention-score .value {
+  color: #e5eefc !important;
+}
+html[data-theme="dark"] .score-bar,
+html[data-theme="dark"] .prob-bar-track,
+html[data-theme="dark"] .confidence-track {
+  background: rgba(148, 163, 184, 0.14) !important;
+}
+
+/* ── Text colors ── */
+html[data-theme="dark"] .focused-regions h4,
+html[data-theme="dark"] .rules-triggered h4,
+html[data-theme="dark"] .warnings h4,
+html[data-theme="dark"] .top-features h4,
+html[data-theme="dark"] .gcam-section-title {
+  color: rgba(193, 207, 232, 0.65) !important;
+}
+html[data-theme="dark"] .focused-regions li,
+html[data-theme="dark"] .rules-triggered li,
+html[data-theme="dark"] .warnings li {
+  color: rgba(193, 207, 232, 0.70) !important;
+}
+html[data-theme="dark"] .image-caption {
+  color: rgba(148, 163, 184, 0.55) !important;
+}
+
+/* ── Anatomy banner ── */
+html[data-theme="dark"] .anatomy-banner {
+  background: rgba(14, 165, 233, 0.06) !important;
+  border-color: rgba(14, 165, 233, 0.18) !important;
+}
+
+/* ── Metric boxes ── */
+html[data-theme="dark"] .metric-box {
+  background: #0f1a2d !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+html[data-theme="dark"] .metric-box:hover {
+  border-color: #0097b4 !important;
+  box-shadow: 0 4px 12px rgba(0, 151, 180, 0.14) !important;
+}
+html[data-theme="dark"] .metric-box .metric-label,
+html[data-theme="dark"] .metric-box .metric-sub {
+  color: rgba(148, 163, 184, 0.55) !important;
+}
+
+/* ── Opacity slider row ── */
+html[data-theme="dark"] .gcam-opacity-row {
+  background: #0f1a2d !important;
+  border-color: rgba(148, 163, 184, 0.16) !important;
+}
+
+/* ── Rec items ── */
+html[data-theme="dark"] .rec-item {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(253, 230, 138, 0.18) !important;
+}
+html[data-theme="dark"] .rec-item:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ── Timeline bars ── */
+html[data-theme="dark"] .timeline-bar-label {
+  color: rgba(148, 163, 184, 0.55) !important;
+}
+
+/* ── Gradcam colorbar ── */
+html[data-theme="dark"] .gradcam-colorbar {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ── Dark scrollbars ── */
+html[data-theme="dark"] .xai-panel::-webkit-scrollbar-thumb,
+html[data-theme="dark"] .similar-panel::-webkit-scrollbar-thumb,
+html[data-theme="dark"] .modal-content::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.20) !important;
+}
+html[data-theme="dark"] .xai-panel::-webkit-scrollbar-thumb:hover,
+html[data-theme="dark"] .similar-panel::-webkit-scrollbar-thumb:hover,
+html[data-theme="dark"] .modal-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.35) !important;
+}
+
+/* ── Error message ── */
+html[data-theme="dark"] .error-message p {
+  color: rgba(193, 207, 232, 0.65) !important;
+}
+html[data-theme="dark"] .error-message .error-detail {
+  color: rgba(148, 163, 184, 0.50) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   INLINE STYLE OVERRIDES — Override hardcoded #ffffff in JS-rendered HTML
+   Scoped to panel containers so general page is not affected
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Case card (has class "similar-case-card") ── */
+html[data-theme="dark"] .similar-case-card {
+  background: #0b1220 !important;
+  border-color: rgba(148, 163, 184, 0.20) !important;
+}
+html[data-theme="dark"] .similar-case-card:hover {
+  border-color: rgba(0, 151, 180, 0.55) !important;
+  box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* ── Override ALL inline background: #ffffff inside the panels ── */
+html[data-theme="dark"] #similarPanel [style*="background: #ffffff"],
+html[data-theme="dark"] #similarPanel [style*="background:#ffffff"] {
+  background: #0b1220 !important;
+}
+html[data-theme="dark"] #xaiPanel [style*="background: #ffffff"],
+html[data-theme="dark"] #xaiPanel [style*="background:#ffffff"] {
+  background: #0b1220 !important;
+}
+html[data-theme="dark"] #comparePicker [style*="background: #ffffff"],
+html[data-theme="dark"] #comparePicker [style*="background:#ffffff"] {
+  background: #0b1220 !important;
+}
+
+/* ── Override inline background: #f8fafc (similarity score box, etc) ── */
+html[data-theme="dark"] #similarPanel [style*="background: #f8fafc"],
+html[data-theme="dark"] #xaiPanel [style*="background: #f8fafc"] {
+  background: #0f1a2d !important;
+  border-color: rgba(148, 163, 184, 0.16) !important;
+}
+
+/* ── Override inline background: #e2e8f0 (filename tag) ── */
+html[data-theme="dark"] #similarPanel [style*="background: #e2e8f0"],
+html[data-theme="dark"] #xaiPanel [style*="background: #e2e8f0"] {
+  background: rgba(148, 163, 184, 0.12) !important;
+}
+
+/* ── Pagination buttons: inactive = dark, active = keep cyan ── */
+html[data-theme="dark"] #similarPanel button {
+  background: #0f1a2d !important;
+  border-color: rgba(148, 163, 184, 0.25) !important;
+  color: rgba(193, 207, 232, 0.80) !important;
+}
+/* Active pagination button keeps cyan (has #0097b4 in inline style) */
+html[data-theme="dark"] #similarPanel button[style*="#0097b4"] {
+  background: #0097b4 !important;
+  border-color: #0097b4 !important;
+  color: #ffffff !important;
+}
+/* Disabled pagination button */
+html[data-theme="dark"] #similarPanel button[disabled] {
+  background: #0b1220 !important;
+  border-color: rgba(148, 163, 184, 0.12) !important;
+  color: rgba(148, 163, 184, 0.30) !important;
+  cursor: default !important;
+}
+
+/* ── Inline text colors inside panels ── */
+html[data-theme="dark"] #similarPanel [style*="color: #4a5568"],
+html[data-theme="dark"] #similarPanel [style*="color: #475569"],
+html[data-theme="dark"] #similarPanel [style*="color: #334155"] {
+  color: rgba(193, 207, 232, 0.75) !important;
+}
+html[data-theme="dark"] #similarPanel [style*="color: #94a3b8"] {
+  color: rgba(148, 163, 184, 0.60) !important;
+}
+
+/* ── "So Sánh 3D" button inside cards ── */
+html[data-theme="dark"] #similarPanel button[id^="cmp3d-btn-"] {
+  background: #0f1a2d !important;
+  border-color: rgba(0, 151, 180, 0.45) !important;
+  color: #38bdf8 !important;
+}
+html[data-theme="dark"] #similarPanel button[id^="cmp3d-btn-"]:hover {
+  background: #0097b4 !important;
+  color: #ffffff !important;
+}
+
+/* ── Header text inside similar panel ── */
+html[data-theme="dark"] #similarPanel h2 {
+  color: #38bdf8 !important;
+}
+html[data-theme="dark"] #similarPanel p {
+  color: rgba(193, 207, 232, 0.65) !important;
+}
+html[data-theme="dark"] #similarPanel strong {
+  color: #e5eefc !important;
+}
+
+/* ── Pagination "..." dots ── */
+html[data-theme="dark"] #similarPanel span[style*="color: #94a3b8"] {
+  color: rgba(148, 163, 184, 0.45) !important;
+}
+
+/* ── XAI Card class (has inline background: #ffffff) ── */
+html[data-theme="dark"] .xai-card {
+  background: #0b1220 !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+
+/* ── xai-card-header ── */
+html[data-theme="dark"] .xai-card-header {
+  border-bottom-color: rgba(148, 163, 184, 0.14) !important;
+}
+html[data-theme="dark"] .xai-card-header h3 {
+  color: #e5eefc !important;
+}
+
+/* ── XAI inline text overrides ── */
+html[data-theme="dark"] #xaiPanel [style*="color: #4a5568"],
+html[data-theme="dark"] #xaiPanel [style*="color: #475569"],
+html[data-theme="dark"] #xaiPanel [style*="color: #334155"] {
+  color: rgba(193, 207, 232, 0.75) !important;
+}
+html[data-theme="dark"] #xaiPanel [style*="color: #94a3b8"] {
+  color: rgba(148, 163, 184, 0.60) !important;
+}
+html[data-theme="dark"] #xaiPanel h2[style],
+html[data-theme="dark"] #xaiPanel h3[style] {
+  color: #e5eefc !important;
+}
+
+/* ── Inline background overrides in xai-card body ── */
+html[data-theme="dark"] #xaiPanel [style*="background: #f8fafc"],
+html[data-theme="dark"] #xaiPanel [style*="background: #f8fbff"],
+html[data-theme="dark"] #xaiPanel [style*="background: #f0f9ff"],
+html[data-theme="dark"] #xaiPanel [style*="background: #eef6ff"] {
+  background: #0f1a2d !important;
+  border-color: rgba(148, 163, 184, 0.14) !important;
+}
+
+/* ── Border color overrides ── */
+html[data-theme="dark"] #similarPanel [style*="border: 1px solid #e2e8f0"],
+html[data-theme="dark"] #xaiPanel [style*="border: 1px solid #e2e8f0"] {
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+html[data-theme="dark"] #similarPanel [style*="border: 1px solid #edf2f7"],
+html[data-theme="dark"] #xaiPanel [style*="border: 1px solid #edf2f7"] {
+  border-color: rgba(148, 163, 184, 0.14) !important;
 }

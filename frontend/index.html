@@ -7,8 +7,8 @@
   <title>NeuroScan AI — Chẩn Đoán MRI Não</title>
 
   <!-- ===== STYLESHEETS ===== -->
-  <link rel="stylesheet" href="styles.css?v=14" />
-  <link rel="stylesheet" href="xai_similar_styles.css?v=9" />
+  <link rel="stylesheet" href="styles.css?v=18" />
+  <link rel="stylesheet" href="xai_similar_styles.css?v=12" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 
   <script src="static/mni_registration.js"></script>
@@ -37,6 +37,23 @@
     })();
   </script>
 
+  <!-- ===== THEME (early apply) ===== -->
+  <script>
+    (function () {
+      try {
+        const key = 'neuroscan_theme';
+        const saved = localStorage.getItem(key);
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = saved || (prefersDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.classList.toggle('dark', theme === 'dark');
+        document.documentElement.style.colorScheme = theme;
+      } catch (e) {
+        // ignore
+      }
+    })();
+  </script>
+
   <!-- ===== HEADER ===== -->
   <header class="header">
     <div class="header-inner">
@@ -53,6 +70,14 @@
         <button class="pill" data-tab="history">Lịch Sử</button>
         <button class="pill" data-tab="info">Thông Tin</button>
       </nav>
+
+      <div class="header-actions">
+        <button class="header-icon-btn" id="themeToggle" type="button" title="Dark theme: Bật/Tắt"
+          aria-label="Chuyển chế độ sáng/tối">
+          <i class="fa-solid fa-moon" aria-hidden="true"></i>
+          <span class="theme-label" id="themeLabel">Light</span>
+        </button>
+      </div>
 
       <div class="header-status">
         <span class="status-dot" id="statusDot"></span>
@@ -130,6 +155,13 @@
         </div>
       </div>
 
+      <!-- CENTER RISK HEATMAP -->
+      <div id="centerRiskHeatmapHost" class="center-risk-heatmap-host" style="display:none; margin-top: 12px; padding: 20px; background: var(--bg-panel); border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+        <div class="brain-control-title" style="margin-bottom: 16px; font-size: 14px; font-weight: 800; color: var(--text-primary); text-transform: uppercase; display: flex; align-items: center; gap: 10px;">
+          <i class="fa-solid fa-chart-area" style="color: var(--cyan); font-size: 16px;"></i> BIÊN AN TOÀN PHẪU THUẬT
+        </div>
+        <div class="brain-risk-card" id="brainRiskCardCenter"></div>
+      </div>
 
     </section>
 
@@ -352,7 +384,8 @@
       <div class="clinical-panel-host" id="clinicalPanelHost">
         <div class="clinical-panel-placeholder">
           <div class="clinical-panel-placeholder-title">&#272;i&#7873;u H&#432;&#7899;ng L&#226;m S&#224;ng</div>
-          <p>B&#7843;ng &#273;i&#7873;u khi&#7875;n l&#226;m s&#224;ng s&#7869; &#273;&#432;&#7907;c hi&#7875;n th&#7883; &#7903; c&#7897;t b&#234;n ph&#7843;i sau khi m&#244; h&#236;nh 3D kh&#7903;i t&#7841;o.</p>
+          <p>B&#7843;ng &#273;i&#7873;u khi&#7875;n l&#226;m s&#224;ng s&#7869; &#273;&#432;&#7907;c hi&#7875;n
+            th&#7883; &#7903; c&#7897;t b&#234;n ph&#7843;i sau khi m&#244; h&#236;nh 3D kh&#7903;i t&#7841;o.</p>
         </div>
       </div>
     </section>
@@ -463,7 +496,7 @@
           <p class="copyright">&copy; 2026 NeuroScan AI - LUU VI THUAN</p>
         </div>
 
-       
+
       </div>
     </div>
   </footer>
@@ -630,10 +663,10 @@
   <!-- ===== APPLICATION SCRIPTS ===== -->
 
   <!-- Brain 3D Engine -->
-  <script src="brain3d_new.js?v=9"></script>
+  <script src="brain3d_new.js?v=10"></script>
 
   <!-- Clinical 3D Enhancer -->
-  <script src="brain3d_clinical_tools.js?v=7"></script>
+  <script src="brain3d_clinical_tools.js?v=9"></script>
 
   <!-- XAI & Similar UI -->
   <script src="xai_similar_ui.js"></script>
@@ -645,16 +678,16 @@
   <script src="brain3d_atlas_viewer_complete.js"></script>
 
   <!-- Main App -->
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=7"></script>
 
   <!-- UI Controls -->
-  <script src="brain3d_ui_controls.js?v=3"></script>
+  <script src="brain3d_ui_controls.js?v=4"></script>
 
   <!-- Integration Patch -->
-  <script src="brain3d_integration_patch.js?v=2"></script>
+  <script src="brain3d_integration_patch.js?v=3"></script>
 
   <!-- Atlas 4-Panel Viewer (EBRAINS-style) -->
-  <script src="atlas_4panel_viewer.js?v=2"></script>
+  <script src="atlas_4panel_viewer.js?v=3"></script>
 
   <script src="history_ui.js"></script>
 

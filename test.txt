@@ -1,1 +1,39 @@
-Xem code và cập nhật trên header nút icon để chuyển đổi trạng thái  Dark theme on or off.
+Mô phỏng toàn bộ quy trình MRI thực tế trong bệnh viện
+để tạo cảm giác:
+
+bệnh nhân được scan,
+ảnh MRI được sinh ra theo từng lát cắt,
+dữ liệu DICOM được truyền,
+AI phân tích theo thời gian thực,
+bác sĩ xem ảnh 3D/XAI/report.
+
+Đây chính là hướng của:
+
+Medical Imaging Simulation
+PACS/RIS workflow
+Realtime AI Diagnostic Pipeline
+
+Tôi sẽ hướng dẫn bạn kiến trúc đúng như một hệ thống thực tế.
+
+1. MỤC TIÊU CỦA WEBSITE MÔ PHỎNG
+
+Bạn sẽ có:
+
+Website 1 — MRI Simulator
+
+Vai trò:
+
+giả lập máy MRI
+sinh ảnh MRI từng slice
+tạo dữ liệu DICOM giả lập
+gửi dữ liệu realtime tới AI server
+Website 2 — AI Diagnosis System (website hiện tại)
+
+Vai trò:
+
+nhận stream MRI
+reconstruct volume 3D
+chạy segmentation
+XAI
+report
+trả kết quả

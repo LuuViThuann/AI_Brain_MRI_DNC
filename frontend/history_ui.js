@@ -192,14 +192,15 @@
     detailModal.id = "historyDetailModal";
     detailModal.style.cssText = `
       display:none; position:fixed; inset:0; z-index:200;
-      align-items:center; justify-content:center;
+      align-items:flex-start; justify-content:center;
+      padding: 100px 24px 60px; overflow-y: auto;
       background:rgba(0,0,0,0.7); backdrop-filter:blur(6px);`;
     detailModal.innerHTML = `
       <div style="
         background:var(--bg-panel); border:1px solid var(--border);
-        border-radius:14px; width:780px; max-width:95vw; max-height:88vh;
-        overflow-y:auto; box-shadow:0 24px 64px rgba(0,0,0,0.4);
-        position:relative;">
+        border-radius:14px; width:780px; max-width:95vw;
+        box-shadow:0 24px 64px rgba(0,0,0,0.4);
+        position:relative; margin-bottom: 20px;">
         <!-- Modal header -->
         <div style="
           display:flex;align-items:center;justify-content:space-between;
@@ -436,7 +437,7 @@
       const btn = document.createElement("button");
       btn.innerHTML = label;
       btn.disabled = disabled;
-      
+
       btn.style.cssText = `
         min-width: 36px; height: 36px; padding: ${isNum ? '0' : '0 12px'}; 
         background: ${active ? 'var(--cyan)' : 'var(--bg-card)'}; 
@@ -449,15 +450,15 @@
       `;
 
       if (!disabled && !active) {
-        btn.onmouseover = () => { 
-          btn.style.borderColor = 'var(--cyan)'; 
-          btn.style.color = 'var(--cyan)'; 
-          btn.style.background = 'var(--cyan-glow)'; 
+        btn.onmouseover = () => {
+          btn.style.borderColor = 'var(--cyan)';
+          btn.style.color = 'var(--cyan)';
+          btn.style.background = 'var(--cyan-glow)';
         };
-        btn.onmouseout = () => { 
-          btn.style.borderColor = 'var(--border)'; 
-          btn.style.color = 'var(--text-sec)'; 
-          btn.style.background = 'var(--bg-card)'; 
+        btn.onmouseout = () => {
+          btn.style.borderColor = 'var(--border)';
+          btn.style.color = 'var(--text-sec)';
+          btn.style.background = 'var(--bg-card)';
         };
         btn.onclick = () => {
           loadPage(page, searchTerm);

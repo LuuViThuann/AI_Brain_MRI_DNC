@@ -148,6 +148,7 @@ if model_path.exists():
         print(f"   Parameters: {model.count_params():,}")
         
         # Test prediction
+        # pyrefly: ignore [missing-import]
         import numpy as np
         test_input = np.random.rand(1, 256, 256, 1).astype(np.float32)
         prediction = model.predict(test_input, verbose=0)

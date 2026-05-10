@@ -14,9 +14,13 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
 
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI, Request
+# pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
+# pyrefly: ignore [missing-import]
 from fastapi.staticfiles import StaticFiles
+# pyrefly: ignore [missing-import]
 from fastapi.responses import FileResponse, JSONResponse
 import time
 
@@ -283,6 +287,7 @@ async def shutdown_event():
 # ===== MAIN ENTRY POINT =====
 
 if __name__ == "__main__":
+    # pyrefly: ignore [missing-import]
     import uvicorn
     import webbrowser
     import threading

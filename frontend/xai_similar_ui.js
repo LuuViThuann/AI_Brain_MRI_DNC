@@ -321,10 +321,10 @@
           .xai-accordion-item {
             width: 100%;
             margin: 0 !important;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--border);
             border-radius: 12px;
             overflow: hidden;
-            background: #ffffff;
+            background: var(--bg-panel);
             box-shadow: 0 1px 4px rgba(0,0,0,0.04);
             box-sizing: border-box;
             transition: box-shadow 0.25s ease;
@@ -355,15 +355,15 @@
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            color: #3b82f6;
+            color: var(--cyan);
             font-size: 14px;
-            background: #eff6ff;
-            border: 1px solid #bfdbfe;
+            background: rgba(0, 151, 180, 0.10);
+            border: 1px solid rgba(0, 151, 180, 0.22);
             border-radius: 10px;
           }
           .xai-accordion-title {
             display: block;
-            color: #1e293b;
+            color: var(--text-primary);
             font-size: 14px;
             font-weight: 600;
             line-height: 1.35;
@@ -374,7 +374,7 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            color: #64748b;
+            color: var(--text-dim);
             font-size: 13px;
             transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
           }
@@ -398,11 +398,11 @@
           }
           /* Separator between stacked inner cards */
           .xai-accordion-body .xai-card + .xai-card {
-            border-top: 1px solid #f1f5f9 !important;
+            border-top: 1px solid var(--border) !important;
           }
           /* Inner sub-boxes keep their light background but no heavy shadow */
           .xai-accordion-body .xai-card .xai-card {
-            border: 1px solid #e8ecf2 !important;
+            border: 1px solid var(--border) !important;
             border-radius: 8px !important;
             box-shadow: none !important;
           }
@@ -875,7 +875,8 @@
       let rightContent = '';
 
 
-      // Rules triggered
+      // Rules triggered <-----------------------------------------------------------------------
+
       if (rules.rules_triggered && rules.rules_triggered.length > 0) {
         rightContent += `
           <div style="${this.styles.infoBox}; margin-bottom: 5px;">
@@ -1631,7 +1632,7 @@
       var caseItem = cases[caseIndex];
       var diagData = window.lastDiagnosisData;
 
-      // ✅ Get current image from previewCanvas (like in 2D compare)
+      // Get current image from previewCanvas (like in 2D compare)
       var previewC = document.getElementById('previewCanvas');
       var imgSrc = previewC ? previewC.toDataURL('image/png') : null;
 
@@ -1671,7 +1672,7 @@
       var statusColorRight = caseItem.has_tumor ? '#ef4444' : '#10b981';
       var simColor = similarity >= 80 ? '#10b981' : similarity >= 55 ? '#f59e0b' : '#ef4444';
 
-      // ✅ Synthetic Depth for Similar Case
+      // Synthetic Depth for Similar Case
       var depthRef = caseItem.tumor_depth_mm;
       if (!depthRef && caseItem.has_tumor) {
         const seed = (caseItem.case_id || 0) + similarity;

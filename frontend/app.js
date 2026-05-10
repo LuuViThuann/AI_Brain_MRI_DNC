@@ -73,6 +73,8 @@
   const loadingState = document.getElementById('loadingState');
   const statusDot = document.getElementById('statusDot');
   const statusText = document.getElementById('statusText');
+  const themeToggle = document.getElementById('themeToggle');
+  const themeLabel = document.getElementById('themeLabel');
 
   // ===== Report Fields =====
   const confidenceBar = document.getElementById('confidenceBar');
@@ -117,6 +119,41 @@
   const LS_KEY_MASK_B64 = 'neuroscan_last_mask_b64';  // base64 PNG of mask canvas
   const LS_KEY_SIMILAR = 'neuroscan_last_similar';
   const LS_KEY_TAB = 'neuroscan_last_tab';
+  const LS_KEY_THEME = 'neuroscan_theme';
+
+  function _getPreferredTheme() {
+    try {
+      return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    } catch (e) {
+      return 'light';
+    }
+  }
+
+  function _applyTheme(theme) {
+    const t = (theme === 'dark' || theme === 'light') ? theme : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+    document.documentElement.classList.toggle('dark', t === 'dark');
+    // Hint built-in form controls / scrollbars
+    document.documentElement.style.colorScheme = t;
+    _updateThemeToggleIcon(t);
+    try { localStorage.setItem(LS_KEY_THEME, t); } catch (e) { }
+  }
+
+  function _updateThemeToggleIcon(theme) {
+    if (!themeToggle) return;
+    const icon = themeToggle.querySelector('i');
+    const isDark = theme === 'dark';
+
+    themeToggle.setAttribute('aria-label', isDark ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối');
+    themeToggle.setAttribute('title', isDark ? 'Chuyển sang Light theme' : 'Chuyển sang Dark theme');
+
+    if (themeLabel) themeLabel.textContent = isDark ? 'Dark' : 'Light';
+
+    if (!icon) return;
+    icon.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+  }
+
+  // NOTE: Click listener is registered only once inside initThemeToggle() below.
 
   // ===== SAVE STATE TO LOCALSTORAGE =====
   function _saveStateToLS(diagnosisResult, imageDataURL, maskB64, similarData) {
@@ -203,6 +240,10 @@
         // ✅ CRITICAL: Restore global variable used by brain3d_new.js comparison picker
         if (lastSimilarData.similar_cases) {
           window._similarCasesData = lastSimilarData.similar_cases;
+        }
+
+        if (window.Brain3DClinicalEnhancer?.onSimilarCasesUpdated) {
+          window.Brain3DClinicalEnhancer.onSimilarCasesUpdated({ similarData: lastSimilarData });
         }
 
         _showCompareButton(lastSimilarData);
@@ -439,12 +480,26 @@
 
       update3DBrain(diagnosisResult);
 
+      lastSimilarData = null;
+      window.lastSimilarData = null;
+      window._similarCasesData = [];
+      if (window.Brain3DClinicalEnhancer?.onSimilarCasesUpdated) {
+        window.Brain3DClinicalEnhancer.onSimilarCasesUpdated({ similarData: null });
+      }
+      _showCompareButton(null);
+
       let similarData = null;
       if (currentImageFile && window.XAISimilarUI?.fetchSimilarCases) {
         try {
           similarData = await window.XAISimilarUI.fetchSimilarCases(currentImageFile);
           lastSimilarData = similarData;
           window.lastSimilarData = similarData;
+          if (similarData?.similar_cases) {
+            window._similarCasesData = similarData.similar_cases;
+          }
+          if (window.Brain3DClinicalEnhancer?.onSimilarCasesUpdated) {
+            window.Brain3DClinicalEnhancer.onSimilarCasesUpdated({ similarData });
+          }
           _showCompareButton(similarData);
         } catch (err) {
           console.warn('[App] ⚠️  Lấy ca tương tự thất bại:', err);
@@ -1220,6 +1275,24 @@
   // ===== INITIALIZATION =====
   window.addEventListener('DOMContentLoaded', () => {
     console.log('%c[App] 🚀 Initializing NeuroScan AI...', 'color: #00e5ff; font-weight: bold; font-size: 14px;');
+
+    // Theme init + toggle (single listener — no duplicate)
+    (function initThemeToggle() {
+      try {
+        const saved = localStorage.getItem(LS_KEY_THEME);
+        const initial = saved || document.documentElement.getAttribute('data-theme') || _getPreferredTheme();
+        _applyTheme(initial); // Apply + update icon + save
+      } catch (e) { }
+
+      if (themeToggle && !themeToggle._themeListenerBound) {
+        themeToggle._themeListenerBound = true;
+        themeToggle.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const current = document.documentElement.getAttribute('data-theme') || 'light';
+          _applyTheme(current === 'dark' ? 'light' : 'dark');
+        });
+      }
+    })();
 
     // Health check
     checkHealth();

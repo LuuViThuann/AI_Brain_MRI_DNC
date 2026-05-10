@@ -1126,8 +1126,8 @@
       // ── Rebuild enhanced overlay (corona rings / reticle / cone / halo) ──
       const depthMet = window.lastDepthMetrics;
       if (depthMet) {
-        buildTumorDepthVector(depthMet);
-        buildTumorEnhancedOverlay(currentTumorPoints, lastTumorHoverData || {}, depthMet);
+        // buildTumorDepthVector(depthMet);
+        // buildTumorEnhancedOverlay(currentTumorPoints, lastTumorHoverData || {}, depthMet);
         console.log(`%c[Brain3D] ✅ Enhanced overlay rebuilt for ${modelType} view`, 'color: #00e5ff; font-weight: bold;');
       } else {
         console.warn('[Brain3D] ⚠️  No stored depth metrics — enhanced overlay skipped');
@@ -1977,8 +1977,8 @@
     buildTumorVolumetricShell(tumorPoints, depthMetrics);
     buildTumorBoundingBox(tumorPoints, depthMetrics);
     if (depthMetrics) {
-      buildTumorDepthVector(depthMetrics);
-      buildTumorEnhancedOverlay(tumorPoints, metrics, depthMetrics);
+      // buildTumorDepthVector(depthMetrics);
+      // buildTumorEnhancedOverlay(tumorPoints, metrics, depthMetrics);
     } else {
       console.warn('[Brain3D] ⚠️  No depth metrics provided');
     }
@@ -2004,8 +2004,7 @@
   };
 
   // ════════════════════════════════════════════════════════════
-  // ENHANCED TUMOR OVERLAY — corona rings, reticle, scan cone,
-  //                           particle halo for main 3D brain
+  // Tổng quan trực quan lên mô hình các phạm vi < ==================================================
   // ════════════════════════════════════════════════════════════
   function buildTumorEnhancedOverlay(tumorPoints, metrics, depthMetrics) {
     if (window._brain3dEnhancedGroup) {
@@ -2340,7 +2339,7 @@
       window._tumorShellGroup = null;
     }
 
-   
+
     // Previously hardcoded 1.0/55 (= 2.8/(2.8*55)) which caused tumor shell to be
     // ~2.4x too large after _brainWS was reduced from 2.8 → 1.15 to fix clipping.
     const BRS = (window._brainWS || 2.8) / (2.8 * 55);
@@ -2720,6 +2719,8 @@
       max-height: calc(100% - 20px);
       overflow-y: auto;
     `;
+    const isMarginOn = window.Brain3DClinicalEnhancer?.getSafetyMarginState?.() ?? true;
+    const marginEyeIcon = isMarginOn ? '👁️' : '👁️‍🗨️';
 
     panel.innerHTML = `
       <style>
@@ -2825,7 +2826,13 @@
       <!-- ── SURGICAL MARGIN ── -->
       <div class="dp2-s">
         <div class="dp2-row">
-          <span class="dp2-lbl">🔪 Surgical Safety Margin</span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <button onclick="
+              const on = window.Brain3DClinicalEnhancer.toggleSafetyMargin();
+              this.innerText = on ? '👁️' : '👁️‍🗨️';
+            " style="background:none;border:none;cursor:pointer;font-size:12px;padding:0;margin-right:2px;" title="Bật/Tắt biên an toàn">${marginEyeIcon}</button>
+            <span class="dp2-lbl">🔪 Biên an toàn phẫu thuật</span>
+          </div>
           <span class="dp2-chip" style="background:rgba(${_hexToRgb(marginClr)},0.15);color:${marginClr};border:1px solid ${marginClr}55;">
             ${marginSafe}
           </span>
