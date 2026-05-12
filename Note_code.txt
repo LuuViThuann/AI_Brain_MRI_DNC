@@ -68,3 +68,9 @@ THÔNG TIN FAISS :
 -------------------
 
 =================================================================================================================================
+
++ Điều chỉnh reload ngẫu nhiên 8 ca bệnh nhân khác bên mô phỏng chưa được 
+
++ Reload mất thông tin từ mô phỏng trả về hiển thị bên trang website chính
+
++ Thêm hiệu ứng quét mô phỏng hình ảnh , mô phỏng di chuyển qua lại

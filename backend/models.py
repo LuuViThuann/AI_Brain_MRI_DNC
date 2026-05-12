@@ -6,7 +6,9 @@ DiagnosticHistory: stores every completed diagnosis for history tracking.
 import uuid
 from datetime import datetime, timezone
 
+# pyrefly: ignore [missing-import]
 from sqlalchemy import Column, String, DateTime, Boolean, Float, Text, Integer
+# pyrefly: ignore [missing-import]
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from database import Base
@@ -95,3 +97,15 @@ class DiagnosticHistory(Base):
             "mask_data":       self.mask_data,
         })
         return d
+
+
+class SavedWorklist(Base):
+    """
+    Stores the currently 'active' or 'saved' patient worklist for the simulator.
+    This allows users to persist a specific set of 5 patients.
+    """
+    __tablename__ = "saved_worklist"
+
+    id = Column(Integer, primary_key=True, index=True)
+    cases = Column(JSONB, nullable=False)  # List of case objects
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)

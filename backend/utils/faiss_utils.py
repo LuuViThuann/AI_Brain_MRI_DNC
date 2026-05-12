@@ -15,6 +15,7 @@ GIẢI PHÁP:
 
 import os
 import json
+# pyrefly: ignore [missing-import]
 import numpy as np
 import base64
 import io
@@ -24,6 +25,7 @@ from pathlib import Path
 import tempfile
 
 try:
+    # pyrefly: ignore [missing-import]
     import faiss
     HAS_FAISS = True
 except ImportError:

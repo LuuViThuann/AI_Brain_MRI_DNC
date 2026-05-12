@@ -4051,6 +4051,44 @@
     return group;
   }
 
+  /**
+   * Injects organic ripple animation into a material using GPU shaders (onBeforeCompile).
+   * This is much smoother and more performant than per-frame CPU vertex manipulation.
+   */
+  function injectOrganicRipples(material, intensity, frequency) {
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.time = { value: 0 };
+      shader.uniforms.uIntensity = { value: intensity };
+      shader.uniforms.uFreq = { value: frequency };
+      
+      material.userData.shader = shader; // Reference to update uniforms in the animation loop
+
+      shader.vertexShader = `
+        uniform float time;
+        uniform float uIntensity;
+        uniform float uFreq;
+      ` + shader.vertexShader;
+
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `
+        // Smooth organic multi-octave wave
+        float wave = sin(position.x * uFreq + time * 1.5) * 
+                     cos(position.y * uFreq * 0.8 + time * 1.2) * 
+                     sin(position.z * uFreq * 1.1 + time * 0.9);
+        
+        // Add a secondary, slower base wave for organic "breathing"
+        wave += sin(position.y * uFreq * 0.4 - time * 0.7) * 0.5;
+        
+        // Apply displacement along normal
+        vec3 transformed = position + normal * wave * uIntensity;
+        `
+      );
+    };
+    // Ensure Three.js creates a unique program for this material
+    material.customProgramCacheKey = () => `organic_ripple_${intensity}_${frequency}`;
+  }
+
   function extractComponentFractions(diagnosisData) {
     const stats = diagnosisData?.multiclass_stats;
     const total = stats?.total_tumor_pixels || 0;
@@ -4081,53 +4119,69 @@
     const group = new THREE.Group();
     group.name = 'ClinicalTumorGroup';
 
-    // 1. Edema Layer (Greenish)
+    // 1. Edema Layer (Greenish) - GPU accelerated ripples
     if (MAIN.state.showEdema) {
       const edemaColor = '#a5d6a7';
-      const edema = new THREE.Mesh(
-        new THREE.SphereGeometry(base * (1.45 + fractions.ed * 0.35), 32, 32),
-        new THREE.MeshStandardMaterial({
-          color: edemaColor,
-          transparent: true,
-          opacity: 0.11,
-          depthWrite: false,
-        })
-      );
+      const radius = base * (1.45 + fractions.ed * 0.35);
+      const mat = new THREE.MeshStandardMaterial({
+        color: edemaColor,
+        transparent: true,
+        opacity: 0.11,
+        depthWrite: false,
+        roughness: 0.3,
+        metalness: 0.1
+      });
+      
+      injectOrganicRipples(mat, 0.02, 4.2);
+      
+      const edema = new THREE.Mesh(new THREE.IcosahedronGeometry(radius, 4), mat);
       edema.position.copy(MAIN.tumorCenter);
+      edema.userData.baseIntensity = 0.02;
       group.add(edema);
+      group.userData.edema = edema;
     }
 
-    // 2. Enhancing Layer (Yellowish Wireframe)
+    // 2. Enhancing Layer (Yellowish Wireframe) - GPU accelerated waves
     if (MAIN.state.showEnhancing) {
       const enhancingColor = '#fff59d';
-      const enhancing = new THREE.Mesh(
-        new THREE.SphereGeometry(base * (1.12 + fractions.et * 0.24), 28, 28),
-        new THREE.MeshStandardMaterial({
-          color: enhancingColor,
-          transparent: true,
-          opacity: 0.30,
-          wireframe: true,
-          depthWrite: false,
-        })
-      );
+      const radius = base * (1.12 + fractions.et * 0.24);
+      const mat = new THREE.MeshStandardMaterial({
+        color: enhancingColor,
+        transparent: true,
+        opacity: 0.32,
+        wireframe: true,
+        depthWrite: false,
+        emissive: enhancingColor,
+        emissiveIntensity: 0.2
+      });
+      
+      injectOrganicRipples(mat, 0.032, 6.5);
+      
+      const enhancing = new THREE.Mesh(new THREE.IcosahedronGeometry(radius, 5), mat);
       enhancing.position.copy(MAIN.tumorCenter);
+      enhancing.userData.baseIntensity = 0.032;
       group.add(enhancing);
+      group.userData.enhancing = enhancing;
     }
 
     // 3. Tumor Core (Reddish)
     if (MAIN.state.showCore) {
       const coreColor = '#ffab91';
       const core = new THREE.Mesh(
-        new THREE.SphereGeometry(base * (0.62 + fractions.ncr * 0.25), 32, 32),
+        new THREE.SphereGeometry(base * (0.62 + fractions.ncr * 0.25), 42, 42),
         new THREE.MeshStandardMaterial({
           color: coreColor,
           transparent: true,
-          opacity: 0.62,
+          opacity: 0.68,
           depthWrite: false,
+          roughness: 0.2,
+          emissive: coreColor,
+          emissiveIntensity: 0.1
         })
       );
       core.position.copy(MAIN.tumorCenter);
       group.add(core);
+      group.userData.core = core;
     }
 
     // 4. Acoustic Wave Ripples (Cảnh báo sóng âm) - Luôn hiển thị để đánh dấu vị trí khối u
@@ -5278,15 +5332,45 @@
     if (MAIN.tumorComponentGroup) {
       const severity = MAIN.tumorComponentGroup.userData.severity;
       const isCritical = severity === 'critical';
+      const pulseSpeed = isCritical ? 2.5 : 1.2;
+      const pulse = 0.5 + 0.5 * Math.sin(time * pulseSpeed);
 
-      // Animate Acoustic Waves
+      // Smooth "Breathing" effect for Core
+      if (MAIN.tumorComponentGroup.userData.core) {
+        const s = 1.0 + pulse * 0.015; // Gentler breathing
+        MAIN.tumorComponentGroup.userData.core.scale.set(s, s, s);
+      }
+
+      // ── GPU Surface Ripple Update ──
+      const updateRippleTime = (mesh) => {
+        if (mesh?.material?.userData?.shader) {
+          mesh.material.userData.shader.uniforms.time.value = time;
+          // Apply a slight intensity boost if critical
+          mesh.material.userData.shader.uniforms.uIntensity.value = 
+            (mesh.userData.baseIntensity || 0.02) * (isCritical ? 1.5 : 1.0);
+        }
+      };
+
+      if (MAIN.tumorComponentGroup.userData.enhancing) {
+        updateRippleTime(MAIN.tumorComponentGroup.userData.enhancing);
+        MAIN.tumorComponentGroup.userData.enhancing.rotation.y += 0.0025; // Gentle rotation
+      }
+      if (MAIN.tumorComponentGroup.userData.edema) {
+        updateRippleTime(MAIN.tumorComponentGroup.userData.edema);
+        MAIN.tumorComponentGroup.userData.edema.rotation.y -= 0.001;
+      }
+
+      // Animate Acoustic Waves with smooth non-linear expansion
       if (MAIN.tumorComponentGroup.userData.waves) {
-        const speed = isCritical ? 0.7 : 0.35;
+        const waveSpeed = isCritical ? 0.8 : 0.45;
         MAIN.tumorComponentGroup.userData.waves.forEach(waveObj => {
-          const progress = (time * speed + waveObj.phase) % 1.0;
-          const scale = 1.0 + progress * 2.2; // Expand
+          const progress = (time * waveSpeed + waveObj.phase) % 1.0;
+          const easedProgress = Math.pow(progress, 0.8);
+          const scale = 1.0 + easedProgress * 2.4; 
           waveObj.mesh.scale.set(scale, scale, scale);
-          waveObj.mesh.material.opacity = (1.0 - progress) * (isCritical ? 0.15 : 0.06);
+          
+          const alpha = Math.sin(progress * Math.PI);
+          waveObj.mesh.material.opacity = alpha * (isCritical ? 0.22 : 0.10) * (1.0 - progress);
         });
       }
     }
@@ -5781,49 +5865,62 @@
     const sideBias = ctx.isLeft ? -1 : 1;
 
     if (state.showEdema) {
+      const mat = new THREE.MeshStandardMaterial({
+        color: ctx.isLeft ? 0x22c55e : 0xe9d5ff,
+        transparent: true,
+        opacity: ctx.isLeft ? 0.12 : 0.16,
+        depthWrite: false,
+        roughness: 0.4
+      });
+      injectOrganicRipples(mat, 0.02, 4.2);
+      
       const edema = new THREE.Mesh(
-        new THREE.SphereGeometry(base * (0.92 + fractions.ed * 0.22), 20, 20),
-        new THREE.MeshBasicMaterial({
-          color: ctx.isLeft ? 0x22c55e : 0xe9d5ff,
-          transparent: true,
-          opacity: ctx.isLeft ? 0.12 : 0.16,
-          depthWrite: false,
-        })
+        new THREE.IcosahedronGeometry(base * (0.92 + fractions.ed * 0.22), 4),
+        mat
       );
       edema.position.copy(ctx.tumorCenter).add(new THREE.Vector3(sideBias * base * 0.28, base * 0.04, -base * 0.06));
       edema.scale.set(1.18, 0.96, 1.08);
       group.add(edema);
+      group.userData.edema = edema;
     }
 
     if (state.showEnhancing) {
+      const mat = new THREE.MeshStandardMaterial({
+        color: ctx.isLeft ? 0xfacc15 : 0xf3e8ff,
+        transparent: true,
+        opacity: ctx.isLeft ? 0.28 : 0.24,
+        wireframe: true,
+        depthWrite: false,
+        emissive: ctx.isLeft ? 0xfacc15 : 0xf3e8ff,
+        emissiveIntensity: 0.15
+      });
+      injectOrganicRipples(mat, 0.032, 6.5);
+
       const enhancing = new THREE.Mesh(
-        new THREE.SphereGeometry(base * (0.72 + fractions.et * 0.18), 18, 18),
-        new THREE.MeshBasicMaterial({
-          color: ctx.isLeft ? 0xfacc15 : 0xf3e8ff,
-          transparent: true,
-          opacity: ctx.isLeft ? 0.28 : 0.24,
-          wireframe: true,
-          depthWrite: false,
-        })
+        new THREE.IcosahedronGeometry(base * (0.72 + fractions.et * 0.18), 4),
+        mat
       );
       enhancing.position.copy(ctx.tumorCenter).add(new THREE.Vector3(-sideBias * base * 0.08, -base * 0.06, base * 0.04));
       enhancing.scale.set(1.08, 0.92, 1.02);
       group.add(enhancing);
+      group.userData.enhancing = enhancing;
     }
 
     if (state.showCore) {
       const core = new THREE.Mesh(
-        new THREE.SphereGeometry(base * (0.56 + fractions.ncr * 0.18), 20, 20),
-        new THREE.MeshBasicMaterial({
+        new THREE.SphereGeometry(base * (0.56 + fractions.ncr * 0.18), 32, 32),
+        new THREE.MeshStandardMaterial({
           color: ctx.isLeft ? 0xf43f5e : 0xe9d5ff,
           transparent: true,
           opacity: ctx.isLeft ? 0.58 : 0.56,
           depthWrite: false,
+          roughness: 0.3
         })
       );
       core.position.copy(ctx.tumorCenter).add(new THREE.Vector3(-sideBias * base * 0.18, 0, 0));
       core.scale.set(0.94, 1.02, 0.88);
       group.add(core);
+      group.userData.core = core;
     }
 
     return group;
@@ -5866,7 +5963,27 @@
       if (!COMPARE.modal || !document.body.contains(COMPARE.modal) || !ctx.canvas || !document.body.contains(ctx.canvas)) {
         return;
       }
+      const time = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
       updateSceneClipPlanes(ctx, COMPARE.state, COMPARE_SCENE_RADIUS);
+      
+      // Animate ripples in compare mode
+      if (ctx.componentGroup?.userData) {
+        const ud = ctx.componentGroup.userData;
+        if (ud.enhancing?.material?.userData?.shader) {
+          ud.enhancing.material.userData.shader.uniforms.time.value = time;
+          ud.enhancing.rotation.y += 0.002;
+        }
+        if (ud.edema?.material?.userData?.shader) {
+          ud.edema.material.userData.shader.uniforms.time.value = time;
+          ud.edema.rotation.y -= 0.0008;
+        }
+        if (ud.core) {
+          const pulse = 0.5 + 0.5 * Math.sin(time * 1.2);
+          const s = 1.0 + pulse * 0.012;
+          ud.core.scale.set(s, s, s);
+        }
+      }
+
       ctx._tickId = requestAnimationFrame(tick);
     }
     tick();

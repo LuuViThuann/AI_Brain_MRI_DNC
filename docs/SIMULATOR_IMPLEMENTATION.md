@@ -1,4 +1,5 @@
 # Lộ trình Triển khai: Hệ thống Mô phỏng Luồng Công việc MRI & AI (PACS/RIS Workflow)
+(Giữ nguyên quá trình gửi ảnh chẩn đoán và chỉ cập nhật thêm quá trình mô phỏng theo tài liệu này)
 
 Tài liệu này hướng dẫn xây dựng hệ thống mô phỏng quy trình chẩn đoán hình ảnh thực tế tại bệnh viện, từ khâu quét tại máy MRI cho đến khâu phân tích AI tại trạm làm việc của bác sĩ.
 
@@ -101,4 +102,3 @@ Trên Website chính, mô hình não 3D có thể thay đổi trạng thái theo
 - [ ] Tích hợp thanh tiến trình nhận dữ liệu y tế.
 
 ---
-**Ghi chú từ Antigravity:** Hướng đi này sẽ biến dự án của bạn từ một công cụ chẩn đoán đơn thuần thành một **Hệ sinh thái Y tế thông minh**. Nó cho thấy sự hiểu biết sâu sắc về quy trình khám chữa bệnh thực tế.

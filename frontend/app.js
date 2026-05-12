@@ -112,6 +112,7 @@
   let lastXAIData = null;
   let lastSimilarData = null;
   let isProcessingDiagnosis = false;
+  let currentScanContext = null;
 
   // ===== LOCALSTORAGE KEYS =====
   const LS_KEY_DIAGNOSIS = 'neuroscan_last_diagnosis';
@@ -336,6 +337,7 @@
       return;
     }
 
+    currentScanContext = null;
     currentFile = file;
     currentImageFile = file;
     window._lastUploadedBlob = file;
@@ -347,6 +349,44 @@
       window.Brain3DUIControls.reset();
     }
   }
+  function setCurrentFile(file, options = {}) {
+    if (!file) return;
+
+    currentFile = file;
+    currentImageFile = file;
+    window._lastUploadedBlob = file;
+    renderPreview(file);
+    btnDiagnose.disabled = false;
+
+    if (options.resetControls !== false && window.Brain3DUIControls?.reset) {
+      window.Brain3DUIControls.reset();
+    }
+  }
+
+  async function loadRemoteImage(url, filename = 'simulated_mri.png', options = {}) {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Khong tai duoc anh mo phong (${response.status})`);
+    }
+
+    const blob = await response.blob();
+    const blobType = blob.type || 'image/png';
+    const normalizedName = filename || url.split('/').pop() || 'simulated_mri.png';
+    const remoteFile = new File([blob], normalizedName, {
+      type: blobType,
+      lastModified: Date.now()
+    });
+
+    currentScanContext = options.scanContext || null;
+    setCurrentFile(remoteFile, options);
+
+    if (options.switchToMainTab !== false) {
+      switchTab('brain3d');
+    }
+
+    return remoteFile;
+  }
+
   // ===== RENDER PREVIEW CANVAS =====
   function renderPreview(file) {
     const reader = new FileReader();
@@ -425,14 +465,20 @@
   window.drawMaskOnCanvas = renderMaskOverlay;
 
   // ===== RUN DIAGNOSIS =====
-  btnDiagnose.addEventListener('click', async () => {
-    if (!currentFile || isProcessingDiagnosis) return;
+  async function runDiagnosis(options = {}) {
+    if (!currentFile || isProcessingDiagnosis) return false;
 
     isProcessingDiagnosis = true;
+    const runSource = options.source || 'manual';
     console.log('%c[App] 🚀 Bắt đầu chẩn đoán...', 'color: #00e5ff; font-weight: bold;');
 
     showState('loading');
     btnDiagnose.disabled = true;
+    window.LiveAcquisition?.onDiagnosisStateChange?.('loading', {
+      source: runSource,
+      scanContext: currentScanContext,
+      filename: currentFile?.name || null
+    });
 
     try {
       const formData = new FormData();
@@ -515,20 +561,37 @@
       _saveStateToLS(diagnosisResult, imageDataURL, maskB64, similarData);
 
       showState('report');
+      window.LiveAcquisition?.onDiagnosisStateChange?.('ready', {
+        source: runSource,
+        scanContext: currentScanContext,
+        diagnosis: diagnosisResult
+      });
 
       // ✅ PATCH: Mở khóa nút Phân Tích Chi Tiết — NHƯNG KHÔNG tự mở panel
       if (window.Brain3DUIControls?.onDiagnosisReady) {
         window.Brain3DUIControls.onDiagnosisReady();
       }
 
+      return true;
+
     } catch (err) {
       console.error('[App] ❌ Lỗi chẩn đoán:', err);
       alert('❌ Lỗi: ' + err.message);
+      window.LiveAcquisition?.onDiagnosisStateChange?.('error', {
+        source: runSource,
+        scanContext: currentScanContext,
+        message: err.message
+      });
       showState('placeholder');
+      return false;
     } finally {
       isProcessingDiagnosis = false;
       btnDiagnose.disabled = false;
     }
+  }
+
+  btnDiagnose.addEventListener('click', () => {
+    runDiagnosis({ source: 'manual' });
   });
 
   // ===== ✅ Hiện/cập nhật nút Compare sau khi có Similar Cases =====
@@ -1257,6 +1320,79 @@
     });
   }
 
+  function ensureLiveAcquisitionUI() {
+    const headerActions = document.querySelector('.header-actions');
+    if (headerActions && !document.getElementById('openSimulatorHeaderLink')) {
+      const link = document.createElement('a');
+      link.id = 'openSimulatorHeaderLink';
+      link.className = 'header-link-btn';
+      link.href = '/mri_modality.html';
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.innerHTML = '<i class="fa-solid fa-wave-square" aria-hidden="true"></i><span>MRI Mô Phỏng</span>';
+      if (themeToggle) {
+        headerActions.insertBefore(link, themeToggle);
+      } else {
+        headerActions.appendChild(link);
+      }
+    }
+
+    const leftPanel = document.querySelector('.panel-left');
+    if (leftPanel && !document.getElementById('liveAcquisitionCard')) {
+      const card = document.createElement('div');
+      card.id = 'liveAcquisitionCard';
+      card.className = 'live-acquisition-card';
+      card.dataset.state = 'idle';
+      card.innerHTML = `
+        <div class="live-acquisition-head">
+          <div>
+            <div class="live-acquisition-title" id="liveAcquisitionTitle">Chưa có kết quả mô phỏng</div>
+          </div>
+        </div>
+        <div class="live-acquisition-body">
+          <div class="live-acquisition-preview-wrap">
+            <i class="fa-solid fa-image live-acquisition-placeholder-icon"></i>
+            <img id="liveAcquisitionPreview" alt="Live acquisition preview" />
+          </div>
+          <div class="live-acquisition-meta">
+            <div class="live-acquisition-patient" id="liveAcquisitionPatient">Vui lòng mở MRI Simulator để truyền dữ liệu.</div>
+            <div class="live-acquisition-sub" id="liveAcquisitionSub">Hệ thống sẽ tự động nhận lát cắt và thực hiện chẩn đoán AI theo thời gian thực.</div>
+            <div class="live-acquisition-progress">
+              <div class="live-acquisition-progress-bar" id="liveAcquisitionProgressBar"></div>
+            </div>
+            <div class="live-acquisition-progress-text">
+              <span id="liveAcquisitionProgressText">0 / 0 lát cắt</span>
+              <span id="liveAcquisitionEta">Đang chờ...</span>
+            </div>
+            <div class="live-acquisition-feed" id="liveAcquisitionFeed"></div>
+            
+            <!-- NEW: Worklist AI Summary Section -->
+            <div class="live-worklist-summary" id="liveWorklistSummary"></div>
+          </div>
+        </div>
+      `;
+
+      const uploadZoneEl = document.getElementById('uploadZone');
+      if (uploadZoneEl) {
+        leftPanel.insertBefore(card, uploadZoneEl);
+      } else {
+        leftPanel.appendChild(card);
+      }
+    }
+  }
+
+  function ensureLiveAcquisitionModule() {
+    if (document.querySelector('script[data-live-acquisition-script="true"]')) {
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'live_acquisition.js?v=1';
+    script.defer = true;
+    script.dataset.liveAcquisitionScript = 'true';
+    document.body.appendChild(script);
+  }
+
   // ===== PRE-LOAD ATLAS IN BACKGROUND =====
   window.addEventListener('DOMContentLoaded', () => {
     setTimeout(async () => {
@@ -1293,6 +1429,9 @@
         });
       }
     })();
+
+    ensureLiveAcquisitionUI();
+    ensureLiveAcquisitionModule();
 
     // Health check
     checkHealth();
@@ -1382,6 +1521,9 @@
     lastXAIData: () => lastXAIData,
     lastSimilarData: () => lastSimilarData,
     getCurrentFile: () => currentFile,
+    loadRemoteImage,
+    runDiagnosis,
+    isProcessingDiagnosis: () => isProcessingDiagnosis,
     clearDiagnosisCache: _clearLS,  // Allow external clear if needed
     displayReport: displayReport,
     update3DBrain: update3DBrain,

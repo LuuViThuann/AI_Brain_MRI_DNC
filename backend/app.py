@@ -29,6 +29,7 @@ from routes.diagnosis import router as diagnosis_router
 from routes.brain3d   import router as brain3d_router
 from routes.xai_explain import router as xai_router
 from routes.similar_cases import router as similar_router
+from routes.simulator import router as simulator_router
 
 from database import engine
 from models import Base
@@ -80,7 +81,7 @@ MODELS_DIR = PROJECT_ROOT / "frontend" / "models"
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
 BRAIN_GLB_PATH = MODELS_DIR / "Brain.glb"
 
-print(f"\n📁 Directory Configuration:")
+print(f"\n[DIR] Directory Configuration:")
 print(f"   BASE_DIR:     {BASE_DIR}")
 print(f"   PROJECT_ROOT: {PROJECT_ROOT}")
 print(f"   FRONTEND_DIR: {FRONTEND_DIR}")
@@ -103,14 +104,14 @@ def find_image_directory():
                 # Check if directory contains images
                 images = list(img_dir.glob('*.png')) + list(img_dir.glob('*.jpg')) + list(img_dir.glob('*.jpeg'))
                 if images:
-                    print(f"\n🖼️  FOUND Image Directory:")
+                    print(f"\n[IMG] FOUND Image Directory:")
                     print(f"   Path: {img_dir}")
                     print(f"   Images: {len(images)} files")
                     return img_dir
             except Exception as e:
-                print(f"   ⚠️  Error checking {img_dir}: {e}")
+                print(f"   [ERROR] Error checking {img_dir}: {e}")
     
-    print(f"\n❌ No image directory found!")
+    print(f"\n[ERROR] No image directory found!")
     print(f"   Searched in:")
     for d in possible_dirs:
         print(f"     - {d} (exists: {d.exists()})")
@@ -140,7 +141,7 @@ def health_check():
 @app.get("/test/brain-model")
 async def test_brain_model():
     """Test endpoint to serve Brain.glb directly"""
-    print(f"\n🔍 Testing Brain.glb access...")
+    print(f"\n[TEST] Testing Brain.glb access...")
     print(f"   Requested path: {BRAIN_GLB_PATH}")
     print(f"   File exists: {BRAIN_GLB_PATH.exists()}")
     
@@ -169,7 +170,7 @@ async def test_brain_model():
             "files_in_models_dir": list(MODELS_DIR.iterdir()) if MODELS_DIR.exists() else []
         }
         
-        print(f"❌ Error: {error_info}")
+        print(f"   [ERROR] Error: {error_info}")
         return JSONResponse(content=error_info, status_code=404)
 
 @app.get("/test/images-dir")
@@ -196,7 +197,7 @@ app.include_router(diagnosis_router, prefix="/api", tags=["Diagnosis"])
 app.include_router(brain3d_router,   prefix="/api", tags=["3D Brain"])
 app.include_router(xai_router, prefix="/api/xai", tags=["xAI"])
 app.include_router(similar_router, prefix="/api/similar", tags=["Similar Cases"])
-
+app.include_router(simulator_router, tags=["MRI Simulator"])
 app.include_router(history_router, prefix="/api", tags=["History"])
 
 # ===== STATIC FILES (MUST BE LAST) =====
@@ -204,10 +205,10 @@ app.include_router(history_router, prefix="/api", tags=["History"])
 # 1. Mount /data/images for Similar Cases (CRITICAL!)
 if IMAGES_DIR and IMAGES_DIR.exists():
     app.mount("/data/images", StaticFiles(directory=str(IMAGES_DIR)), name="images")
-    print(f"\n✅ MOUNTED: /data/images -> {IMAGES_DIR}")
+    print(f"\n[OK] MOUNTED: /data/images -> {IMAGES_DIR}")
     print(f"   Example URL: http://127.0.0.1:8000/data/images/mat_005363.png")
 else:
-    print(f"\n❌ FAILED to mount /data/images - directory not found")
+    print(f"\n[ERROR] FAILED to mount /data/images - directory not found")
 
 # 2. Mount models directory
 if MODELS_DIR.exists():
@@ -215,29 +216,29 @@ if MODELS_DIR.exists():
     app.mount("/models", StaticFiles(directory=str(MODELS_DIR)), name="models")
     # /frontend/models → legacy reference
     app.mount("/frontend/models", StaticFiles(directory=str(MODELS_DIR)), name="frontend_models")
-    print(f"✅ MOUNTED: /models -> {MODELS_DIR}")
-    print(f"✅ MOUNTED: /frontend/models -> {MODELS_DIR}")
+    print(f"[OK] MOUNTED: /models -> {MODELS_DIR}")
+    print(f"[OK] MOUNTED: /frontend/models -> {MODELS_DIR}")
 
     detail_glb = MODELS_DIR / "detail_brain.glb"
     if BRAIN_GLB_PATH.exists():
         mb = BRAIN_GLB_PATH.stat().st_size / (1024 * 1024)
-        print(f"   ✅ Brain.glb found ({mb:.1f} MB)")
+        print(f"   [OK] Brain.glb found ({mb:.1f} MB)")
     else:
-        print(f"   ❌ Brain.glb NOT found")
+        print(f"   [ERROR] Brain.glb NOT found")
     if detail_glb.exists():
         mb2 = detail_glb.stat().st_size / (1024 * 1024)
-        print(f"   ✅ detail_brain.glb found ({mb2:.1f} MB)")
+        print(f"   [OK] detail_brain.glb found ({mb2:.1f} MB)")
     else:
-        print(f"   ⚠️  detail_brain.glb NOT found (will fall back to Brain.glb)")
+        print(f"   [WARNING] detail_brain.glb NOT found (will fall back to Brain.glb)")
 else:
-    print(f"❌ Models directory not found: {MODELS_DIR}")
+    print(f"[ERROR] Models directory not found: {MODELS_DIR}")
 
 # 3. Mount frontend (MUST BE LAST!)
 if FRONTEND_DIR.exists():
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
-    print(f"✅ MOUNTED: / -> {FRONTEND_DIR}")
+    print(f"[OK] MOUNTED: / -> {FRONTEND_DIR}")
 else:
-    print(f"❌ Frontend directory not found: {FRONTEND_DIR}")
+    print(f"[ERROR] Frontend directory not found: {FRONTEND_DIR}")
 
 # ===== STARTUP/SHUTDOWN EVENTS =====
 
@@ -246,33 +247,33 @@ async def startup_event():
     # Create all DB tables if they don't exist yet
     try:
         Base.metadata.create_all(bind=engine)
-        print("✅ Database tables initialised")
+        print("[OK] Database tables initialised")
     except Exception as e:
-        print(f"❌ Failed to initialise database tables: {e}")
+        print(f"[ERROR] Failed to initialise database tables: {e}")
 
     """Run on server startup"""
     print("\n" + "=" * 70)
-    print("  🧠 Brain MRI Diagnosis API - Server Started")
+    print("  Brain MRI Diagnosis API - Server Started")
     print("=" * 70)
-    print(f"\n📍 Main Endpoints:")
+    print(f"\n[INFO] Main Endpoints:")
     print(f"   • Frontend:      http://127.0.0.1:8000")
     print(f"   • API Health:    http://127.0.0.1:8000/api/health")
     print(f"   • Diagnosis:     http://127.0.0.1:8000/api/diagnose")
     
     if IMAGES_DIR:
-        print(f"\n🖼️  Similar Cases Images:")
+        print(f"\n[INFO] Similar Cases Images:")
         print(f"   • Directory:     {IMAGES_DIR}")
         print(f"   • Image count:   {len(list(IMAGES_DIR.glob('*.png')))}")
         print(f"   • Test URL:      http://127.0.0.1:8000/test/images-dir")
         print(f"   • Sample:        http://127.0.0.1:8000/data/images/mat_005363.png")
     else:
-        print(f"\n⚠️  Similar Cases images NOT available (directory not found)")
+        print(f"\n[WARNING] Similar Cases images NOT available (directory not found)")
     
-    print(f"\n🧪 Debug/Test Endpoints:")
+    print(f"\n[INFO] Debug/Test Endpoints:")
     print(f"   • Brain Model:   http://127.0.0.1:8000/test/brain-model")
     print(f"   • Images Dir:    http://127.0.0.1:8000/test/images-dir")
     
-    print(f"\n📚 Documentation:")
+    print(f"\n[INFO] Documentation:")
     print(f"   • Swagger UI:    http://127.0.0.1:8000/docs")
     print(f"   • ReDoc:         http://127.0.0.1:8000/redoc")
     print("\n" + "=" * 70 + "\n")
@@ -281,7 +282,7 @@ async def startup_event():
 async def shutdown_event():
     """Run on server shutdown"""
     print("\n" + "=" * 70)
-    print("  👋 Brain MRI Diagnosis API - Server Shutting Down")
+    print("  Brain MRI Diagnosis API - Server Shutting Down")
     print("=" * 70 + "\n")
 
 # ===== MAIN ENTRY POINT =====
@@ -299,7 +300,7 @@ if __name__ == "__main__":
             webbrowser.open("http://127.0.0.1:8000")
             print("🌐 Browser opened at http://127.0.0.1:8000\n")
         except Exception as e:
-            print(f"⚠️  Could not open browser: {e}")
+            print(f"[WARNING] Could not open browser: {e}")
     
     # Start browser in separate thread
     browser_thread = threading.Thread(target=open_browser, daemon=True)
@@ -307,9 +308,9 @@ if __name__ == "__main__":
     
     # Print startup banner
     print("\n" + "=" * 70)
-    print("  🚀 Starting Brain MRI Diagnosis API Server")
+    print("  Starting Brain MRI Diagnosis API Server")
     print("=" * 70)
-    print("\n⏳ Initializing server...\n")
+    print("\n[INFO] Initializing server...\n")
     
     # Run server
     uvicorn.run(

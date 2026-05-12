@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mô phỏng thiết bị MRI | NeuroScan AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="mri_modality.css" />
+</head>
+
+<body>
+  <div class="modality-shell">
+    <header class="modality-topbar">
+      <div>
+        <p class="eyebrow">Mô phỏng thiết bị MRI</p>
+        <h1>Bảng điều khiển thu nhận ảnh theo luồng PACS/RIS</h1>
+      </div>
+      <div class="topbar-actions">
+        <!-- Dashboard presence and workstation links hidden as requested -->
+      </div>
+    </header>
+
+    <main class="modality-grid">
+      <section class="console-card worklist-card">
+        <div class="card-header worklist-header">
+          <div class="header-title-wrapper">
+            <div class="header-icon-box">
+              <i class="fa-solid fa-hospital-user"></i>
+            </div>
+            <div>
+              <p class="card-label">Bệnh nhân</p>
+              <h2>Danh sách chờ</h2>
+            </div>
+          </div>
+          <div class="header-btn-group">
+            <button class="icon-btn batch-icon-btn" id="batchPickBtn" type="button"
+              title="Thay thế ảnh hàng loạt cho các ca bệnh">
+              <i class="fa-solid fa-layer-group"></i>
+            </button>
+            <button class="icon-btn" id="saveCasesBtn" type="button" title="Lưu danh sách hiện tại">
+              <i class="fa-solid fa-floppy-disk"></i>
+            </button>
+            <button class="icon-btn" id="shuffleCasesBtn" type="button" title="Xáo trộn & tạo mới">
+              <i class="fa-solid fa-shuffle"></i>
+            </button>
+            <button class="icon-btn" id="refreshCasesBtn" type="button" title="Tải lại danh sách">
+              <i class="fa-solid fa-rotate"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="worklist-summary">
+          <div>
+            <span class="metric-label">Số ca đã tải</span>
+            <strong id="caseCount">0</strong>
+          </div>
+          <div>
+            <span class="metric-label">Đang chọn</span>
+            <strong id="selectedCaseLabel">Chưa chọn</strong>
+          </div>
+        </div>
+
+        <div class="worklist-list" id="worklistList"></div>
+      </section>
+
+      <section class="console-card scanner-card">
+        <div class="card-header scanner-header">
+          <div class="header-title-wrapper">
+            <div class="header-icon-box">
+              <i class="fa-solid fa-microchip"></i>
+            </div>
+            <div>
+              <p class="card-label">Điều khiển thiết bị</p>
+              <h2>Bảng điều khiển máy quét</h2>
+            </div>
+          </div>
+          <div class="scan-badge" id="scanBadge">Chờ</div>
+        </div>
+
+        <div class="scanner-stage" id="scannerStage">
+          <div class="scanner-ring"></div>
+          <div class="scanner-bed"></div>
+          <img id="slicePreview" class="slice-preview" alt="Xem trước lát cắt MRI" />
+          <div class="stage-overlay">
+            <div class="stage-title" id="stageTitle">Chưa có ca đang thu nhận</div>
+            <div class="stage-subtitle" id="stageSubtitle">Chọn ca bệnh để bắt đầu mô phỏng lát cắt.</div>
+          </div>
+        </div>
+
+        <div class="progress-block">
+          <div class="progress-head">
+            <span id="progressLabel">0 / 0 lát cắt</span>
+            <span id="timerLabel">00:00</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="scanProgressBar"></div>
+          </div>
+        </div>
+
+        <div class="telemetry-grid">
+          <div class="telemetry-card">
+            <span class="metric-label">Mã bệnh nhân</span>
+            <strong id="patientIdValue">--</strong>
+          </div>
+          <div class="telemetry-card">
+            <span class="metric-label">Giao thức</span>
+            <strong id="protocolValue">--</strong>
+          </div>
+          <div class="telemetry-card">
+            <span class="metric-label">Ma trận ảnh</span>
+            <strong id="matrixValue">256 x 256</strong>
+          </div>
+          <div class="telemetry-card">
+            <span class="metric-label">Thời gian</span>
+            <strong id="intervalValue">500 ms</strong>
+          </div>
+        </div>
+
+        <div class="control-actions">
+          <button class="primary-btn" id="startScanBtn" type="button">
+            <i class="fa-solid fa-play"></i>
+            Bắt đầu chụp
+          </button>
+          <button class="danger-btn" id="stopScanBtn" type="button" disabled>
+            <i class="fa-solid fa-stop"></i>
+            Dừng lại
+          </button>
+          <button class="ghost-btn" id="generateFilmBtn" type="button" style="display:none">
+            <i class="fa-solid fa-film"></i>
+            Xuất phim
+          </button>
+        </div>
+      </section>
+
+      <section class="console-card telemetry-panel">
+        <div class="card-header telemetry-header">
+          <div class="header-title-wrapper">
+            <div class="header-icon-box">
+              <i class="fa-solid fa-sliders"></i>
+            </div>
+            <div>
+              <p class="card-label">Cài đặt chuỗi xung</p>
+              <h2>Thông số kỹ thuật</h2>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-grid">
+          <label class="field">
+            <span>Giao thức (Protocol)</span>
+            <select id="protocolPreset">
+              <option value="T2-FLAIR">T2-FLAIR</option>
+              <option value="T1-POST">T1-POST</option>
+              <option value="DWI-ADC">DWI-ADC</option>
+              <option value="T2-AXIAL">T2-AXIAL</option>
+              <option value="SWI-HEMO">SWI-HEMO</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Khoảng cách lát cắt (ms)</span>
+            <input id="sliceIntervalInput" type="number" min="200" max="1500" step="100" value="500" />
+          </label>
+          <label class="field">
+            <span>Thời gian lặp TR (ms)</span>
+            <input id="trInput" type="number" min="100" max="6000" step="50" value="4800" />
+          </label>
+          <label class="field">
+            <span>Thời gian dội TE (ms)</span>
+            <input id="teInput" type="number" min="10" max="300" step="5" value="124" />
+          </label>
+          <label class="field">
+            <span>Độ dày lát cắt (mm)</span>
+            <input id="thicknessInput" type="number" min="1" max="8" step="0.5" value="4.5" />
+          </label>
+          <label class="field">
+            <span>Cuộn cảm (Coil)</span>
+            <select id="coilInput">
+              <option value="Head/Neck 20ch">Đầu/Cổ 20 kênh</option>
+              <option value="Head 32ch">Đầu 32 kênh</option>
+              <option value="Neurovascular 16ch">Thần kinh mạch máu 16 kênh</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Tâm cửa sổ (Window center)</span>
+            <input id="windowCenterInput" type="number" min="50" max="500" step="10" value="180" />
+          </label>
+          <label class="field">
+            <span>Độ rộng cửa sổ (Window width)</span>
+            <input id="windowWidthInput" type="number" min="100" max="1200" step="20" value="760" />
+          </label>
+        </div>
+
+        <label class="toggle-row">
+          <input id="audioToggle" type="checkbox" checked />
+          <span>Phát âm thanh beep mỗi khi gửi lát cắt</span>
+        </label>
+
+        <div class="log-card">
+          <div class="log-head">
+            <span>Nhật ký hoạt động</span>
+            <span id="socketStateText">Đang kết nối</span>
+          </div>
+          <div class="log-list" id="eventLog"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ===== Image Picker Modal ===== -->
+  <div class="img-picker-overlay" id="imgPickerOverlay" role="dialog" aria-modal="true"
+    aria-labelledby="imgPickerTitle">
+    <div class="img-picker-modal">
+
+      <div class="img-picker-header">
+        <div>
+          <p class="card-label">Chọn ảnh MRI tùy chỉnh</p>
+          <h2 id="imgPickerTitle" id="imgPickerCaseTitle">Ca bệnh</h2>
+        </div>
+        <button class="icon-btn" id="imgPickerCloseBtn" type="button" title="Đóng">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="img-picker-dropzone" id="imgPickerDropzone">
+        <div class="dropzone-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+        <p class="dropzone-text">Kéo &amp; thả ảnh vào đây</p>
+        <p class="dropzone-hint">hoặc nhấn nút bên dưới để duyệt file</p>
+        <label class="pick-files-label" for="imgPickerInput">
+          <i class="fa-solid fa-folder-open"></i>
+          Duyệt file ảnh
+        </label>
+        <input type="file" id="imgPickerInput" accept="image/png,image/jpeg,image/jpg" multiple />
+        <p class="dropzone-hint">Hỗ trợ PNG, JPG. Chọn nhiều ảnh cùng lúc.</p>
+      </div>
+
+      <div class="img-picker-stats" id="imgPickerStats" style="display:none">
+        <span id="imgPickerCountLabel">0 ảnh đã chọn</span>
+        <button class="clear-all-btn" id="imgPickerClearBtn" type="button">
+          <i class="fa-solid fa-trash-can"></i> Xóa tất cả
+        </button>
+      </div>
+
+      <div class="img-picker-thumbnails" id="imgPickerThumbnails"></div>
+
+      <div class="img-picker-footer">
+        <button class="ghost-cancel-btn" id="imgPickerCancelBtn" type="button">Hủy</button>
+        <button class="primary-btn" id="imgPickerConfirmBtn" type="button" disabled>
+          <i class="fa-solid fa-check-circle"></i>
+          Áp dụng <span id="imgPickerConfirmCount"></span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== Batch Image Picker Modal ===== -->
+  <div class="img-picker-overlay" id="batchPickerOverlay" role="dialog" aria-modal="true"
+    aria-labelledby="batchPickerTitle">
+    <div class="img-picker-modal batch-picker-modal">
+
+      <div class="img-picker-header">
+        <div>
+          <p class="card-label">Thay thế ảnh hàng loạt</p>
+          <h2 id="batchPickerTitle">Gán ảnh riêng cho từng ca bệnh</h2>
+        </div>
+        <button class="icon-btn" id="batchPickerCloseBtn" type="button" title="Đóng">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="batch-picker-toolbar">
+        <p class="batch-hint">Nhấn vào từng ô để chọn ảnh, hoặc kéo thả vào. Chọn nhiều ảnh cùng lúc để điền tự động
+          theo thứ tự.</p>
+        <label class="pick-files-label" for="batchAllInput">
+          <i class="fa-solid fa-images"></i>
+          Chọn tất cả cùng lúc
+        </label>
+        <input type="file" id="batchAllInput" accept="image/png,image/jpeg,image/jpg" multiple />
+      </div>
+
+      <div class="batch-slots-grid" id="batchSlotsGrid"></div>
+
+      <div class="img-picker-footer">
+        <span id="batchPickerStatus" class="batch-status">Chưa có ảnh nào được gán</span>
+        <div style="display:flex;gap:12px;">
+          <button class="ghost-cancel-btn" id="batchPickerCancelBtn" type="button">Hủy</button>
+          <button class="primary-btn" id="batchPickerConfirmBtn" type="button" disabled>
+            <i class="fa-solid fa-check-circle"></i>
+            Áp dụng tất cả
+          </button>
+        </div>
+      </div>
+
+    </div>
+    </div>
+  </div>
+
+  <!-- ===== Notice Modal (Professional Popup) ===== -->
+  <div class="notice-overlay" id="noticeOverlay" role="dialog" aria-modal="true">
+    <div class="notice-modal">
+      <div class="notice-icon" id="noticeIcon">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      <h2 id="noticeTitle">Thông báo</h2>
+      <p id="noticeMessage">Nội dung thông báo sẽ xuất hiện ở đây.</p>
+      <div class="notice-footer">
+        <button class="primary-btn" id="noticeCloseBtn" type="button">Đồng ý</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="mri_modality.js"></script>
+</body>
+
+</html>
